@@ -39,10 +39,9 @@ function NavLinks({
   return (
     <nav className="flex flex-col gap-1 px-2">
       {items.map((item) => {
-        const active =
-          pathname === item.href ||
-          (item.href !== `/dashboard/${item.href.split("/")[2]}` &&
-            pathname.startsWith(item.href));
+        const active = item.exact
+          ? pathname === item.href
+          : pathname === item.href || pathname.startsWith(item.href + "/");
         return (
           <Link
             key={item.href}

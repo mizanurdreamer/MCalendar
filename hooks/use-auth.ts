@@ -7,9 +7,9 @@ import type { UserView } from "@/models/view";
 import type { LoginDTO, RegisterDTO } from "@/dto/auth.dto";
 
 const dashboardPath: Record<UserView["role"], string> = {
-  SUPER_ADMIN: "/dashboard/super-admin",
-  CLIENT: "/dashboard/client",
-  CLEANER: "/dashboard/cleaner",
+  SUPER_ADMIN: "/admin/dashboard",
+  CLIENT: "/client/today",
+  CLEANER: "/cleaner/today",
 };
 
 export function useMe() {

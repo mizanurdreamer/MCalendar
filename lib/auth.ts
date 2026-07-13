@@ -87,11 +87,11 @@ export async function requireActor(...roles: Role[]): Promise<ActorContext> {
 export function dashboardPathForRole(role: Role): string {
   switch (role) {
     case "SUPER_ADMIN":
-      return "/dashboard/super-admin";
+      return "/admin/dashboard";
     case "CLEANER":
-      return "/dashboard/cleaner";
+      return "/cleaner/today";
     case "CLIENT":
     default:
-      return "/dashboard/client";
+      return "/client/today";
   }
 }

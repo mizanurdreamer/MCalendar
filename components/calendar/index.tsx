@@ -7,14 +7,14 @@ import {
   CALENDAR_EVENTS,
   UPCOMING_CLEANINGS,
 } from "@/dto/booking-calendar";
-import { CalendarToolbar } from "@/components/booking-calendar/calendar-toolbar";
+import { CalendarToolbar } from "@/components/calendar/calendar-toolbar";
 import {
   CalendarGrid,
   moveCalendar,
   changeCalendarView,
   type CalendarViewMode,
-} from "@/components/booking-calendar/calendar-grid";
-import { UpcomingCleanings } from "@/components/booking-calendar/upcoming-cleanings";
+} from "@/components/calendar/calendar-grid";
+import { UpcomingCleanings } from "@/components/calendar/upcoming-cleanings";
 
 export function BookingCalendar() {
   const calendarRef = useRef<FullCalendar | null>(null);

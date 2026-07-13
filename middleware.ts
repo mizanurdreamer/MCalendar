@@ -9,18 +9,27 @@ import type { Role } from "@prisma/client";
  */
 
 const ROLE_HOME: Record<Role, string> = {
-  SUPER_ADMIN: "/dashboard/super-admin",
-  CLIENT: "/dashboard/client",
-  CLEANER: "/dashboard/cleaner",
+  SUPER_ADMIN: "/admin/dashboard",
+  CLIENT: "/client/today",
+  CLEANER: "/cleaner/today",
 };
 
 const ROLE_PREFIX: Record<Role, string> = {
-  SUPER_ADMIN: "/dashboard/super-admin",
-  CLIENT: "/dashboard/client",
-  CLEANER: "/dashboard/cleaner",
+  SUPER_ADMIN: "/admin",
+  CLIENT: "/client",
+  CLEANER: "/cleaner",
 };
 
 const AUTH_PAGES = ["/login", "/register"];
+
+const PUBLIC_PREFIXES = ["/_next", "/api", "/icon.svg", "/favicon.ico"];
+
+function isPublic(pathname: string): boolean {
+  if (AUTH_PAGES.includes(pathname)) return true;
+  return PUBLIC_PREFIXES.some(
+    (p) => pathname === p || pathname.startsWith(p + "/") || pathname.startsWith(p),
+  );
+}
 
 async function readRole(req: NextRequest): Promise<Role | null> {
   const token = req.cookies.get(ACCESS_COOKIE)?.value;
@@ -33,11 +42,17 @@ async function readRole(req: NextRequest): Promise<Role | null> {
   }
 }
 
+function toLogin(req: NextRequest, pathname: string) {
+  const loginUrl = new URL("/login", req.url);
+  loginUrl.searchParams.set("redirect", pathname);
+  return NextResponse.redirect(loginUrl);
+}
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const role = await readRole(req);
 
-  // Signed-in users shouldn't sit on the login/register pages.
+  // Login/register must stay reachable for everyone (sign-in would loop otherwise).
   if (AUTH_PAGES.includes(pathname)) {
     if (role) {
       return NextResponse.redirect(new URL(ROLE_HOME[role], req.url));
@@ -45,17 +60,27 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  if (pathname.startsWith("/dashboard")) {
-    if (!role) {
-      const loginUrl = new URL("/login", req.url);
-      loginUrl.searchParams.set("redirect", pathname);
-      return NextResponse.redirect(loginUrl);
+  // Public assets / API are not gated here (APIs return JSON 401/403).
+  if (isPublic(pathname)) return NextResponse.next();
+
+  // Unauthenticated → login (preserving the intended destination).
+  if (!role) {
+    return toLogin(req, pathname);
+  }
+
+  // Authenticated users: bare role root → its home screen.
+  const matchedPrefix = (Object.keys(ROLE_PREFIX) as Role[]).find(
+    (r) => pathname === ROLE_PREFIX[r] || pathname.startsWith(ROLE_PREFIX[r] + "/"),
+  );
+
+  if (matchedPrefix) {
+    // Bare role root (e.g. /client) → its dashboard/today.
+    if (pathname === ROLE_PREFIX[role]) {
+      return NextResponse.redirect(new URL(ROLE_HOME[role], req.url));
     }
 
     // Keep each role within its own section.
-    const allowedPrefix = ROLE_PREFIX[role];
-    const isBareDashboard = pathname === "/dashboard" || pathname === "/dashboard/";
-    if (isBareDashboard || !pathname.startsWith(allowedPrefix)) {
+    if (pathname !== ROLE_HOME[role] && !pathname.startsWith(ROLE_PREFIX[role] + "/")) {
       return NextResponse.redirect(new URL(ROLE_HOME[role], req.url));
     }
   }
@@ -64,5 +89,9 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/login", "/register"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|icon.svg).*)",
+    "/login",
+    "/register",
+  ],
 };

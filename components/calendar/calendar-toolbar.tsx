@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { PROPERTIES, type PropertyFilter } from "@/dto/booking-calendar";
-import type { CalendarViewMode } from "@/components/booking-calendar/calendar-grid";
+import type { CalendarViewMode } from "@/components/calendar/calendar-grid";
 
 type Direction = "prev" | "next";
 

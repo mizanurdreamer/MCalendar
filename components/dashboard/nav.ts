@@ -1,32 +1,40 @@
 import type { LucideIcon } from "lucide-react";
-import { LayoutDashboard, Users, Sparkles, Sun, Link2 } from "lucide-react";
+import {
+  LayoutDashboard,
+  Users,
+  Sparkles,
+  Sun,
+  Link2,
+  CalendarDays,
+} from "lucide-react";
 import type { Role } from "@/models/view";
 
 export type NavItem = {
   label: string;
   href: string;
   icon: LucideIcon;
+  exact?: boolean;
 };
 
 const SUPER_ADMIN_NAV: NavItem[] = [
-  { label: "Overview", href: "/dashboard/super-admin", icon: LayoutDashboard },
-  { label: "Clients", href: "/dashboard/super-admin/clients", icon: Users },
-  { label: "Cleaners", href: "/dashboard/super-admin/cleaners", icon: Sparkles },
+  { label: "Overview", href: "/admin/dashboard", icon: LayoutDashboard, exact: true },
+  { label: "Clients", href: "/admin/clients", icon: Users },
+  { label: "Cleaners", href: "/admin/cleaners", icon: Sparkles },
 ];
 
 const CLIENT_NAV: NavItem[] = [
-  { label: "Today", href: "/dashboard/client", icon: Sun },
-  { label: "Cleaners", href: "/dashboard/client/cleaners", icon: Sparkles },
+  { label: "Today", href: "/client/today", icon: Sun, exact: true },
+  { label: "Calendar", href: "/client/calendar", icon: CalendarDays },
   {
     label: "Booking Endpoints",
-    href: "/dashboard/client/booking-endpoints",
+    href: "/client/booking-endpoints",
     icon: Link2,
   },
-  { label: "Calendar", href: "/dashboard/client/calendar", icon: CalendarDays },
+  { label: "Cleaners", href: "/client/cleaners", icon: Sparkles }
 ];
 
 const CLEANER_NAV: NavItem[] = [
-  { label: "Overview", href: "/dashboard/cleaner", icon: LayoutDashboard },
+  { label: "Today", href: "/cleaner/today", icon: Sun, exact: true },
 ];
 
 export const NAV_BY_ROLE: Record<Role, NavItem[]> = {

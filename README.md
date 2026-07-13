@@ -23,10 +23,11 @@ This is the easiest way to run the full stack.
 
 ```bash
 # 1. Start PostgreSQL and the app
+#    Database migrations are applied automatically on app startup.
 docker compose up -d
 
-# 2. Run migrations and seed the database
-docker compose run setup
+# 2. (First run only) Seed the initial super admin account manually
+docker compose exec app node prisma/seed.mjs
 
 # 3. Open http://localhost:3000
 ```
@@ -42,7 +43,8 @@ To reset the database:
 ```bash
 docker compose down -v
 docker compose up -d
-docker compose run setup
+# Re-seed after a reset
+docker compose exec app node prisma/seed.mjs
 ```
 
 ### Option 2: Local Development
@@ -115,7 +117,7 @@ bookingCalendar/
 ├── lib/                    # Shared utilities (auth, JWT, errors, API client)
 ├── prisma/                 # Schema, migrations, seed
 ├── Dockerfile              # Multi-stage production build
-└── docker-compose.yml      # PostgreSQL + app + setup
+└── docker-compose.yml      # PostgreSQL + app
 ```
 
 ## API Endpoints
@@ -139,10 +141,12 @@ bookingCalendar/
 npm run build
 npm start
 
-# Docker build
+# Docker build (migrations run automatically on startup)
 docker compose build
 docker compose up -d
-docker compose run setup
+
+# Seed the initial super admin (first run only)
+docker compose exec app node prisma/seed.mjs
 ```
 
 ## License

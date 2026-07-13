@@ -33,9 +33,6 @@ export default async function LandingPage() {
             <Button variant="ghost" asChild>
               <Link href="/login">Sign in</Link>
             </Button>
-            <Button asChild>
-              <Link href="/register">Get started</Link>
-            </Button>
           </div>
         </div>
       </header>
@@ -52,11 +49,8 @@ export default async function LandingPage() {
           organized in one place.
         </p>
         <div className="mt-8 flex gap-3">
-          <Button size="lg" asChild>
-            <Link href="/register">Create an account</Link>
-          </Button>
           <Button size="lg" variant="outline" asChild>
-            <Link href="/login">I already have an account</Link>
+            <Link href="/login">Sign in</Link>
           </Button>
         </div>
 
