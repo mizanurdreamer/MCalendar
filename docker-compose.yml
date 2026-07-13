@@ -1,0 +1,55 @@
+services:
+  db:
+    container_name: bookingCalendar-db
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: bookingcalendar
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    container_name: bookingCalendar-app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: bookingcalendar-app:latest
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: "postgresql://postgres:postgres@db:5432/bookingcalendar?schema=public"
+      JWT_ACCESS_SECRET: "prod-access-secret-change-me-in-production-32chars!!"
+      JWT_REFRESH_SECRET: "prod-refresh-secret-change-me-in-production-32chars!!"
+      JWT_ACCESS_TTL: "15m"
+      JWT_REFRESH_TTL: "7d"
+      NODE_ENV: "production"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # One-off service to run migrations + seed
+  setup:
+    container_name: bookingCalendar-setup
+    image: bookingcalendar-app:latest
+    environment:
+      DATABASE_URL: "postgresql://postgres:postgres@db:5432/bookingcalendar?schema=public"
+      JWT_ACCESS_SECRET: "prod-access-secret-change-me-in-production-32chars!!"
+      JWT_REFRESH_SECRET: "prod-refresh-secret-change-me-in-production-32chars!!"
+      NODE_ENV: "production"
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: ["sh", "-c", "npx prisma migrate deploy && npx tsx prisma/seed.ts"]
+
+volumes:
+  pgdata:
