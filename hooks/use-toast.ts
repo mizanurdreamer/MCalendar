@@ -49,9 +49,7 @@ export function toast(props: Omit<ToasterToast, "id">) {
     });
   const dismiss = () =>
     dispatch({
-      toasts: memoryState.toasts.map((t) =>
-        t.id === id ? { ...t, open: false } : t,
-      ),
+      toasts: memoryState.toasts.map((t) => (t.id === id ? { ...t, open: false } : t)),
     });
 
   dispatch({

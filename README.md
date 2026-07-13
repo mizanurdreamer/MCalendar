@@ -81,22 +81,22 @@ npm run db:seed            # Seed demo data
 
 ## Demo Accounts
 
-| Role | Email | Password |
-|------|-------|----------|
-| Super Admin | admin@bookingcalendar.com | Password123! |
-| Client | client@bookingcalendar.com | Password123! |
-| Cleaner | cleaner@bookingcalendar.com | Password123! |
+| Role        | Email                       | Password     |
+| ----------- | --------------------------- | ------------ |
+| Super Admin | admin@bookingcalendar.com   | Password123! |
+| Client      | client@bookingcalendar.com  | Password123! |
+| Cleaner     | cleaner@bookingcalendar.com | Password123! |
 
 ## Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://postgres:postgres@localhost:5432/bookingcalendar?schema=public` |
-| `JWT_ACCESS_SECRET` | Secret for signing access tokens | (dev fallback) |
-| `JWT_REFRESH_SECRET` | Secret for signing refresh tokens | (dev fallback) |
-| `JWT_ACCESS_TTL` | Access token lifetime | `15m` |
-| `JWT_REFRESH_TTL` | Refresh token lifetime | `7d` |
-| `NODE_ENV` | Environment mode | `development` |
+| Variable             | Description                       | Default                                                                       |
+| -------------------- | --------------------------------- | ----------------------------------------------------------------------------- |
+| `DATABASE_URL`       | PostgreSQL connection string      | `postgresql://postgres:postgres@localhost:5432/bookingcalendar?schema=public` |
+| `JWT_ACCESS_SECRET`  | Secret for signing access tokens  | (dev fallback)                                                                |
+| `JWT_REFRESH_SECRET` | Secret for signing refresh tokens | (dev fallback)                                                                |
+| `JWT_ACCESS_TTL`     | Access token lifetime             | `15m`                                                                         |
+| `JWT_REFRESH_TTL`    | Refresh token lifetime            | `7d`                                                                          |
+| `NODE_ENV`           | Environment mode                  | `development`                                                                 |
 
 ## Project Structure
 
@@ -120,17 +120,17 @@ bookingCalendar/
 
 ## API Endpoints
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/auth/register` | Create account |
-| POST | `/api/auth/login` | Sign in |
-| POST | `/api/auth/logout` | Sign out |
-| POST | `/api/auth/refresh` | Refresh tokens |
-| GET | `/api/auth/me` | Current user |
-| GET/POST | `/api/users` | List / create users |
-| GET/PATCH/DELETE | `/api/users/[id]` | User CRUD |
-| GET | `/api/users/cleaners` | List cleaners |
-| GET | `/api/users/clients` | List clients |
+| Method           | Endpoint              | Description         |
+| ---------------- | --------------------- | ------------------- |
+| POST             | `/api/auth/register`  | Create account      |
+| POST             | `/api/auth/login`     | Sign in             |
+| POST             | `/api/auth/logout`    | Sign out            |
+| POST             | `/api/auth/refresh`   | Refresh tokens      |
+| GET              | `/api/auth/me`        | Current user        |
+| GET/POST         | `/api/users`          | List / create users |
+| GET/PATCH/DELETE | `/api/users/[id]`     | User CRUD           |
+| GET              | `/api/users/cleaners` | List cleaners       |
+| GET              | `/api/users/clients`  | List clients        |
 
 ## Building for Production
 

@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import { LayoutDashboard, Users, Sun, Link2 } from "lucide-react";
 import { LayoutDashboard, Users, CalendarDays, Sun } from "lucide-react";
 import type { Role } from "@/models/view";
 
@@ -14,7 +15,12 @@ const SUPER_ADMIN_NAV: NavItem[] = [
 ];
 
 const CLIENT_NAV: NavItem[] = [
-  { label: "Today", href: "/dashboard/client/today", icon: Sun },
+  { label: "Today", href: "/dashboard/client", icon: Sun },
+  {
+    label: "Booking Endpoints",
+    href: "/dashboard/client/booking-endpoints",
+    icon: Link2,
+  },
   { label: "Calendar", href: "/dashboard/client/calendar", icon: CalendarDays },
 ];
 

@@ -33,7 +33,9 @@ function randomId(len = 16): string {
 }
 
 export class AuthService {
-  private async issueTokens(user: User): Promise<{ accessToken: string; refreshToken: string }> {
+  private async issueTokens(
+    user: User,
+  ): Promise<{ accessToken: string; refreshToken: string }> {
     const accessToken = await signAccessToken({
       sub: user.id,
       email: user.email,

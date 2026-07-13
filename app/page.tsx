@@ -48,8 +48,8 @@ export default async function LandingPage() {
           Run your rental cleaning operation from a single hub
         </h1>
         <p className="mt-4 max-w-2xl text-muted-foreground">
-          bookingCalendar connects administrators and team members so
-          operations stay organized in one place.
+          bookingCalendar connects administrators and team members so operations stay
+          organized in one place.
         </p>
         <div className="mt-8 flex gap-3">
           <Button size="lg" asChild>

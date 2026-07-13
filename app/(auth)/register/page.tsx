@@ -80,7 +80,9 @@ export default function RegisterPage() {
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input id="email" type="email" {...register("email")} />
-            {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+            {errors.email && (
+              <p className="text-xs text-destructive">{errors.email.message}</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="phone">Phone (optional)</Label>
@@ -95,7 +97,10 @@ export default function RegisterPage() {
           </div>
           <div className="space-y-2">
             <Label>I am a…</Label>
-            <Select value={role} onValueChange={(v) => setValue("role", v as RegisterDTO["role"])}>
+            <Select
+              value={role}
+              onValueChange={(v) => setValue("role", v as RegisterDTO["role"])}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>

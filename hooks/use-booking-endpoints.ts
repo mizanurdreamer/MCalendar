@@ -2,42 +2,45 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
-import type { Paginated, UserView } from "@/models/view";
+import type { BookingEndpointView, Paginated } from "@/models/view";
 
-const KEY = "users";
+const KEY = "booking-endpoints";
 
-export function useUsers(params: { page?: number; search?: string; role?: string } = {}) {
+export function useBookingEndpoints(params: { page?: number; search?: string } = {}) {
   const query = new URLSearchParams();
   query.set("page", String(params.page ?? 1));
   if (params.search) query.set("search", params.search);
-  if (params.role) query.set("role", params.role);
   return useQuery({
     queryKey: [KEY, params],
-    queryFn: () => api.get<Paginated<UserView>>(`/api/users?${query.toString()}`),
+    queryFn: () =>
+      api.get<Paginated<BookingEndpointView>>(
+        `/api/booking-endpoints?${query.toString()}`,
+      ),
   });
 }
 
-export function useCreateUser() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (body: Record<string, unknown>) => api.post<UserView>("/api/users", body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: [KEY] }),
-  });
-}
-
-export function useUpdateUser(id: string) {
+export function useCreateBookingEndpoint() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: Record<string, unknown>) =>
-      api.patch<UserView>(`/api/users/${id}`, body),
+      api.post<BookingEndpointView>("/api/booking-endpoints", body),
     onSuccess: () => qc.invalidateQueries({ queryKey: [KEY] }),
   });
 }
 
-export function useDeleteUser() {
+export function useUpdateBookingEndpoint(id: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api.del(`/api/users/${id}`),
+    mutationFn: (body: Record<string, unknown>) =>
+      api.patch<BookingEndpointView>(`/api/booking-endpoints/${id}`, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [KEY] }),
+  });
+}
+
+export function useDeleteBookingEndpoint() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.del(`/api/booking-endpoints/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: [KEY] }),
   });
 }

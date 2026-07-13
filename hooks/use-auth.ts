@@ -37,7 +37,8 @@ export function useRegister() {
   const router = useRouter();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (dto: RegisterDTO) => api.post<{ user: UserView }>("/api/auth/register", dto),
+    mutationFn: (dto: RegisterDTO) =>
+      api.post<{ user: UserView }>("/api/auth/register", dto),
     onSuccess: ({ user }) => {
       qc.setQueryData(["me"], user);
       router.replace(dashboardPath[user.role]);

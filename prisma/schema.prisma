@@ -36,6 +36,7 @@ model User {
 
   // Relations
   refreshTokens     RefreshToken[]
+  bookingEndpoints  ClientBookingEndpoint[]
 
   // Audit + soft delete
   createdAt DateTime  @default(now())
@@ -60,4 +61,24 @@ model RefreshToken {
 
   @@index([userId])
   @@map("refresh_tokens")
+}
+
+model ClientBookingEndpoint {
+  id       String  @id @default(uuid()) @db.Uuid
+  clientId String  @db.Uuid
+  client   User    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name     String
+  url      String
+  isActive Boolean @default(true)
+
+  // Audit + soft delete
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  createdBy String?   @db.Uuid
+  updatedBy String?   @db.Uuid
+  deletedAt DateTime?
+
+  @@index([clientId])
+  @@index([deletedAt])
+  @@map("ClientBookingEndpoints")
 }

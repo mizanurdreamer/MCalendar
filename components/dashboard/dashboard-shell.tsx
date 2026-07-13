@@ -126,12 +126,7 @@ export function DashboardShell({
 
           <div className="flex flex-col gap-1">
             {bottomNav && (
-              <div
-                className={cn(
-                  "pb-1",
-                  collapsed ? "flex justify-center" : "px-2",
-                )}
-              >
+              <div className={cn("pb-1", collapsed ? "flex justify-center" : "px-2")}>
                 {bottomNav}
               </div>
             )}
@@ -140,9 +135,7 @@ export function DashboardShell({
             <button
               className={cn(
                 "flex items-center rounded-lg text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                collapsed
-                  ? "justify-center px-2 py-2.5"
-                  : "mx-2 gap-3 px-3 py-2.5",
+                collapsed ? "justify-center px-2 py-2.5" : "mx-2 gap-3 px-3 py-2.5",
               )}
               title={collapsed ? "Dark mode" : undefined}
             >
@@ -178,7 +171,10 @@ export function DashboardShell({
       {/* Mobile sidebar */}
       {mobileOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setMobileOpen(false)}
+          />
           <aside className="absolute left-0 top-0 flex h-full w-60 flex-col border-r bg-background">
             <div className="flex h-14 items-center justify-between border-b px-4">
               <span className="flex items-center gap-2.5">
@@ -192,7 +188,11 @@ export function DashboardShell({
               </Button>
             </div>
             <div className="flex-1 py-3">
-              <NavLinks items={items} collapsed={false} onNavigate={() => setMobileOpen(false)} />
+              <NavLinks
+                items={items}
+                collapsed={false}
+                onNavigate={() => setMobileOpen(false)}
+              />
             </div>
           </aside>
         </div>
@@ -231,11 +231,16 @@ export function DashboardShell({
                   <span>
                     {user.firstName} {user.lastName}
                   </span>
-                  <span className="text-xs font-normal text-muted-foreground">{user.email}</span>
+                  <span className="text-xs font-normal text-muted-foreground">
+                    {user.email}
+                  </span>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => logout.mutate()} className="text-destructive">
+              <DropdownMenuItem
+                onClick={() => logout.mutate()}
+                className="text-destructive"
+              >
                 <LogOut className="h-4 w-4" />
                 Sign out
               </DropdownMenuItem>
