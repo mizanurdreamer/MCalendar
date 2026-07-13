@@ -1,7 +1,7 @@
 import type { Role } from "@prisma/client";
 import { userRepository } from "@/repositories/UserRepository";
 import { hashPassword } from "@/lib/password";
-import { ConflictError, NotFoundError } from "@/lib/errors";
+import { ConflictError, ForbiddenError, NotFoundError } from "@/lib/errors";
 import { toPublicUser, type PublicUser } from "@/services/AuthService";
 import type { CreateUserDTO, UpdateUserDTO } from "@/dto/user.dto";
 import type { ActorContext, Paginated } from "@/models";
@@ -60,11 +60,17 @@ export class UserService {
     const existing = await userRepository.findById(id);
     if (!existing) throw new NotFoundError("User not found");
 
+    // Non-admins (clients) may only manage cleaner accounts and cannot change roles.
+    const isAdmin = actor.role === "SUPER_ADMIN";
+    if (!isAdmin && !(actor.role === "CLIENT" && existing.role === "CLEANER")) {
+      throw new ForbiddenError();
+    }
+
     const user = await userRepository.update(id, {
       firstName: dto.firstName,
       lastName: dto.lastName,
       phone: dto.phone === "" ? null : dto.phone,
-      role: dto.role,
+      role: isAdmin ? dto.role : undefined,
       isActive: dto.isActive,
       updatedBy: actor.userId,
     });
@@ -75,6 +81,15 @@ export class UserService {
   async remove(id: string, actor: ActorContext): Promise<void> {
     const existing = await userRepository.findById(id);
     if (!existing) throw new NotFoundError("User not found");
+
+    // Non-admins (clients) may only delete cleaner accounts.
+    if (
+      actor.role !== "SUPER_ADMIN" &&
+      !(actor.role === "CLIENT" && existing.role === "CLEANER")
+    ) {
+      throw new ForbiddenError();
+    }
+
     await userRepository.softDelete(id, actor.userId);
   }
 

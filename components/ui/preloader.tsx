@@ -37,12 +37,7 @@ export function Preloader({
         <div className="absolute inset-0 rounded-full border-4 border-muted" />
         <div className="absolute inset-0 animate-spin rounded-full border-4 border-transparent border-t-primary" />
       </div>
-      <div className="flex items-center gap-2.5">
-        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-xs font-bold text-primary-foreground">
-          b
-        </div>
-        <span className="text-sm font-medium text-muted-foreground">{label}</span>
-      </div>
+      <span className="text-sm font-medium text-muted-foreground">{label}</span>
     </div>
   );
 }

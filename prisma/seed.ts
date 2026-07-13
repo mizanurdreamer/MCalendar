@@ -12,7 +12,7 @@ async function main() {
 
   const password = await hash("Password123!");
 
-  const admin = await prisma.user.upsert({
+  await prisma.user.upsert({
     where: { email: "admin@bookingcalendar.com" },
     update: {},
     create: {
@@ -24,36 +24,8 @@ async function main() {
     },
   });
 
-  const client = await prisma.user.upsert({
-    where: { email: "client@bookingcalendar.com" },
-    update: {},
-    create: {
-      email: "client@bookingcalendar.com",
-      passwordHash: password,
-      firstName: "Chris",
-      lastName: "Client",
-      phone: "+1 555 0100",
-      role: "CLIENT",
-    },
-  });
-
-  const cleaner = await prisma.user.upsert({
-    where: { email: "cleaner@bookingcalendar.com" },
-    update: {},
-    create: {
-      email: "cleaner@bookingcalendar.com",
-      passwordHash: password,
-      firstName: "Cleo",
-      lastName: "Cleaner",
-      phone: "+1 555 0200",
-      role: "CLEANER",
-    },
-  });
-
   console.log("✅ Seed complete.");
   console.log("   Super Admin: admin@bookingcalendar.com / Password123!");
-  console.log("   Client:      client@bookingcalendar.com / Password123!");
-  console.log("   Cleaner:     cleaner@bookingcalendar.com / Password123!");
 }
 
 main()

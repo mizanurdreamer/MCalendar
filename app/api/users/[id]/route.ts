@@ -20,7 +20,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 
 export async function PATCH(req: NextRequest, { params }: Ctx) {
   try {
-    const actor = await requireActor("SUPER_ADMIN");
+    const actor = await requireActor("SUPER_ADMIN", "CLIENT");
     const { id } = await params;
     const dto = updateUserSchema.parse(await req.json());
     const user = await userService.update(uuidSchema.parse(id), dto, actor);
@@ -32,7 +32,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
 
 export async function DELETE(_req: NextRequest, { params }: Ctx) {
   try {
-    const actor = await requireActor("SUPER_ADMIN");
+    const actor = await requireActor("SUPER_ADMIN", "CLIENT");
     const { id } = await params;
     await userService.remove(uuidSchema.parse(id), actor);
     return ok({ message: "User deleted" });

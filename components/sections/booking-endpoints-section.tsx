@@ -36,7 +36,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "@/hooks/use-toast";
-import { Field, EmptyRow, Pagination, msg } from "@/components/sections/shared-utils";
+import {
+  Field,
+  EmptyRow,
+  Pagination,
+  ConfirmDialog,
+  msg,
+} from "@/components/sections/shared-utils";
 import type { BookingEndpointView } from "@/models/view";
 
 export function BookingEndpointsSection() {
@@ -49,14 +55,17 @@ export function BookingEndpointsSection() {
     open: false,
   });
 
+  const [toDelete, setToDelete] = React.useState<BookingEndpointView | null>(null);
+
   const { data, isLoading } = useBookingEndpoints({ page, search });
   const del = useDeleteBookingEndpoint();
 
-  const onDelete = async (e: BookingEndpointView) => {
-    if (!confirm(`Delete "${e.name}"?`)) return;
+  const onConfirmDelete = async () => {
+    if (!toDelete) return;
     try {
-      await del.mutateAsync(e.id);
+      await del.mutateAsync(toDelete.id);
       toast({ title: "Endpoint deleted" });
+      setToDelete(null);
     } catch (err) {
       toast({ title: "Delete failed", description: msg(err), variant: "destructive" });
     }
@@ -119,7 +128,7 @@ export function BookingEndpointsSection() {
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => onDelete(e)}>
+                      <Button variant="ghost" size="icon" onClick={() => setToDelete(e)}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </TableCell>
@@ -141,6 +150,23 @@ export function BookingEndpointsSection() {
           onClose={() => setDialog({ open: false })}
         />
       )}
+
+      <ConfirmDialog
+        open={!!toDelete}
+        title="Delete endpoint?"
+        description={
+          toDelete ? (
+            <>
+              This will remove{" "}
+              <span className="font-medium text-foreground">{toDelete.name}</span>. This
+              action cannot be undone.
+            </>
+          ) : undefined
+        }
+        pending={del.isPending}
+        onConfirm={onConfirmDelete}
+        onClose={() => setToDelete(null)}
+      />
     </div>
   );
 }

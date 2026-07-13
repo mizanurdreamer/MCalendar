@@ -1,8 +1,17 @@
 "use client";
 
 import * as React from "react";
+import { Loader2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { ApiError } from "@/lib/api-client";
 
@@ -79,4 +88,47 @@ export function Pagination({
 
 export function msg(e: unknown) {
   return e instanceof ApiError ? e.message : "Something went wrong";
+}
+
+export function ConfirmDialog({
+  open,
+  title = "Are you sure?",
+  description,
+  confirmLabel = "Delete",
+  pending = false,
+  onConfirm,
+  onClose,
+}: {
+  open: boolean;
+  title?: string;
+  description?: React.ReactNode;
+  confirmLabel?: string;
+  pending?: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && !pending && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          {description && <DialogDescription>{description}</DialogDescription>}
+        </DialogHeader>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose} disabled={pending}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={onConfirm}
+            disabled={pending}
+          >
+            {pending && <Loader2 className="h-4 w-4 animate-spin" />}
+            {confirmLabel}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }

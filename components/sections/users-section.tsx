@@ -20,13 +20,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Table,
   TableBody,
   TableCell,
@@ -35,31 +28,59 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "@/hooks/use-toast";
-import { Field, EmptyRow, Pagination, msg } from "@/components/sections/shared-utils";
+import {
+  Field,
+  EmptyRow,
+  Pagination,
+  ConfirmDialog,
+  msg,
+} from "@/components/sections/shared-utils";
 import type { Role, UserView } from "@/models/view";
 
-const ROLES: Role[] = ["SUPER_ADMIN", "CLIENT", "CLEANER"];
-const ROLE_VARIANT: Record<Role, React.ComponentProps<typeof Badge>["variant"]> = {
-  SUPER_ADMIN: "default",
-  CLIENT: "info",
-  CLEANER: "success",
+type ManagedRole = Extract<Role, "CLIENT" | "CLEANER">;
+
+const COPY: Record<
+  ManagedRole,
+  { singular: string; plural: string; description: string }
+> = {
+  CLIENT: {
+    singular: "Client",
+    plural: "Clients",
+    description: "Manage client accounts.",
+  },
+  CLEANER: {
+    singular: "Cleaner",
+    plural: "Cleaners",
+    description: "Manage cleaner accounts.",
+  },
 };
 
-export function UsersSection() {
+export function UsersSection({
+  role,
+  canCreate = true,
+  canDelete = true,
+}: {
+  role: ManagedRole;
+  canCreate?: boolean;
+  canDelete?: boolean;
+}) {
+  const copy = COPY[role];
   const [page, setPage] = React.useState(1);
   const [search, setSearch] = React.useState("");
   const [dialog, setDialog] = React.useState<{ open: boolean; editing?: UserView }>({
     open: false,
   });
+  const [toDelete, setToDelete] = React.useState<UserView | null>(null);
 
-  const { data, isLoading } = useUsers({ page, search });
+  const { data, isLoading } = useUsers({ page, search, role });
   const del = useDeleteUser();
 
-  const onDelete = async (u: UserView) => {
-    if (!confirm(`Delete ${u.firstName} ${u.lastName}?`)) return;
+  const onConfirmDelete = async () => {
+    if (!toDelete) return;
     try {
-      await del.mutateAsync(u.id);
-      toast({ title: "User deleted" });
+      await del.mutateAsync(toDelete.id);
+      toast({ title: `${copy.singular} deleted` });
+      setToDelete(null);
     } catch (e) {
       toast({ title: "Delete failed", description: msg(e), variant: "destructive" });
     }
@@ -68,18 +89,20 @@ export function UsersSection() {
   return (
     <div>
       <PageHeader
-        title="Users"
-        description="Manage platform accounts and roles."
+        title={copy.plural}
+        description={copy.description}
         action={
-          <Button onClick={() => setDialog({ open: true })}>
-            <Plus className="h-4 w-4" /> New user
-          </Button>
+          canCreate ? (
+            <Button onClick={() => setDialog({ open: true })}>
+              <Plus className="h-4 w-4" /> New {copy.singular.toLowerCase()}
+            </Button>
+          ) : undefined
         }
       />
 
       <div className="mb-4 max-w-sm">
         <Input
-          placeholder="Search users…"
+          placeholder={`Search ${copy.plural.toLowerCase()}…`}
           value={search}
           onChange={(e) => {
             setPage(1);
@@ -95,8 +118,8 @@ export function UsersSection() {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Active</TableHead>
+                <TableHead>Phone</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -110,11 +133,7 @@ export function UsersSection() {
                       {u.firstName} {u.lastName}
                     </TableCell>
                     <TableCell>{u.email}</TableCell>
-                    <TableCell>
-                      <Badge variant={ROLE_VARIANT[u.role]}>
-                        {u.role.replace("_", " ")}
-                      </Badge>
-                    </TableCell>
+                    <TableCell>{u.phone ?? "—"}</TableCell>
                     <TableCell>
                       <Badge variant={u.isActive ? "success" : "muted"}>
                         {u.isActive ? "Active" : "Disabled"}
@@ -128,14 +147,20 @@ export function UsersSection() {
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => onDelete(u)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      {canDelete && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setToDelete(u)}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))
               ) : (
-                <EmptyRow colSpan={5}>No users found.</EmptyRow>
+                <EmptyRow colSpan={5}>No {copy.plural.toLowerCase()} found.</EmptyRow>
               )}
             </TableBody>
           </Table>
@@ -146,21 +171,44 @@ export function UsersSection() {
 
       {dialog.open && (
         <UserFormDialog
+          role={role}
           editing={dialog.editing}
           onClose={() => setDialog({ open: false })}
         />
       )}
+
+      <ConfirmDialog
+        open={!!toDelete}
+        title={`Delete ${copy.singular.toLowerCase()}?`}
+        description={
+          toDelete ? (
+            <>
+              This will remove{" "}
+              <span className="font-medium text-foreground">
+                {toDelete.firstName} {toDelete.lastName}
+              </span>
+              . This action cannot be undone.
+            </>
+          ) : undefined
+        }
+        pending={del.isPending}
+        onConfirm={onConfirmDelete}
+        onClose={() => setToDelete(null)}
+      />
     </div>
   );
 }
 
 function UserFormDialog({
+  role,
   editing,
   onClose,
 }: {
+  role: ManagedRole;
   editing?: UserView;
   onClose: () => void;
 }) {
+  const copy = COPY[role];
   const create = useCreateUser();
   const update = useUpdateUser(editing?.id ?? "");
 
@@ -182,10 +230,9 @@ function UserFormDialog({
           role: editing.role,
           isActive: editing.isActive,
         }
-      : { role: "CLIENT", isActive: true, password: "" },
+      : { role, isActive: true, password: "" },
   });
 
-  const role = watch("role");
   const isActive = watch("isActive");
 
   const onSubmit = async (values: CreateUserDTO) => {
@@ -198,10 +245,10 @@ function UserFormDialog({
           role: values.role,
           isActive: values.isActive,
         });
-        toast({ title: "User updated" });
+        toast({ title: `${copy.singular} updated` });
       } else {
-        await create.mutateAsync(values);
-        toast({ title: "User created" });
+        await create.mutateAsync({ ...values, role });
+        toast({ title: `${copy.singular} created` });
       }
       onClose();
     } catch (e) {
@@ -215,7 +262,11 @@ function UserFormDialog({
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{editing ? "Edit user" : "New user"}</DialogTitle>
+          <DialogTitle>
+            {editing
+              ? `Edit ${copy.singular.toLowerCase()}`
+              : `New ${copy.singular.toLowerCase()}`}
+          </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
@@ -237,20 +288,6 @@ function UserFormDialog({
               <Input type="password" {...register("password")} />
             </Field>
           )}
-          <Field label="Role">
-            <Select value={role} onValueChange={(v) => setValue("role", v as Role)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ROLES.map((r) => (
-                  <SelectItem key={r} value={r}>
-                    {r.replace("_", " ")}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
           <Field label="Status">
             <div className="flex items-center gap-3">
               <Switch
