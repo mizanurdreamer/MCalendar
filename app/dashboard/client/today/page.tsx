@@ -8,19 +8,12 @@ export default async function ClientTodayPage() {
   const stats = await statsService.client({ userId: user.sub, role: user.role });
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col gap-4">
       <PageHeader
-        title={`Good ${getTimeOfDay()}, ${user.firstName}`}
-        description="Here's what's happening across your account today."
+        title={`Welcome, ${user.firstName}`}
+        description="Your dashboard at a glance."
       />
       <StatCards stats={stats} />
     </div>
   );
-}
-
-function getTimeOfDay(): string {
-  const hour = new Date().getHours();
-  if (hour < 12) return "morning";
-  if (hour < 17) return "afternoon";
-  return "evening";
 }

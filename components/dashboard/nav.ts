@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { LayoutDashboard, Users, Sun } from "lucide-react";
+import { LayoutDashboard, Users, CalendarDays, Sun } from "lucide-react";
 import type { Role } from "@/models/view";
 
 export type NavItem = {
@@ -14,7 +14,8 @@ const SUPER_ADMIN_NAV: NavItem[] = [
 ];
 
 const CLIENT_NAV: NavItem[] = [
-  { label: "Today", href: "/dashboard/client", icon: Sun },
+  { label: "Today", href: "/dashboard/client/today", icon: Sun },
+  { label: "Calendar", href: "/dashboard/client/calendar", icon: CalendarDays },
 ];
 
 const CLEANER_NAV: NavItem[] = [
