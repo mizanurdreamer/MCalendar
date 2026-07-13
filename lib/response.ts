@@ -22,7 +22,10 @@ export type ApiFailure = {
 
 export type ApiResponse<T> = ApiSuccess<T> | ApiFailure;
 
-export function ok<T>(data: T, init?: { status?: number; meta?: Record<string, unknown> }) {
+export function ok<T>(
+  data: T,
+  init?: { status?: number; meta?: Record<string, unknown> },
+) {
   return NextResponse.json<ApiSuccess<T>>(
     { success: true, data, meta: init?.meta },
     { status: init?.status ?? 200 },

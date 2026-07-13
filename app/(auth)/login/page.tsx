@@ -29,7 +29,11 @@ export default function LoginPage() {
 
   const onSubmit = (values: LoginDTO) => login.mutate(values);
   const serverError =
-    login.error instanceof ApiError ? login.error.message : login.error ? "Login failed" : null;
+    login.error instanceof ApiError
+      ? login.error.message
+      : login.error
+        ? "Login failed"
+        : null;
 
   return (
     <Card>
@@ -47,7 +51,9 @@ export default function LoginPage() {
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input id="email" type="email" autoComplete="email" {...register("email")} />
-            {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+            {errors.email && (
+              <p className="text-xs text-destructive">{errors.email.message}</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
@@ -63,7 +69,10 @@ export default function LoginPage() {
           </div>
           <div className="rounded-md bg-muted p-3 text-xs text-muted-foreground">
             <p className="font-medium">Demo accounts (password: Password123!)</p>
-            <p>admin@bookingcalendar.com · client@bookingcalendar.com · cleaner@bookingcalendar.com</p>
+            <p>
+              admin@bookingcalendar.com · client@bookingcalendar.com ·
+              cleaner@bookingcalendar.com
+            </p>
           </div>
         </CardContent>
         <CardFooter className="flex-col gap-4">

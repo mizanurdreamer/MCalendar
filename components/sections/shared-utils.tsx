@@ -3,12 +3,7 @@
 import * as React from "react";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { ApiError } from "@/lib/api-client";
 
 export function Field({
@@ -29,7 +24,13 @@ export function Field({
   );
 }
 
-export function EmptyRow({ colSpan, children }: { colSpan: number; children: React.ReactNode }) {
+export function EmptyRow({
+  colSpan,
+  children,
+}: {
+  colSpan: number;
+  children: React.ReactNode;
+}) {
   return (
     <TableRow>
       <TableCell colSpan={colSpan} className="h-24 text-center text-muted-foreground">
@@ -55,7 +56,12 @@ export function Pagination({
         Page {data.page} of {data.totalPages} · {data.total} total
       </span>
       <div className="flex gap-2">
-        <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => onPage(page - 1)}>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={page <= 1}
+          onClick={() => onPage(page - 1)}
+        >
           Previous
         </Button>
         <Button

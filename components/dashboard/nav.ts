@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { LayoutDashboard, Users, Sun } from "lucide-react";
+import { LayoutDashboard, Users, Sun, Link2 } from "lucide-react";
 import type { Role } from "@/models/view";
 
 export type NavItem = {
@@ -15,6 +15,11 @@ const SUPER_ADMIN_NAV: NavItem[] = [
 
 const CLIENT_NAV: NavItem[] = [
   { label: "Today", href: "/dashboard/client", icon: Sun },
+  {
+    label: "Booking Endpoints",
+    href: "/dashboard/client/booking-endpoints",
+    icon: Link2,
+  },
 ];
 
 const CLEANER_NAV: NavItem[] = [

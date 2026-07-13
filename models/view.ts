@@ -17,4 +17,13 @@ export type UserView = {
   createdAt: string;
 };
 
+export type BookingEndpointView = {
+  id: string;
+  clientId: string;
+  name: string;
+  url: string;
+  isActive: boolean;
+  createdAt: string;
+};
+
 export type { Paginated };

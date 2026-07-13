@@ -5,16 +5,12 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { createUserSchema, type CreateUserDTO } from "@/dto/user.dto";
-import {
-  useUsers,
-  useCreateUser,
-  useUpdateUser,
-  useDeleteUser,
-} from "@/hooks/use-users";
+import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from "@/hooks/use-users";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
@@ -115,7 +111,9 @@ export function UsersSection() {
                     </TableCell>
                     <TableCell>{u.email}</TableCell>
                     <TableCell>
-                      <Badge variant={ROLE_VARIANT[u.role]}>{u.role.replace("_", " ")}</Badge>
+                      <Badge variant={ROLE_VARIANT[u.role]}>
+                        {u.role.replace("_", " ")}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       <Badge variant={u.isActive ? "success" : "muted"}>
@@ -147,13 +145,22 @@ export function UsersSection() {
       <Pagination data={data} page={page} onPage={setPage} />
 
       {dialog.open && (
-        <UserFormDialog editing={dialog.editing} onClose={() => setDialog({ open: false })} />
+        <UserFormDialog
+          editing={dialog.editing}
+          onClose={() => setDialog({ open: false })}
+        />
       )}
     </div>
   );
 }
 
-function UserFormDialog({ editing, onClose }: { editing?: UserView; onClose: () => void }) {
+function UserFormDialog({
+  editing,
+  onClose,
+}: {
+  editing?: UserView;
+  onClose: () => void;
+}) {
   const create = useCreateUser();
   const update = useUpdateUser(editing?.id ?? "");
 
@@ -245,18 +252,15 @@ function UserFormDialog({ editing, onClose }: { editing?: UserView; onClose: () 
             </Select>
           </Field>
           <Field label="Status">
-            <Select
-              value={isActive ? "true" : "false"}
-              onValueChange={(v) => setValue("isActive", v === "true")}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="true">Active</SelectItem>
-                <SelectItem value="false">Disabled</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-3">
+              <Switch
+                checked={isActive}
+                onCheckedChange={(v) => setValue("isActive", v)}
+              />
+              <span className="text-sm text-muted-foreground">
+                {isActive ? "Active" : "Disabled"}
+              </span>
+            </div>
           </Field>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>

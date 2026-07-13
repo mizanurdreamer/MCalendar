@@ -12,9 +12,7 @@ import type { PaginationDTO } from "@/dto/common.dto";
  * authorized as SUPER_ADMIN at the API boundary, except the role-list helpers.
  */
 export class UserService {
-  async list(
-    params: PaginationDTO & { role?: Role },
-  ): Promise<Paginated<PublicUser>> {
+  async list(params: PaginationDTO & { role?: Role }): Promise<Paginated<PublicUser>> {
     const { items, total } = await userRepository.list({
       page: params.page,
       pageSize: params.pageSize,
@@ -82,15 +80,11 @@ export class UserService {
 
   /** Active cleaners, for assignment dropdowns. */
   listCleaners() {
-    return userRepository
-      .listByRole("CLEANER")
-      .then((users) => users.map(toPublicUser));
+    return userRepository.listByRole("CLEANER").then((users) => users.map(toPublicUser));
   }
 
   listClients() {
-    return userRepository
-      .listByRole("CLIENT")
-      .then((users) => users.map(toPublicUser));
+    return userRepository.listByRole("CLIENT").then((users) => users.map(toPublicUser));
   }
 }
 
