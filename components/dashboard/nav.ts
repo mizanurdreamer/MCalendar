@@ -22,6 +22,7 @@ const CLIENT_NAV: NavItem[] = [
     href: "/dashboard/client/booking-endpoints",
     icon: Link2,
   },
+  { label: "Calendar", href: "/dashboard/client/calendar", icon: CalendarDays },
 ];
 
 const CLEANER_NAV: NavItem[] = [
