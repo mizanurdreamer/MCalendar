@@ -6,10 +6,13 @@ import type { BookingEndpointView, Paginated } from "@/models/view";
 
 const KEY = "booking-endpoints";
 
-export function useBookingEndpoints(params: { page?: number; search?: string } = {}) {
+export function useBookingEndpoints(
+  params: { page?: number; search?: string; status?: string } = {}
+) {
   const query = new URLSearchParams();
   query.set("page", String(params.page ?? 1));
   if (params.search) query.set("search", params.search);
+  if (params.status && params.status !== "all") query.set("status", params.status);
   return useQuery({
     queryKey: [KEY, params],
     queryFn: () =>

@@ -18,7 +18,11 @@ export async function GET(req: NextRequest) {
     }
 
     const params = parseListParams(req.nextUrl.searchParams);
-    const result = await userService.list({ ...params, role: roleParam ?? undefined });
+    const result = await userService.list({
+      ...params,
+      role: roleParam ?? undefined,
+      status: params.status,
+    });
     return ok(result);
   } catch (error) {
     return handleApiError(error);

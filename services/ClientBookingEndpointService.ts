@@ -41,6 +41,7 @@ export class ClientBookingEndpointService {
       page: params.page,
       pageSize: params.pageSize,
       search: params.search,
+      status: params.status,
       clientId: actor.userId,
     });
 

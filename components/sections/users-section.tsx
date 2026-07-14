@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { Loader2, Plus, Download, Eye, Pencil, Trash2 } from "lucide-react";
 import { createUserSchema, type CreateUserDTO } from "@/dto/user.dto";
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from "@/hooks/use-users";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -12,6 +12,14 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent } from "@/components/ui/card";
+import { FilterTabs } from "@/components/ui/filter-tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -41,19 +49,85 @@ type ManagedRole = Extract<Role, "CLIENT" | "CLEANER">;
 
 const COPY: Record<
   ManagedRole,
-  { singular: string; plural: string; description: string }
+  {
+    singular: string;
+    plural: string;
+    description: string;
+    statusTabs: { label: string; value: string }[];
+    sortOptions: { label: string; value: string }[];
+    itemLabel: string;
+  }
 > = {
   CLIENT: {
     singular: "Client",
     plural: "Clients",
     description: "Manage client accounts.",
+    statusTabs: [
+      { label: "All", value: "all" },
+      { label: "Active", value: "active" },
+      { label: "Inactive", value: "inactive" },
+    ],
+    sortOptions: [
+      { label: "Sort: Newest", value: "newest" },
+      { label: "Sort: Oldest", value: "oldest" },
+      { label: "Sort: Name A–Z", value: "name_asc" },
+      { label: "Sort: Name Z–A", value: "name_desc" },
+    ],
+    itemLabel: "clients",
   },
   CLEANER: {
     singular: "Cleaner",
     plural: "Cleaners",
     description: "Manage cleaner accounts.",
+    statusTabs: [
+      { label: "All", value: "all" },
+      { label: "Active", value: "active" },
+      { label: "Inactive", value: "inactive" },
+    ],
+    sortOptions: [
+      { label: "Sort: Rating", value: "rating" },
+      { label: "Sort: Newest", value: "newest" },
+      { label: "Sort: Name A–Z", value: "name_asc" },
+      { label: "Sort: Name Z–A", value: "name_desc" },
+    ],
+    itemLabel: "cleaners",
   },
 };
+
+function getStatusBadgeVariant(isActive: boolean) {
+  return isActive ? "success" : "muted";
+}
+
+function getStatusLabel(isActive: boolean) {
+  return isActive ? "Active" : "Inactive";
+}
+
+function getInitials(firstName: string, lastName: string) {
+  return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+}
+
+function UserAvatar({ firstName, lastName }: { firstName: string; lastName: string }) {
+  const initials = getInitials(firstName, lastName);
+  const colors = [
+    "bg-blue-100 text-blue-700",
+    "bg-green-100 text-green-700",
+    "bg-purple-100 text-purple-700",
+    "bg-amber-100 text-amber-700",
+    "bg-rose-100 text-rose-700",
+    "bg-cyan-100 text-cyan-700",
+    "bg-emerald-100 text-emerald-700",
+    "bg-orange-100 text-orange-700",
+  ];
+  const colorIndex =
+    (firstName.charCodeAt(0) + lastName.charCodeAt(0)) % colors.length;
+  return (
+    <div
+      className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-semibold ${colors[colorIndex]}`}
+    >
+      {initials}
+    </div>
+  );
+}
 
 export function UsersSection({
   role,
@@ -67,13 +141,35 @@ export function UsersSection({
   const copy = COPY[role];
   const [page, setPage] = React.useState(1);
   const [search, setSearch] = React.useState("");
+  const [status, setStatus] = React.useState("all");
+  const [sort, setSort] = React.useState(copy.sortOptions[0].value);
+  const [selected, setSelected] = React.useState<Set<string>>(new Set());
   const [dialog, setDialog] = React.useState<{ open: boolean; editing?: UserView }>({
     open: false,
   });
+  const [viewUser, setViewUser] = React.useState<UserView | null>(null);
   const [toDelete, setToDelete] = React.useState<UserView | null>(null);
 
-  const { data, isLoading } = useUsers({ page, search, role });
+  const { data, isLoading } = useUsers({ page, search, role, status, sort });
   const del = useDeleteUser();
+
+  const toggleSelectAll = () => {
+    if (!data) return;
+    if (selected.size === data.items.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(data.items.map((u) => u.id)));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const onConfirmDelete = async () => {
     if (!toDelete) return;
@@ -86,88 +182,160 @@ export function UsersSection({
     }
   };
 
+  const allSelected = data && data.items.length > 0 && selected.size === data.items.length;
+
   return (
     <div>
       <PageHeader
         title={copy.plural}
-        description={copy.description}
+        count={data?.total}
         action={
-          canCreate ? (
-            <Button onClick={() => setDialog({ open: true })}>
-              <Plus className="h-4 w-4" /> New {copy.singular.toLowerCase()}
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm">
+              <Download className="h-4 w-4" />
+              Export
             </Button>
-          ) : undefined
+            {canCreate && (
+              <Button size="sm" onClick={() => setDialog({ open: true })}>
+                <Plus className="h-4 w-4" /> Add {copy.singular.toLowerCase()}
+              </Button>
+            )}
+          </div>
         }
       />
 
-      <div className="mb-4 max-w-sm">
-        <Input
-          placeholder={`Search ${copy.plural.toLowerCase()}…`}
-          value={search}
-          onChange={(e) => {
-            setPage(1);
-            setSearch(e.target.value);
-          }}
-        />
+      {/* Toolbar */}
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <Input
+            placeholder={`Search ${copy.plural.toLowerCase()}…`}
+            value={search}
+            onChange={(e) => {
+              setPage(1);
+              setSearch(e.target.value);
+            }}
+            className="w-64"
+          />
+          <FilterTabs tabs={copy.statusTabs} value={status} onChange={(v) => { setStatus(v); setPage(1); }} />
+        </div>
+        <Select value={sort} onValueChange={setSort}>
+          <SelectTrigger className="w-[150px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {copy.sortOptions.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
+      {/* Table */}
       <Card>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="w-12">
+                  <input
+                    type="checkbox"
+                    checked={!!allSelected}
+                    onChange={toggleSelectAll}
+                    className="h-4 w-4 rounded border-gray-300"
+                  />
+                </TableHead>
+                <TableHead>{role === "CLIENT" ? "CLIENT" : "CLEANER"}</TableHead>
+                <TableHead>EMAIL</TableHead>
+                <TableHead>PHONE</TableHead>
+                <TableHead>STATUS</TableHead>
+                <TableHead className="text-right">ACTIONS</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <EmptyRow colSpan={5}>Loading…</EmptyRow>
+                <EmptyRow colSpan={6}>Loading…</EmptyRow>
               ) : data && data.items.length > 0 ? (
                 data.items.map((u) => (
                   <TableRow key={u.id}>
-                    <TableCell className="font-medium">
-                      {u.firstName} {u.lastName}
-                    </TableCell>
-                    <TableCell>{u.email}</TableCell>
-                    <TableCell>{u.phone ?? "—"}</TableCell>
                     <TableCell>
-                      <Badge variant={u.isActive ? "success" : "muted"}>
-                        {u.isActive ? "Active" : "Disabled"}
+                      <input
+                        type="checkbox"
+                        checked={selected.has(u.id)}
+                        onChange={() => toggleSelect(u.id)}
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <UserAvatar firstName={u.firstName} lastName={u.lastName} />
+                        <div>
+                          <div className="font-medium">
+                            {u.firstName} {u.lastName}
+                          </div>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {u.email}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {u.phone ?? "—"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={getStatusBadgeVariant(u.isActive)}
+                        className={
+                          u.isActive
+                            ? "border-transparent bg-emerald-500/15 text-emerald-700"
+                            : "border-transparent bg-muted text-muted-foreground"
+                        }
+                      >
+                        {getStatusLabel(u.isActive)}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setDialog({ open: true, editing: u })}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      {canDelete && (
+                      <div className="flex items-center justify-end gap-1">
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => setToDelete(u)}
+                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                          onClick={() => setViewUser(u)}
                         >
-                          <Trash2 className="h-4 w-4 text-destructive" />
+                          <Eye className="h-4 w-4" />
                         </Button>
-                      )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                          onClick={() => setDialog({ open: true, editing: u })}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        {canDelete && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive/80"
+                            onClick={() => setToDelete(u)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
               ) : (
-                <EmptyRow colSpan={5}>No {copy.plural.toLowerCase()} found.</EmptyRow>
+                <EmptyRow colSpan={6}>No {copy.plural.toLowerCase()} found.</EmptyRow>
               )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
 
-      <Pagination data={data} page={page} onPage={setPage} />
+      <Pagination data={data} page={page} onPage={setPage} itemLabel={copy.itemLabel} />
 
       {dialog.open && (
         <UserFormDialog
@@ -195,6 +363,8 @@ export function UsersSection({
         onConfirm={onConfirmDelete}
         onClose={() => setToDelete(null)}
       />
+
+      {viewUser && <UserViewDialog user={viewUser} role={role} onClose={() => setViewUser(null)} />}
     </div>
   );
 }
@@ -227,10 +397,11 @@ function UserFormDialog({
           email: editing.email,
           phone: editing.phone ?? "",
           password: "unchanged-placeholder",
+          confirmPassword: "unchanged-placeholder",
           role: editing.role,
           isActive: editing.isActive,
         }
-      : { role, isActive: true, password: "" },
+      : { role, isActive: true, password: "", confirmPassword: "" },
   });
 
   const isActive = watch("isActive");
@@ -284,9 +455,14 @@ function UserFormDialog({
             <Input {...register("phone")} />
           </Field>
           {!editing && (
-            <Field label="Password" error={errors.password?.message}>
-              <Input type="password" {...register("password")} />
-            </Field>
+            <>
+              <Field label="Password" error={errors.password?.message}>
+                <Input type="password" autoComplete="new-password" {...register("password")} />
+              </Field>
+              <Field label="Confirm password" error={errors.confirmPassword?.message}>
+                <Input type="password" autoComplete="new-password" {...register("confirmPassword")} />
+              </Field>
+            </>
           )}
           <Field label="Status">
             <div className="flex items-center gap-3">
@@ -309,6 +485,73 @@ function UserFormDialog({
             </Button>
           </DialogFooter>
         </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function UserViewDialog({
+  user,
+  role,
+  onClose,
+}: {
+  user: UserView;
+  role: ManagedRole;
+  onClose: () => void;
+}) {
+  const copy = COPY[role];
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{copy.singular} details</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="flex items-center gap-4">
+            <UserAvatar firstName={user.firstName} lastName={user.lastName} />
+            <div>
+              <div className="text-lg font-semibold">
+                {user.firstName} {user.lastName}
+              </div>
+              <div className="text-sm text-muted-foreground">{user.email}</div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <div className="text-sm font-medium text-muted-foreground">Phone</div>
+              <div className="text-sm">{user.phone ?? "—"}</div>
+            </div>
+            <div>
+              <div className="text-sm font-medium text-muted-foreground">Status</div>
+              <Badge
+                variant={user.isActive ? "success" : "muted"}
+                className={
+                  user.isActive
+                    ? "border-transparent bg-emerald-500/15 text-emerald-700"
+                    : "border-transparent bg-muted text-muted-foreground"
+                }
+              >
+                {user.isActive ? "Active" : "Inactive"}
+              </Badge>
+            </div>
+            <div>
+              <div className="text-sm font-medium text-muted-foreground">Role</div>
+              <div className="text-sm capitalize">{user.role.toLowerCase()}</div>
+            </div>
+            <div>
+              <div className="text-sm font-medium text-muted-foreground">Created</div>
+              <div className="text-sm">
+                {new Date(user.createdAt).toLocaleDateString()}
+              </div>
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

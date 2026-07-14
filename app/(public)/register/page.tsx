@@ -90,9 +90,16 @@ export default function RegisterPage() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
-            <Input id="password" type="password" {...register("password")} />
+            <Input id="password" type="password" autoComplete="new-password" {...register("password")} />
             {errors.password && (
               <p className="text-xs text-destructive">{errors.password.message}</p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="confirmPassword">Confirm password</Label>
+            <Input id="confirmPassword" type="password" autoComplete="new-password" {...register("confirmPassword")} />
+            {errors.confirmPassword && (
+              <p className="text-xs text-destructive">{errors.confirmPassword.message}</p>
             )}
           </div>
           <div className="space-y-2">

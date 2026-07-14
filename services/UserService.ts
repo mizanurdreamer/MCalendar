@@ -18,6 +18,7 @@ export class UserService {
       pageSize: params.pageSize,
       search: params.search,
       role: params.role,
+      status: params.status,
     });
 
     return {
