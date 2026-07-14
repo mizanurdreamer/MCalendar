@@ -1,7 +1,7 @@
-import { clientBookingDataRepository } from "@/repositories/ClientBookingDataRepository";
+import { guestBookingInfoRepository } from "@/repositories/GuestBookingInfoRepository";
 import type { ActorContext, Paginated } from "@/models";
 
-export type BookingDataView = {
+export type GuestBookingInfoView = {
   id: string;
   endpointId: string;
   endpointName: string;
@@ -15,18 +15,19 @@ export type BookingDataView = {
   createdAt: string;
 };
 
-export function toBookingDataView(
-  item: Awaited<ReturnType<typeof clientBookingDataRepository.findById>> & {
+export function toGuestBookingInfoView(
+  item: Awaited<ReturnType<typeof guestBookingInfoRepository.findById>> & {
     endpoint?: { name: string };
+    fetchData?: { rawData: unknown; fetchedAt: Date };
   },
-): BookingDataView {
+): GuestBookingInfoView {
   return {
     id: item.id,
     endpointId: item.endpointId,
     endpointName: item.endpoint?.name ?? "",
     clientId: item.clientId,
-    rawData: item.rawData,
-    fetchedAt: item.fetchedAt.toISOString(),
+    rawData: item.fetchData?.rawData ?? null,
+    fetchedAt: item.fetchData?.fetchedAt.toISOString() ?? "",
     summary: item.summary,
     startDate: item.startDate?.toISOString() ?? null,
     endDate: item.endDate?.toISOString() ?? null,
@@ -38,15 +39,15 @@ export function toBookingDataView(
 /**
  * Client booking data service. Read-only access to fetched booking data.
  */
-export class ClientBookingDataService {
+export class GuestBookingInfoService {
   async list(
     params: { page: number; pageSize: number; clientId?: string; endpointId?: string },
     _actor?: ActorContext,
-  ): Promise<Paginated<BookingDataView>> {
-    const { items, total } = await clientBookingDataRepository.list(params);
+  ): Promise<Paginated<GuestBookingInfoView>> {
+    const { items, total } = await guestBookingInfoRepository.list(params);
     return {
       items: items.map((item) =>
-        toBookingDataView(item as Parameters<typeof toBookingDataView>[0]),
+        toGuestBookingInfoView(item as Parameters<typeof toGuestBookingInfoView>[0]),
       ),
       total,
       page: params.page,
@@ -55,11 +56,11 @@ export class ClientBookingDataService {
     };
   }
 
-  async getById(id: string): Promise<BookingDataView | null> {
-    const item = await clientBookingDataRepository.findById(id);
+  async getById(id: string): Promise<GuestBookingInfoView | null> {
+    const item = await guestBookingInfoRepository.findById(id);
     if (!item) return null;
-    return toBookingDataView(item as Parameters<typeof toBookingDataView>[0]);
+    return toGuestBookingInfoView(item as Parameters<typeof toGuestBookingInfoView>[0]);
   }
 }
 
-export const clientBookingDataService = new ClientBookingDataService();
+export const guestBookingInfoService = new GuestBookingInfoService();

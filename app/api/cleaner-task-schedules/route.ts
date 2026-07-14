@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server";
-import { cleanerAssignmentService } from "@/services/CleanerAssignmentService";
+import { cleanerTaskScheduleService } from "@/services/CleanerTaskScheduleService";
 import { parseListParams } from "@/dto/common.dto";
 import { created, ok, handleApiError } from "@/lib/response";
 import { requireActor } from "@/lib/auth";
 import { z } from "zod";
 
-const createAssignmentSchema = z.object({
+const createTaskScheduleSchema = z.object({
   clientId: z.string().uuid(),
   cleanerId: z.string().uuid(),
   startDate: z.string().datetime(),
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     const cleanerId = req.nextUrl.searchParams.get("cleanerId") ?? undefined;
     const activeOnly = req.nextUrl.searchParams.get("activeOnly") === "true";
 
-    const result = await cleanerAssignmentService.list(
+    const result = await cleanerTaskScheduleService.list(
       { ...params, clientId, cleanerId, activeOnly },
       actor,
     );
@@ -34,9 +34,9 @@ export async function POST(req: NextRequest) {
   try {
     const actor = await requireActor("SUPER_ADMIN", "CLIENT");
     const body = await req.json();
-    const dto = createAssignmentSchema.parse(body);
+    const dto = createTaskScheduleSchema.parse(body);
 
-    const result = await cleanerAssignmentService.create(
+    const result = await cleanerTaskScheduleService.create(
       {
         clientId: dto.clientId,
         cleanerId: dto.cleanerId,

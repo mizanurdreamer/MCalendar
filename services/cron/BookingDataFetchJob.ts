@@ -1,5 +1,5 @@
 import { Prisma } from "@prisma/client";
-import { clientBookingDataRepository } from "@/repositories/ClientBookingDataRepository";
+import { guestBookingInfoRepository } from "@/repositories/GuestBookingInfoRepository";
 import { prisma } from "@/lib/prisma";
 import { CRON_CONFIG } from "@/lib/cron/config";
 
@@ -9,15 +9,12 @@ import { CRON_CONFIG } from "@/lib/cron/config";
  * This is a cron job service — separated from normal business services.
  */
 export class BookingDataFetchJob {
-  private readonly JOB_NAME = "booking-data-fetch";
-
   /**
    * Execute the job: fetch all active endpoints and save responses.
    */
   async execute(): Promise<{ fetched: number; failed: number; skipped: number }> {
     const endpoints = await prisma.clientBookingEndpoint.findMany({
       where: { isActive: true, deletedAt: null },
-      include: { client: { select: { id: true } } },
     });
 
     let fetched = 0;
@@ -81,18 +78,35 @@ export class BookingDataFetchJob {
         rawData = await response.text();
       }
 
-      // Parse basic booking data from iCal if applicable
-      const parsed = this.parseICalData(rawData);
+      const bookings = this.extractBookings(rawData);
+      if (!bookings.length) return false;
 
-      await clientBookingDataRepository.create({
-        endpoint: { connect: { id: endpoint.id } },
-        client: { connect: { id: endpoint.clientId } },
-        rawData: rawData as unknown as Prisma.InputJsonValue,
-        summary: parsed.summary,
-        startDate: parsed.startDate,
-        endDate: parsed.endDate,
-        status: parsed.status,
+      const fetchedAt = new Date();
+      const payload = {
+        endpointName: endpoint.name,
+        payload: rawData,
+      } as Prisma.InputJsonValue;
+      const payloadHash = await this.hashPayload(payload);
+      const fetchData = await guestBookingInfoRepository.upsertFetchData({
+        endpointId: endpoint.id,
+        clientId: endpoint.clientId,
+        payloadHash,
+        rawData: payload,
+        fetchedAt,
       });
+
+      await guestBookingInfoRepository.createMany(
+        bookings.map((booking) => ({
+          endpointId: endpoint.id,
+          clientId: endpoint.clientId,
+          fetchDataId: fetchData.id,
+          dedupeKey: this.buildDedupeKey(endpoint.id, booking),
+          summary: booking.summary,
+          startDate: booking.startDate,
+          endDate: booking.endDate,
+          status: booking.status,
+        })),
+      );
 
       return true;
     } catch (error) {
@@ -103,31 +117,66 @@ export class BookingDataFetchJob {
     }
   }
 
-  /**
-   * Basic iCal parser. Extracts booking summary, dates, and status.
-   * For production, consider using a dedicated iCal library.
-   */
-  private parseICalData(data: unknown): {
+  private extractBookings(data: unknown): Array<{
     summary: string | null;
     startDate: Date | null;
     endDate: Date | null;
     status: string | null;
-  } {
-    if (typeof data !== "string") {
-      return { summary: null, startDate: null, endDate: null, status: null };
+  }> {
+    if (typeof data === "string") {
+      return this.parseICalEvents(data);
     }
+    return this.parseJsonEvents(data);
+  }
 
-    const summaryMatch = data.match(/SUMMARY:(.*)/m);
-    const dtStartMatch = data.match(/DTSTART[;:](.*)/m);
-    const dtEndMatch = data.match(/DTEND[;:](.*)/m);
-    const statusMatch = data.match(/STATUS:(.*)/m);
+  private parseICalEvents(data: string) {
+    const events = data.match(/BEGIN:VEVENT[\s\S]*?END:VEVENT/gm) ?? [];
+    return events
+      .map((entry) => {
+        const summaryMatch = entry.match(/SUMMARY:(.*)/m);
+        const dtStartMatch = entry.match(/DTSTART(?:;[^:]+)?:(.*)/m);
+        const dtEndMatch = entry.match(/DTEND(?:;[^:]+)?:(.*)/m);
+        const statusMatch = entry.match(/STATUS:(.*)/m);
 
-    return {
-      summary: summaryMatch?.[1]?.trim() ?? null,
-      startDate: dtStartMatch ? this.parseICalDate(dtStartMatch[1]) : null,
-      endDate: dtEndMatch ? this.parseICalDate(dtEndMatch[1]) : null,
-      status: statusMatch?.[1]?.trim()?.toLowerCase() ?? null,
-    };
+        return {
+          summary: summaryMatch?.[1]?.trim() ?? null,
+          startDate: dtStartMatch ? this.parseICalDate(dtStartMatch[1]) : null,
+          endDate: dtEndMatch ? this.parseICalDate(dtEndMatch[1]) : null,
+          status: statusMatch?.[1]?.trim()?.toLowerCase() ?? null,
+        };
+      })
+      .filter((item) => item.startDate !== null || item.endDate !== null || item.summary);
+  }
+
+  private parseJsonEvents(data: unknown) {
+    const list = this.extractJsonArray(data);
+
+    return list
+      .map((item) => {
+        if (!item || typeof item !== "object") {
+          return null;
+        }
+
+        const row = item as Record<string, unknown>;
+        return {
+          summary: this.asOptionalString(row.summary ?? row.title ?? row.guestName),
+          startDate: this.asOptionalDate(row.startDate ?? row.start ?? row.checkIn),
+          endDate: this.asOptionalDate(row.endDate ?? row.end ?? row.checkOut),
+          status: this.asOptionalString(row.status)?.toLowerCase() ?? null,
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => !!item)
+      .filter((item) => item.startDate !== null || item.endDate !== null || item.summary);
+  }
+
+  private extractJsonArray(data: unknown): unknown[] {
+    if (Array.isArray(data)) return data;
+    if (!data || typeof data !== "object") return [];
+    const obj = data as Record<string, unknown>;
+    if (Array.isArray(obj.items)) return obj.items;
+    if (Array.isArray(obj.bookings)) return obj.bookings;
+    if (Array.isArray(obj.data)) return obj.data;
+    return [];
   }
 
   /**
@@ -158,6 +207,46 @@ export class BookingDataFetchJob {
     } catch {
       return null;
     }
+  }
+
+  private asOptionalString(value: unknown): string | null {
+    if (typeof value !== "string") return null;
+    const trimmed = value.trim();
+    return trimmed.length ? trimmed : null;
+  }
+
+  private asOptionalDate(value: unknown): Date | null {
+    if (value instanceof Date) {
+      return Number.isNaN(value.getTime()) ? null : value;
+    }
+    if (typeof value !== "string" && typeof value !== "number") return null;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  private buildDedupeKey(
+    endpointId: string,
+    booking: {
+      summary: string | null;
+      startDate: Date | null;
+      endDate: Date | null;
+      status: string | null;
+    },
+  ) {
+    return [
+      endpointId,
+      booking.summary ?? "",
+      booking.status ?? "",
+      booking.startDate?.toISOString() ?? "",
+      booking.endDate?.toISOString() ?? "",
+    ].join("|");
+  }
+
+  private async hashPayload(payload: Prisma.InputJsonValue) {
+    const input = new TextEncoder().encode(JSON.stringify(payload));
+    const digest = await crypto.subtle.digest("SHA-256", input);
+    const bytes = Array.from(new Uint8Array(digest));
+    return bytes.map((b) => b.toString(16).padStart(2, "0")).join("");
   }
 }
 

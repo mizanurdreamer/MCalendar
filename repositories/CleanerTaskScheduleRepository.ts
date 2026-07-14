@@ -1,13 +1,13 @@
-import { Prisma, type CleanerAssignment } from "@prisma/client";
+import { Prisma, type CleanerTaskSchedule } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 /**
- * Data-access for cleaner assignments (client ↔ cleaner with date range).
- * Prisma queries only — no business logic.
+ * Data-access for cleaner task schedules (client-cleaner with date range).
+ * Prisma queries only, no business logic.
  */
-export class CleanerAssignmentRepository {
+export class CleanerTaskScheduleRepository {
   findById(id: string) {
-    return prisma.cleanerAssignment.findUnique({
+    return prisma.cleanerTaskSchedule.findUnique({
       where: { id },
       include: {
         client: { select: { id: true, firstName: true, lastName: true, email: true } },
@@ -24,7 +24,7 @@ export class CleanerAssignmentRepository {
     activeOnly?: boolean;
   }) {
     const { page, pageSize, clientId, cleanerId, activeOnly } = params;
-    const where: Prisma.CleanerAssignmentWhereInput = {
+    const where: Prisma.CleanerTaskScheduleWhereInput = {
       deletedAt: null,
       ...(clientId ? { clientId } : {}),
       ...(cleanerId ? { cleanerId } : {}),
@@ -32,7 +32,7 @@ export class CleanerAssignmentRepository {
     };
 
     const [items, total] = await Promise.all([
-      prisma.cleanerAssignment.findMany({
+      prisma.cleanerTaskSchedule.findMany({
         where,
         orderBy: { startDate: "desc" },
         skip: (page - 1) * pageSize,
@@ -42,7 +42,7 @@ export class CleanerAssignmentRepository {
           cleaner: { select: { id: true, firstName: true, lastName: true, email: true } },
         },
       }),
-      prisma.cleanerAssignment.count({ where }),
+      prisma.cleanerTaskSchedule.count({ where }),
     ]);
 
     return { items, total };
@@ -50,7 +50,7 @@ export class CleanerAssignmentRepository {
 
   findActiveForClient(clientId: string, date?: Date) {
     const now = date ?? new Date();
-    return prisma.cleanerAssignment.findMany({
+    return prisma.cleanerTaskSchedule.findMany({
       where: {
         clientId,
         isActive: true,
@@ -69,7 +69,7 @@ export class CleanerAssignmentRepository {
 
   findActiveForCleaner(cleanerId: string, date?: Date) {
     const now = date ?? new Date();
-    return prisma.cleanerAssignment.findMany({
+    return prisma.cleanerTaskSchedule.findMany({
       where: {
         cleanerId,
         isActive: true,
@@ -86,8 +86,8 @@ export class CleanerAssignmentRepository {
     });
   }
 
-  create(data: Prisma.CleanerAssignmentCreateInput) {
-    return prisma.cleanerAssignment.create({
+  create(data: Prisma.CleanerTaskScheduleCreateInput) {
+    return prisma.cleanerTaskSchedule.create({
       data,
       include: {
         client: { select: { id: true, firstName: true, lastName: true, email: true } },
@@ -96,8 +96,8 @@ export class CleanerAssignmentRepository {
     });
   }
 
-  update(id: string, data: Prisma.CleanerAssignmentUpdateInput) {
-    return prisma.cleanerAssignment.update({
+  update(id: string, data: Prisma.CleanerTaskScheduleUpdateInput) {
+    return prisma.cleanerTaskSchedule.update({
       where: { id },
       data,
       include: {
@@ -108,11 +108,12 @@ export class CleanerAssignmentRepository {
   }
 
   softDelete(id: string, deletedBy?: string) {
-    return prisma.cleanerAssignment.update({
+    return prisma.cleanerTaskSchedule.update({
       where: { id },
       data: { deletedAt: new Date(), isActive: false, updatedBy: deletedBy },
     });
   }
 }
 
-export const cleanerAssignmentRepository = new CleanerAssignmentRepository();
+export const cleanerTaskScheduleRepository = new CleanerTaskScheduleRepository();
+export type { CleanerTaskSchedule };

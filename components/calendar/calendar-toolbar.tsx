@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { PROPERTIES, type PropertyFilter } from "@/dto/booking-calendar";
 import type { CalendarViewMode } from "@/components/calendar/calendar-grid";
 
 type Direction = "prev" | "next";
@@ -11,8 +10,11 @@ type Direction = "prev" | "next";
 type CalendarToolbarProps = {
   title: string;
   viewMode: CalendarViewMode;
-  activeProperty: PropertyFilter;
-  onChangeProperty: (property: PropertyFilter) => void;
+  properties: string[];
+  activeProperty: string;
+  search: string;
+  onChangeSearch: (value: string) => void;
+  onChangeProperty: (property: string) => void;
   onNavigate: (direction: Direction) => void;
   onViewModeChange: (mode: CalendarViewMode) => void;
 };
@@ -20,7 +22,10 @@ type CalendarToolbarProps = {
 export function CalendarToolbar({
   title,
   viewMode,
+  properties,
   activeProperty,
+  search,
+  onChangeSearch,
   onChangeProperty,
   onNavigate,
   onViewModeChange,
@@ -45,6 +50,8 @@ export function CalendarToolbar({
         <div className="ml-auto flex w-full flex-wrap items-center gap-2 lg:w-auto lg:justify-end">
           <Input
             placeholder="Search guests, properties..."
+            value={search}
+            onChange={(event) => onChangeSearch(event.target.value)}
             className="h-12 w-full rounded-2xl border-slate-300 bg-white text-[17px] sm:w-[290px]"
           />
           <div className="inline-flex items-center rounded-2xl bg-slate-200 p-1">
@@ -91,7 +98,7 @@ export function CalendarToolbar({
 
       <div className="overflow-x-auto pb-1">
         <div className="inline-flex min-w-full gap-2 pr-1">
-          {PROPERTIES.map((property) => (
+          {properties.map((property) => (
             <Badge
               key={property}
               variant={activeProperty === property ? "default" : "secondary"}

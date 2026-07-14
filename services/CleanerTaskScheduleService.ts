@@ -1,10 +1,10 @@
-import { cleanerAssignmentRepository } from "@/repositories/CleanerAssignmentRepository";
+import { cleanerTaskScheduleRepository } from "@/repositories/CleanerTaskScheduleRepository";
 import { userRepository } from "@/repositories/UserRepository";
 import { ConflictError, ForbiddenError, NotFoundError } from "@/lib/errors";
 import type { ActorContext, Paginated } from "@/models";
 import type { PaginationDTO } from "@/dto/common.dto";
 
-export type CleanerAssignmentView = {
+export type CleanerTaskScheduleView = {
   id: string;
   clientId: string;
   clientName: string;
@@ -18,9 +18,9 @@ export type CleanerAssignmentView = {
   createdAt: string;
 };
 
-export function toAssignmentView(
-  item: NonNullable<Awaited<ReturnType<typeof cleanerAssignmentRepository.findById>>>,
-): CleanerAssignmentView {
+export function toTaskScheduleView(
+  item: NonNullable<Awaited<ReturnType<typeof cleanerTaskScheduleRepository.findById>>>,
+): CleanerTaskScheduleView {
   return {
     id: item.id,
     clientId: item.clientId,
@@ -37,18 +37,18 @@ export function toAssignmentView(
 }
 
 /**
- * Cleaner assignment management. Clients assign cleaners for date ranges.
+ * Cleaner task schedule management. Clients assign cleaners for date ranges.
  */
-export class CleanerAssignmentService {
+export class CleanerTaskScheduleService {
   async list(
     params: PaginationDTO & { clientId?: string; cleanerId?: string; activeOnly?: boolean },
     actor: ActorContext,
-  ): Promise<Paginated<CleanerAssignmentView>> {
-    // Clients can only see their own assignments
+  ): Promise<Paginated<CleanerTaskScheduleView>> {
+    // Clients can only see their own task schedules
     const clientId = actor.role === "CLIENT" ? actor.userId : params.clientId;
     const cleanerId = actor.role === "CLEANER" ? actor.userId : params.cleanerId;
 
-    const { items, total } = await cleanerAssignmentRepository.list({
+    const { items, total } = await cleanerTaskScheduleRepository.list({
       page: params.page,
       pageSize: params.pageSize,
       clientId,
@@ -57,7 +57,7 @@ export class CleanerAssignmentService {
     });
 
     return {
-      items: items.map(toAssignmentView),
+      items: items.map(toTaskScheduleView),
       total,
       page: params.page,
       pageSize: params.pageSize,
@@ -66,8 +66,8 @@ export class CleanerAssignmentService {
   }
 
   async getActiveForClient(clientId: string, date?: Date) {
-    const assignments = await cleanerAssignmentRepository.findActiveForClient(clientId, date);
-    return assignments.map((a) => ({
+    const taskSchedules = await cleanerTaskScheduleRepository.findActiveForClient(clientId, date);
+    return taskSchedules.map((a) => ({
       id: a.id,
       cleanerId: a.cleanerId,
       cleanerName: `${a.cleaner.firstName} ${a.cleaner.lastName}`,
@@ -103,7 +103,7 @@ export class CleanerAssignmentService {
       throw new ConflictError("End date must be after start date");
     }
 
-    const assignment = await cleanerAssignmentRepository.create({
+    const taskSchedule = await cleanerTaskScheduleRepository.create({
       client: { connect: { id: params.clientId } },
       cleaner: { connect: { id: params.cleanerId } },
       startDate: params.startDate,
@@ -112,7 +112,7 @@ export class CleanerAssignmentService {
       updatedBy: actor.userId,
     });
 
-    return toAssignmentView(assignment);
+    return toTaskScheduleView(taskSchedule);
   }
 
   async update(
@@ -120,34 +120,34 @@ export class CleanerAssignmentService {
     params: { endDate?: Date; isActive?: boolean },
     actor: ActorContext,
   ) {
-    const existing = await cleanerAssignmentRepository.findById(id);
-    if (!existing) throw new NotFoundError("Assignment not found");
+    const existing = await cleanerTaskScheduleRepository.findById(id);
+    if (!existing) throw new NotFoundError("Task schedule not found");
 
-    // Non-admins can only update their own assignments
+    // Non-admins can only update their own task schedules
     if (actor.role !== "SUPER_ADMIN" && actor.userId !== existing.clientId) {
       throw new ForbiddenError();
     }
 
-    const assignment = await cleanerAssignmentRepository.update(id, {
+    const taskSchedule = await cleanerTaskScheduleRepository.update(id, {
       endDate: params.endDate,
       isActive: params.isActive,
       updatedBy: actor.userId,
     });
 
-    return toAssignmentView(assignment);
+    return toTaskScheduleView(taskSchedule);
   }
 
   async remove(id: string, actor: ActorContext) {
-    const existing = await cleanerAssignmentRepository.findById(id);
-    if (!existing) throw new NotFoundError("Assignment not found");
+    const existing = await cleanerTaskScheduleRepository.findById(id);
+    if (!existing) throw new NotFoundError("Task schedule not found");
 
-    // Non-admins can only remove their own assignments
+    // Non-admins can only remove their own task schedules
     if (actor.role !== "SUPER_ADMIN" && actor.userId !== existing.clientId) {
       throw new ForbiddenError();
     }
 
-    await cleanerAssignmentRepository.softDelete(id, actor.userId);
+    await cleanerTaskScheduleRepository.softDelete(id, actor.userId);
   }
 }
 
-export const cleanerAssignmentService = new CleanerAssignmentService();
+export const cleanerTaskScheduleService = new CleanerTaskScheduleService();

@@ -7,6 +7,7 @@ import {
   Link2,
   CalendarDays,
   UserCircle2,
+  Clock3,
 } from "lucide-react";
 import type { Role } from "@/models/view";
 
@@ -32,7 +33,12 @@ const CLIENT_NAV: NavItem[] = [
     href: "/client/booking-endpoints",
     icon: Link2,
   },
-  { label: "Cleaners", href: "/client/cleaners", icon: Sparkles }
+  { label: "Cleaners", href: "/client/cleaners", icon: Sparkles },
+  {
+    label: "Cleaner Availability",
+    href: "/client/cleaner-availability",
+    icon: Clock3,
+  },
 ];
 
 const CLEANER_NAV: NavItem[] = [

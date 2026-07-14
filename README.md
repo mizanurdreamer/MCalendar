@@ -125,7 +125,7 @@ bookingCalendar/
 │       ├── auth/                 # Login, register, refresh, logout
 │       ├── users/                # User CRUD
 │       ├── booking-endpoints/    # Booking endpoint CRUD
-│       ├── cleaner-assignments/  # Client ↔ Cleaner assignments
+│       ├── cleaner-task-schedules/  # Client ↔ Cleaner Task Schedules
 │       └── cron/                 # Cron job triggers
 ├── components/                   # React components
 │   ├── ui/                       # shadcn/ui primitives
@@ -138,8 +138,8 @@ bookingCalendar/
 │   ├── AuthService.ts            # Auth + token management
 │   ├── UserService.ts            # User CRUD
 │   ├── ClientBookingEndpointService.ts # Endpoint CRUD
-│   ├── ClientBookingDataService.ts # Read fetched booking data
-│   └── CleanerAssignmentService.ts # Client ↔ Cleaner assignments
+│   ├── GuestBookingInfoService.ts # Read fetched booking data
+│   └── CleanerTaskScheduleService.ts # Client ↔ Cleaner Task Schedules
 ├── repositories/                 # Database access layer (Prisma only)
 ├── dto/                          # Zod validation schemas
 ├── models/                       # Domain types
@@ -191,14 +191,14 @@ bookingCalendar/
 | PATCH | `/api/booking-endpoints/[id]` | Update endpoint |
 | DELETE | `/api/booking-endpoints/[id]` | Delete endpoint |
 
-### Cleaner Assignments
+### Cleaner Task Schedules
 
 | Method | Endpoint | Description |
 | --- | --- | --- |
-| GET | `/api/cleaner-assignments` | List assignments (supports `?clientId=`, `?cleanerId=`, `?activeOnly=`) |
-| POST | `/api/cleaner-assignments` | Create assignment |
-| PATCH | `/api/cleaner-assignments/[id]` | Update assignment |
-| DELETE | `/api/cleaner-assignments/[id]` | Delete assignment |
+| GET | `/api/cleaner-task-schedules` | List task schedules (supports `?clientId=`, `?cleanerId=`, `?activeOnly=`) |
+| POST | `/api/cleaner-task-schedules` | Create assignment |
+| PATCH | `/api/cleaner-task-schedules/[id]` | Update assignment |
+| DELETE | `/api/cleaner-task-schedules/[id]` | Delete assignment |
 
 ### Cron Jobs
 
@@ -222,18 +222,18 @@ POST https://yourapp.com/api/cron/booking-data-fetch
 Header: Authorization: Bearer YOUR_CRON_API_SECRET
 ```
 
-## Cleaner Assignments
+## Cleaner Task Schedules
 
 Clients can assign cleaners for specific date ranges. The system supports:
 
 - **Many-to-many**: One client can have multiple cleaners, one cleaner can serve multiple clients
 - **Date range**: Each assignment has a `startDate` and optional `endDate`
-- **Active/inactive**: Soft-disable assignments without deleting
+- **Active/inactive**: Soft-disable task schedules without deleting
 
 **Example: Assign a cleaner for summer**
 
 ```json
-POST /api/cleaner-assignments
+POST /api/cleaner-task-schedules
 {
   "clientId": "uuid-of-client",
   "cleanerId": "uuid-of-cleaner",
@@ -261,9 +261,9 @@ DTO (validation) → Repository (Prisma) → Service (business logic) → API Ro
 
 | Role | Access |
 | --- | --- |
-| SUPER_ADMIN | Full access to all users, endpoints, assignments |
+| SUPER_ADMIN | Full access to all users, endpoints, task schedules |
 | CLIENT | Manage own endpoints, view assigned cleaners |
-| CLEANER | View own schedule and assignments |
+| CLEANER | View own schedule and task schedules |
 
 ## Building for Production
 
@@ -279,4 +279,5 @@ docker compose up -d
 # Seed the initial super admin (first run only)
 docker compose exec app node prisma/seed.mjs
 ```
+
 

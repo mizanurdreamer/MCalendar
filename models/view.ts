@@ -33,4 +33,45 @@ export type BookingEndpointView = {
   createdAt: string;
 };
 
+export type CleanerTaskScheduleView = {
+  id: string;
+  clientId: string;
+  clientName: string;
+  clientEmail: string;
+  cleanerId: string;
+  cleanerName: string;
+  cleanerEmail: string;
+  startDate: string;
+  endDate: string | null;
+  isActive: boolean;
+  createdAt: string;
+};
+
+export type CalendarEventView = {
+  id: string;
+  title: string;
+  start?: string;
+  end?: string;
+  allDay: boolean;
+  classNames: string[];
+  extendedProps: {
+    property: string;
+    status: string;
+  };
+};
+
+export type UpcomingCleaningView = {
+  day: string;
+  month: string;
+  property: string;
+  note: string;
+  status: string | null;
+};
+
+export type CalendarDataView = {
+  properties: string[];
+  events: CalendarEventView[];
+  upcomingCleanings: UpcomingCleaningView[];
+};
+
 export type { Paginated };

@@ -1,10 +1,10 @@
 import { NextRequest } from "next/server";
-import { cleanerAssignmentService } from "@/services/CleanerAssignmentService";
+import { cleanerTaskScheduleService } from "@/services/CleanerTaskScheduleService";
 import { ok, handleApiError } from "@/lib/response";
 import { requireActor } from "@/lib/auth";
 import { z } from "zod";
 
-const updateAssignmentSchema = z.object({
+const updateTaskScheduleSchema = z.object({
   endDate: z.string().datetime().optional(),
   isActive: z.boolean().optional(),
 });
@@ -17,9 +17,9 @@ export async function PATCH(
     const actor = await requireActor("SUPER_ADMIN", "CLIENT");
     const { id } = await params;
     const body = await req.json();
-    const dto = updateAssignmentSchema.parse(body);
+    const dto = updateTaskScheduleSchema.parse(body);
 
-    const result = await cleanerAssignmentService.update(
+    const result = await cleanerTaskScheduleService.update(
       id,
       {
         endDate: dto.endDate ? new Date(dto.endDate) : undefined,
@@ -40,7 +40,7 @@ export async function DELETE(
   try {
     const actor = await requireActor("SUPER_ADMIN", "CLIENT");
     const { id } = await params;
-    await cleanerAssignmentService.remove(id, actor);
+    await cleanerTaskScheduleService.remove(id, actor);
     return ok({ deleted: true });
   } catch (error) {
     return handleApiError(error);

@@ -1,8 +1,14 @@
 import { ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { UpcomingCleaningDto } from "@/dto/booking-calendar";
+import type { UpcomingCleaningView } from "@/models/view";
 
-export function UpcomingCleanings({ items }: { items: UpcomingCleaningDto[] }) {
+const STATUS_DOT: Record<string, string> = {
+  pending: "#f59e0b",
+  cancelled: "#ef4444",
+  canceled: "#ef4444",
+};
+
+export function UpcomingCleanings({ items }: { items: UpcomingCleaningView[] }) {
   return (
     <div className="space-y-4">
       <Card className="rounded-3xl border-slate-200 bg-white">
@@ -12,11 +18,11 @@ export function UpcomingCleanings({ items }: { items: UpcomingCleaningDto[] }) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {items.map((item, idx) => (
+          {items.map((item) => (
             <div key={`${item.day}-${item.property}`} className="border-b pb-3 last:border-b-0 last:pb-0">
               <div className="flex gap-3">
-                <div className="w-10 text-center">
-                  <p className="text-[11px] font-semibold uppercase text-slate-400">Jul</p>
+                  <div className="w-10 text-center">
+                  <p className="text-[11px] font-semibold uppercase text-slate-400">{item.month}</p>
                   <p className="text-3xl font-black leading-none text-slate-900">{item.day}</p>
                 </div>
                 <div className="flex flex-1 items-start justify-between gap-2">
@@ -26,7 +32,7 @@ export function UpcomingCleanings({ items }: { items: UpcomingCleaningDto[] }) {
                   </div>
                   <span
                     className="mt-2 inline-flex h-2.5 w-2.5 shrink-0 rounded-full"
-                    style={{ backgroundColor: idx === 3 ? "#f59e0b" : "#7c3aed" }}
+                    style={{ backgroundColor: STATUS_DOT[item.status ?? ""] ?? "#7c3aed" }}
                   />
                 </div>
               </div>

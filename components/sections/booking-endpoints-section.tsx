@@ -336,10 +336,18 @@ function EndpointFormDialog({
             <Input placeholder="e.g. Airbnb — Main listing" {...register("name")} />
           </Field>
           <Field label="URL" error={errors.url?.message}>
-            <Input
-              placeholder="https://www.airbnb.com/calendar/ical/….ics"
-              {...register("url")}
-            />
+            <div className="space-y-2">
+              <Input
+                placeholder="https://www.airbnb.com/calendar/ical/<listing-id>.ics?t=<token>"
+                {...register("url")}
+              />
+              <p className="text-xs text-slate-500">
+                Airbnb example: https://www.airbnb.com/calendar/ical/1505374101975637733.ics?t=ff970f261dc6471792ef4f5996d46acc
+              </p>
+              <p className="text-xs text-slate-500">
+                VRBO example: https://www.vrbo.com/icalendar/d6381199be784af1a05a88492413e278.ics?nonTentative
+              </p>
+            </div>
           </Field>
           <Field label="Status">
             <div className="flex items-center gap-3">
