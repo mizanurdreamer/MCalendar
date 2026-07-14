@@ -15,10 +15,12 @@ export class ClientBookingEndpointRepository {
   }
 
   async list(params: ListParams & { clientId: string }) {
-    const { page, pageSize, search, clientId } = params;
+    const { page, pageSize, search, clientId, status } = params;
     const where: Prisma.ClientBookingEndpointWhereInput = {
       ...this.notDeleted,
       clientId,
+      ...(status === "active" ? { isActive: true } : {}),
+      ...(status === "inactive" ? { isActive: false } : {}),
       ...(search
         ? {
             OR: [

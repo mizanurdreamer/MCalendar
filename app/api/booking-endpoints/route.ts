@@ -9,7 +9,10 @@ export async function GET(req: NextRequest) {
   try {
     const actor = await requireActor("CLIENT");
     const params = parseListParams(req.nextUrl.searchParams);
-    const result = await clientBookingEndpointService.list(params, actor);
+    const result = await clientBookingEndpointService.list(
+      { ...params, status: params.status },
+      actor,
+    );
     return ok(result);
   } catch (error) {
     return handleApiError(error);

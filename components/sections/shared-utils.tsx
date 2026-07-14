@@ -53,34 +53,74 @@ export function Pagination({
   data,
   page,
   onPage,
+  itemLabel = "items",
 }: {
-  data?: { page: number; totalPages: number; total: number };
+  data?: { page: number; totalPages: number; total: number; pageSize: number };
   page: number;
   onPage: (p: number) => void;
+  itemLabel?: string;
 }) {
   if (!data || data.totalPages <= 1) return null;
+
+  const start = (data.page - 1) * data.pageSize + 1;
+  const end = Math.min(data.page * data.pageSize, data.total);
+
+  const pages: (number | "...")[] = [];
+  if (data.totalPages <= 7) {
+    for (let i = 1; i <= data.totalPages; i++) pages.push(i);
+  } else {
+    pages.push(1);
+    if (page > 3) pages.push("...");
+    for (
+      let i = Math.max(2, page - 1);
+      i <= Math.min(data.totalPages - 1, page + 1);
+      i++
+    ) {
+      pages.push(i);
+    }
+    if (page < data.totalPages - 2) pages.push("...");
+    pages.push(data.totalPages);
+  }
+
   return (
     <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
       <span>
-        Page {data.page} of {data.totalPages} · {data.total} total
+        Showing {start}–{end} of {data.total.toLocaleString()} {itemLabel}
       </span>
-      <div className="flex gap-2">
-        <Button
-          variant="outline"
-          size="sm"
+      <div className="flex items-center gap-1">
+        <button
+          className="px-2 py-1 text-sm font-medium text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:pointer-events-none"
           disabled={page <= 1}
           onClick={() => onPage(page - 1)}
         >
-          Previous
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
+          &lt; Prev
+        </button>
+        {pages.map((p, i) =>
+          p === "..." ? (
+            <span key={`dots-${i}`} className="px-2 py-1 text-sm text-muted-foreground">
+              ...
+            </span>
+          ) : (
+            <button
+              key={p}
+              onClick={() => onPage(p)}
+              className={
+                p === page
+                  ? "flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-medium text-primary-foreground"
+                  : "flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium text-muted-foreground hover:bg-muted"
+              }
+            >
+              {p}
+            </button>
+          )
+        )}
+        <button
+          className="px-2 py-1 text-sm font-medium text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:pointer-events-none"
           disabled={page >= data.totalPages}
           onClick={() => onPage(page + 1)}
         >
-          Next
-        </Button>
+          Next &gt;
+        </button>
       </div>
     </div>
   );

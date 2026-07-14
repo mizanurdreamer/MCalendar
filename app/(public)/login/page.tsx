@@ -67,13 +67,6 @@ export default function LoginPage() {
               <p className="text-xs text-destructive">{errors.password.message}</p>
             )}
           </div>
-          <div className="rounded-md bg-muted p-3 text-xs text-muted-foreground">
-            <p className="font-medium">Demo accounts (password: Password123!)</p>
-            <p>
-              admin@bookingcalendar.com · client@bookingcalendar.com ·
-              cleaner@bookingcalendar.com
-            </p>
-          </div>
         </CardContent>
         <CardFooter className="flex-col gap-4">
           <Button type="submit" className="w-full" disabled={login.isPending}>

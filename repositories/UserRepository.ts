@@ -24,10 +24,12 @@ export class UserRepository {
   }
 
   async list(params: ListParams & { role?: Role }) {
-    const { page, pageSize, search, role } = params;
+    const { page, pageSize, search, role, status } = params;
     const where: Prisma.UserWhereInput = {
       ...this.notDeleted,
       ...(role ? { role } : {}),
+      ...(status === "active" ? { isActive: true } : {}),
+      ...(status === "inactive" ? { isActive: false } : {}),
       ...(search
         ? {
             OR: [

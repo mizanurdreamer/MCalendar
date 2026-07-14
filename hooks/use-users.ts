@@ -6,11 +6,21 @@ import type { Paginated, UserView } from "@/models/view";
 
 const KEY = "users";
 
-export function useUsers(params: { page?: number; search?: string; role?: string } = {}) {
+export function useUsers(
+  params: {
+    page?: number;
+    search?: string;
+    role?: string;
+    status?: string;
+    sort?: string;
+  } = {}
+) {
   const query = new URLSearchParams();
   query.set("page", String(params.page ?? 1));
   if (params.search) query.set("search", params.search);
   if (params.role) query.set("role", params.role);
+  if (params.status && params.status !== "all") query.set("status", params.status);
+  if (params.sort) query.set("sort", params.sort);
   return useQuery({
     queryKey: [KEY, params],
     queryFn: () => api.get<Paginated<UserView>>(`/api/users?${query.toString()}`),
