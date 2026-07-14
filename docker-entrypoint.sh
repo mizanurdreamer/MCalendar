@@ -1,8 +1,8 @@
 #!/bin/sh
-set -e
+set -eu
 
-echo "▶ Applying database migrations..."
+echo "Applying database migrations..."
 node node_modules/prisma/build/index.js migrate deploy
 
-echo "▶ Starting server..."
+echo "Starting server..."
 exec node server.js
