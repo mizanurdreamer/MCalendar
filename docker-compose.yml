@@ -33,6 +33,10 @@ services:
       JWT_ACCESS_TTL: "15m"
       JWT_REFRESH_TTL: "7d"
       NODE_ENV: "production"
+      BOOKING_DATA_FETCH_ENABLED: "true"
+      CRON_BOOKING_DATA_FETCH_INTERVAL_MS: "300000"
+      CRON_FETCH_TIMEOUT_MS: "30000"
+      CRON_API_SECRET: ""
     depends_on:
       db:
         condition: service_healthy

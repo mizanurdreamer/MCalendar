@@ -35,8 +35,11 @@ model User {
   isActive     Boolean @default(true)
 
   // Relations
-  refreshTokens     RefreshToken[]
-  bookingEndpoints  ClientBookingEndpoint[]
+  refreshTokens          RefreshToken[]
+  bookingEndpoints       ClientBookingEndpoint[]
+  clientBookingData      ClientBookingData[] @relation("ClientBookingData")
+  clientAssignments      CleanerAssignment[] @relation("ClientAssignments")
+  cleanerAssignments     CleanerAssignment[] @relation("CleanerAssignments")
 
   // Audit + soft delete
   createdAt DateTime  @default(now())
@@ -71,6 +74,9 @@ model ClientBookingEndpoint {
   url      String
   isActive Boolean @default(true)
 
+  // Relations
+  bookingData ClientBookingData[]
+
   // Audit + soft delete
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -81,4 +87,86 @@ model ClientBookingEndpoint {
   @@index([clientId])
   @@index([deletedAt])
   @@map("ClientBookingEndpoints")
+}
+
+// ----------------------------------------------------------------------------
+// Cron Job: BookingFetchData
+// ----------------------------------------------------------------------------
+model bookingFetchData {
+  id         String   @id @default(uuid()) @db.Uuid
+  endpointId String   @db.Uuid
+  endpoint   ClientBookingEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  clientId   String   @db.Uuid
+  client     User     @relation("ClientBookingData", fields: [clientId], references: [id], onDelete: Cascade)
+
+  rowData String ? 
+  fetchedAt string?
+
+  // Audit
+  createdAt  DateTime @default(now())
+
+  @@index([endpointId])
+  @@index([clientId])
+  @@index([fetchedAt])
+  @@map("ClientBookingData")
+}
+// ----------------------------------------------------------------------------
+// Cron Job: guestBookingInfo
+// ----------------------------------------------------------------------------
+
+model guestBookingInfo {
+  id         String   @id @default(uuid()) @db.Uuid
+  endpointId String   @db.Uuid
+  endpoint   ClientBookingEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  clientId   String   @db.Uuid
+  client     User     @relation("ClientBookingData", fields: [clientId], references: [id], onDelete: Cascade)
+  fetchDataId String   @db.Uuid
+  endpoint   bookingFetchData @relation(fields: [fetchDataId], references: [id], onDelete: Cascade)
+
+  // Parsed booking fields
+  UID    String?
+  DTSTAMP
+  startDate  DateTime?
+  endDate    DateTime?
+  summary     String?  // confirmed, tentative, cancelled
+  description string? 
+
+  // Audit
+  createdAt  DateTime @default(now())
+
+  @@index([endpointId])
+  @@index([clientId])
+  @@index([fetchedAt])
+  @@map("ClientBookingData")
+}
+
+// ----------------------------------------------------------------------------
+// Client ↔ Cleaner Task Schedule
+// ----------------------------------------------------------------------------
+
+model cleanerTaskSchedule {
+  id        String   @id @default(uuid()) @db.Uuid
+  clientId  String   @db.Uuid
+  cleanerId String   @db.Uuid
+  cleaner   CleanerProfile     @relation("cleanerTaskSchedule", fields: [cleanerProfileId], references: [id], onDelete: Cascade)
+  guestBookingId    @db.Uuid
+  guestBooking   GuestBookingInfo @relation(fields: [guestBookingId], references: [id], onDelete: Cascade)
+
+  // Date range for assignment
+  taskStartDate DateTime
+  taskEndDate   DateTime?
+  isActive  Boolean  @default(true)
+
+  // Audit + soft delete
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  createdBy String?   @db.Uuid
+  updatedBy String?   @db.Uuid
+  deletedAt DateTime?
+
+  @@unique([clientId, cleanerId, taskStartDate])
+  @@index([clientId])
+  @@index([cleanerId])
+  @@index([taskStartDate, taskEndDate])
+  @@map("CleanerAssignments")
 }
