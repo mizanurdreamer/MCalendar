@@ -1,5 +1,5 @@
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
-import type { Role } from "@prisma/client";
+import type { Role } from "@/models/role";
 
 /**
  * JWT helpers built on `jose` so they run in both the Node.js runtime

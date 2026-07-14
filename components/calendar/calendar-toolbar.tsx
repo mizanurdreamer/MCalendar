@@ -30,10 +30,10 @@ export function CalendarToolbar({
   return (
     <>
       <div className="flex flex-wrap items-center gap-2.5 md:gap-3">
-        <h2 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl md:text-5xl">
+        <h2 className="text-5xl font-extrabold tracking-tight text-slate-900">
           {heading}
         </h2>
-        <div className="inline-flex items-center gap-1 rounded-full border bg-background p-1">
+        <div className="inline-flex items-center gap-1 rounded-full p-1">
           <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => onNavigate("prev")}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -43,12 +43,18 @@ export function CalendarToolbar({
         </div>
 
         <div className="ml-auto flex w-full flex-wrap items-center gap-2 lg:w-auto lg:justify-end">
-          <Input placeholder="Search guests, properties..." className="h-10 w-full rounded-full sm:w-[280px]" />
-          <div className="inline-flex items-center rounded-full border bg-muted/30 p-1">
+          <Input
+            placeholder="Search guests, properties..."
+            className="h-12 w-full rounded-2xl border-slate-300 bg-white text-[17px] sm:w-[290px]"
+          />
+          <div className="inline-flex items-center rounded-2xl bg-slate-200 p-1">
             <Button
               size="sm"
               variant={viewMode === "month" ? "default" : "ghost"}
-              className={cn("h-8 rounded-full px-4 text-sm", viewMode !== "month" && "text-muted-foreground")}
+              className={cn(
+                "h-10 rounded-xl px-5 text-[17px] font-semibold",
+                viewMode !== "month" && "text-slate-600",
+              )}
               onClick={() => onViewModeChange("month")}
             >
               Month
@@ -56,7 +62,10 @@ export function CalendarToolbar({
             <Button
               size="sm"
               variant={viewMode === "week" ? "default" : "ghost"}
-              className={cn("h-8 rounded-full px-4 text-sm", viewMode !== "week" && "text-muted-foreground")}
+              className={cn(
+                "h-10 rounded-xl px-5 text-[17px] font-semibold",
+                viewMode !== "week" && "text-slate-600",
+              )}
               onClick={() => onViewModeChange("week")}
             >
               Week
@@ -64,13 +73,16 @@ export function CalendarToolbar({
             <Button
               size="sm"
               variant={viewMode === "day" ? "default" : "ghost"}
-              className={cn("h-8 rounded-full px-4 text-sm", viewMode !== "day" && "text-muted-foreground")}
+              className={cn(
+                "h-10 rounded-xl px-5 text-[17px] font-semibold",
+                viewMode !== "day" && "text-slate-600",
+              )}
               onClick={() => onViewModeChange("day")}
             >
               Day
             </Button>
           </div>
-          <Button className="h-10 rounded-full px-4">
+          <Button className="h-12 rounded-2xl px-5 text-[17px] font-semibold">
             <Plus className="mr-1 h-4 w-4" />
             New booking
           </Button>
@@ -84,10 +96,10 @@ export function CalendarToolbar({
               key={property}
               variant={activeProperty === property ? "default" : "secondary"}
               className={cn(
-                "cursor-pointer whitespace-nowrap rounded-full px-4 py-2 text-sm",
+                "cursor-pointer whitespace-nowrap rounded-2xl border px-5 py-2.5 text-[17px] font-semibold",
                 activeProperty === property
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
               )}
               onClick={() => onChangeProperty(property)}
             >

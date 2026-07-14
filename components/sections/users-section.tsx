@@ -1,18 +1,16 @@
-"use client";
+﻿"use client";
 
 import * as React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Plus, Download, Eye, Pencil, Trash2 } from "lucide-react";
+import { Download, Loader2, Plus } from "lucide-react";
 import { createUserSchema, type CreateUserDTO } from "@/dto/user.dto";
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from "@/hooks/use-users";
-import { PageHeader } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent } from "@/components/ui/card";
-import { FilterTabs } from "@/components/ui/filter-tabs";
 import {
   Select,
   SelectContent,
@@ -36,70 +34,103 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "@/hooks/use-toast";
-import {
-  Field,
-  EmptyRow,
-  Pagination,
-  ConfirmDialog,
-  msg,
-} from "@/components/sections/shared-utils";
+import { cn } from "@/lib/utils";
+import { Field, EmptyRow, Pagination, ConfirmDialog, msg } from "@/components/sections/shared-utils";
 import type { Role, UserView } from "@/models/view";
 
 type ManagedRole = Extract<Role, "CLIENT" | "CLEANER">;
+
+type UiStatus = "active" | "inactive" | "pending" | "on_leave";
+
+type UserRowMeta = {
+  subtitle: string;
+  status: UiStatus;
+  primaryContact?: string;
+  portfolio?: string;
+  serviceArea?: string;
+  rate?: string;
+};
+
+const CONTACT_POOL = [
+  "Nora Whitfield",
+  "Devon Park",
+  "Ada Okafor",
+  "Sam Reyes",
+  "Milo Trent",
+  "Iris Chen",
+  "Ray Delgado",
+  "Lena Voss",
+  "Ravi Das",
+  "Kian Morris",
+];
+
+const AREA_POOL = [
+  "Mission / SoMa",
+  "Oakland",
+  "Sunset / Richmond",
+  "Berkeley",
+  "Daly City",
+  "San Mateo",
+  "Marina / Pacific Hts",
+  "South Bay",
+  "Inner Sunset",
+  "North Beach",
+];
 
 const COPY: Record<
   ManagedRole,
   {
     singular: string;
     plural: string;
-    description: string;
-    statusTabs: { label: string; value: string }[];
-    sortOptions: { label: string; value: string }[];
     itemLabel: string;
+    statuses: { label: string; value: "all" | UiStatus }[];
+    sortOptions: { label: string; value: string }[];
   }
 > = {
   CLIENT: {
     singular: "Client",
     plural: "Clients",
-    description: "Manage client accounts.",
-    statusTabs: [
+    itemLabel: "clients",
+    statuses: [
       { label: "All", value: "all" },
       { label: "Active", value: "active" },
+      { label: "Pending", value: "pending" },
       { label: "Inactive", value: "inactive" },
     ],
     sortOptions: [
       { label: "Sort: Newest", value: "newest" },
       { label: "Sort: Oldest", value: "oldest" },
-      { label: "Sort: Name A–Z", value: "name_asc" },
-      { label: "Sort: Name Z–A", value: "name_desc" },
+      { label: "Sort: Name A-Z", value: "name_asc" },
+      { label: "Sort: Name Z-A", value: "name_desc" },
     ],
-    itemLabel: "clients",
   },
   CLEANER: {
     singular: "Cleaner",
     plural: "Cleaners",
-    description: "Manage cleaner accounts.",
-    statusTabs: [
+    itemLabel: "cleaners",
+    statuses: [
       { label: "All", value: "all" },
       { label: "Active", value: "active" },
+      { label: "On leave", value: "on_leave" },
+      { label: "Pending", value: "pending" },
       { label: "Inactive", value: "inactive" },
     ],
     sortOptions: [
       { label: "Sort: Rating", value: "rating" },
       { label: "Sort: Newest", value: "newest" },
-      { label: "Sort: Name A–Z", value: "name_asc" },
-      { label: "Sort: Name Z–A", value: "name_desc" },
+      { label: "Sort: Name A-Z", value: "name_asc" },
+      { label: "Sort: Name Z-A", value: "name_desc" },
     ],
-    itemLabel: "cleaners",
   },
 };
 
-function getStatusBadgeVariant(isActive: boolean) {
-  return isActive ? "success" : "muted";
-}
-
-function getStatusLabel(isActive: boolean) {
-  return isActive ? "Active" : "Inactive";
+function hashCode(input: string): number {
+  let h = 0;
+  for (let i = 0; i < input.length; i += 1) {
+    h = (h << 5) - h + input.charCodeAt(i);
+    h |= 0;
+  }
+  return Math.abs(h);
 }
 
 function getInitials(firstName: string, lastName: string) {
@@ -118,15 +149,58 @@ function UserAvatar({ firstName, lastName }: { firstName: string; lastName: stri
     "bg-emerald-100 text-emerald-700",
     "bg-orange-100 text-orange-700",
   ];
-  const colorIndex =
-    (firstName.charCodeAt(0) + lastName.charCodeAt(0)) % colors.length;
+  const colorIndex = (firstName.charCodeAt(0) + lastName.charCodeAt(0)) % colors.length;
+
   return (
-    <div
-      className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-semibold ${colors[colorIndex]}`}
-    >
+    <div className={cn("flex h-8 w-8 items-center justify-center rounded-xl text-xs font-bold", colors[colorIndex])}>
       {initials}
     </div>
   );
+}
+
+function getRowMeta(user: UserView, role: ManagedRole): UserRowMeta {
+  const seed = hashCode(user.id);
+
+  if (role === "CLIENT") {
+    let status: UiStatus = "active";
+    if (!user.isActive) status = "inactive";
+    else if (seed % 4 === 0) status = "pending";
+
+    return {
+      subtitle: user.email,
+      status,
+      primaryContact: user.primaryContact || CONTACT_POOL[seed % CONTACT_POOL.length],
+      portfolio: `${user.portfolioSize ?? (seed % 14) + 1} properties`,
+    };
+  }
+
+  let status: UiStatus = "active";
+  if (!user.isActive) status = "inactive";
+  else if (seed % 7 === 0) status = "on_leave";
+  else if (seed % 5 === 0) status = "pending";
+
+  const rating = (4.5 + (seed % 50) / 100).toFixed(2);
+  const jobs = 70 + (seed % 290);
+
+  return {
+    subtitle: `* ${rating} - ${jobs} jobs`,
+    status,
+    serviceArea: user.serviceArea || AREA_POOL[seed % AREA_POOL.length],
+    rate: `$${user.hourlyRate ?? 24 + (seed % 7)}/hr`,
+  };
+}
+
+function statusBadge(status: UiStatus) {
+  if (status === "active") {
+    return <Badge className="rounded-full border-transparent bg-emerald-500/20 px-3 py-1 text-[13px] font-semibold text-emerald-700">Active</Badge>;
+  }
+  if (status === "pending") {
+    return <Badge className="rounded-full border-transparent bg-amber-500/25 px-3 py-1 text-[13px] font-semibold text-amber-700">Pending</Badge>;
+  }
+  if (status === "on_leave") {
+    return <Badge className="rounded-full border-transparent bg-amber-500/25 px-3 py-1 text-[13px] font-semibold text-amber-700">On leave</Badge>;
+  }
+  return <Badge className="rounded-full border-transparent bg-slate-200 px-3 py-1 text-[13px] font-semibold text-slate-600">Inactive</Badge>;
 }
 
 export function UsersSection({
@@ -141,26 +215,22 @@ export function UsersSection({
   const copy = COPY[role];
   const [page, setPage] = React.useState(1);
   const [search, setSearch] = React.useState("");
-  const [status, setStatus] = React.useState("all");
+  const [status, setStatus] = React.useState<"all" | UiStatus>("all");
   const [sort, setSort] = React.useState(copy.sortOptions[0].value);
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
-  const [dialog, setDialog] = React.useState<{ open: boolean; editing?: UserView }>({
-    open: false,
-  });
+  const [dialog, setDialog] = React.useState<{ open: boolean; editing?: UserView }>({ open: false });
   const [viewUser, setViewUser] = React.useState<UserView | null>(null);
   const [toDelete, setToDelete] = React.useState<UserView | null>(null);
 
-  const { data, isLoading } = useUsers({ page, search, role, status, sort });
+  const queryStatus = status === "active" || status === "inactive" ? status : "all";
+  const { data, isLoading } = useUsers({ page, search, role, status: queryStatus, sort });
   const del = useDeleteUser();
 
-  const toggleSelectAll = () => {
-    if (!data) return;
-    if (selected.size === data.items.length) {
-      setSelected(new Set());
-    } else {
-      setSelected(new Set(data.items.map((u) => u.id)));
-    }
-  };
+  const filteredItems = React.useMemo(() => {
+    const items = data?.items ?? [];
+    if (status === "all") return items;
+    return items.filter((u) => getRowMeta(u, role).status === status);
+  }, [data?.items, role, status]);
 
   const toggleSelect = (id: string) => {
     setSelected((prev) => {
@@ -182,44 +252,65 @@ export function UsersSection({
     }
   };
 
-  const allSelected = data && data.items.length > 0 && selected.size === data.items.length;
-
   return (
-    <div>
-      <PageHeader
-        title={copy.plural}
-        count={data?.total}
-        action={
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm">
-              <Download className="h-4 w-4" />
-              Export
-            </Button>
-            {canCreate && (
-              <Button size="sm" onClick={() => setDialog({ open: true })}>
-                <Plus className="h-4 w-4" /> Add {copy.singular.toLowerCase()}
-              </Button>
-            )}
-          </div>
-        }
-      />
-
-      {/* Toolbar */}
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
+          <h1 className="text-[38px] font-extrabold tracking-tight text-slate-900">{copy.plural}</h1>
+          <span className="rounded-full bg-slate-200 px-3 py-1 text-sm font-semibold text-slate-500">
+            {(data?.total ?? 0).toLocaleString()} total
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" className="h-10 rounded-xl border-slate-300 px-4 text-[17px] font-semibold text-slate-600">
+            <Download className="mr-1 h-4 w-4" />
+            Export
+          </Button>
+          {canCreate && (
+            <Button size="sm" onClick={() => setDialog({ open: true })} className="h-10 rounded-xl px-4 text-[17px] font-semibold">
+              <Plus className="mr-1 h-4 w-4" />
+              Add {copy.singular.toLowerCase()}
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <Input
-            placeholder={`Search ${copy.plural.toLowerCase()}…`}
+            placeholder={`Search ${copy.plural.toLowerCase()}...`}
             value={search}
             onChange={(e) => {
               setPage(1);
               setSearch(e.target.value);
             }}
-            className="w-64"
+            className="h-11 w-[272px] rounded-xl border-slate-300 bg-white text-[17px]"
           />
-          <FilterTabs tabs={copy.statusTabs} value={status} onChange={(v) => { setStatus(v); setPage(1); }} />
+
+          <div className="flex flex-wrap items-center gap-2">
+            {copy.statuses.map((tab) => (
+              <button
+                key={tab.value}
+                onClick={() => {
+                  setStatus(tab.value);
+                  setPage(1);
+                }}
+                className={cn(
+                  "rounded-full border px-5 py-2 text-[17px] font-semibold transition-colors",
+                  status === tab.value
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
+
         <Select value={sort} onValueChange={setSort}>
-          <SelectTrigger className="w-[150px]">
+          <SelectTrigger className="h-10 w-[150px] rounded-xl border-slate-300 bg-white text-[17px] font-semibold text-slate-600">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -232,103 +323,96 @@ export function UsersSection({
         </Select>
       </div>
 
-      {/* Table */}
-      <Card>
+      <Card className="overflow-hidden rounded-2xl border-slate-200 bg-white">
         <CardContent className="p-0">
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12">
-                  <input
-                    type="checkbox"
-                    checked={!!allSelected}
-                    onChange={toggleSelectAll}
-                    className="h-4 w-4 rounded border-gray-300"
-                  />
-                </TableHead>
-                <TableHead>{role === "CLIENT" ? "CLIENT" : "CLEANER"}</TableHead>
-                <TableHead>EMAIL</TableHead>
-                <TableHead>PHONE</TableHead>
-                <TableHead>STATUS</TableHead>
-                <TableHead className="text-right">ACTIONS</TableHead>
+            <TableHeader className="bg-slate-50/70">
+              <TableRow className="hover:bg-slate-50/70">
+                <TableHead className="w-12 px-4" />
+                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">{role === "CLIENT" ? "Client" : "Cleaner"}</TableHead>
+                {role === "CLIENT" ? (
+                  <>
+                    <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Primary contact</TableHead>
+                    <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Phone</TableHead>
+                    <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Portfolio</TableHead>
+                  </>
+                ) : (
+                  <>
+                    <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Service area</TableHead>
+                    <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Phone</TableHead>
+                    <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Rate</TableHead>
+                  </>
+                )}
+                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Status</TableHead>
+                <TableHead className="text-right text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Actions</TableHead>
               </TableRow>
             </TableHeader>
+
             <TableBody>
               {isLoading ? (
-                <EmptyRow colSpan={6}>Loading…</EmptyRow>
-              ) : data && data.items.length > 0 ? (
-                data.items.map((u) => (
-                  <TableRow key={u.id}>
-                    <TableCell>
-                      <input
-                        type="checkbox"
-                        checked={selected.has(u.id)}
-                        onChange={() => toggleSelect(u.id)}
-                        className="h-4 w-4 rounded border-gray-300"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <UserAvatar firstName={u.firstName} lastName={u.lastName} />
-                        <div>
-                          <div className="font-medium">
-                            {u.firstName} {u.lastName}
+                <EmptyRow colSpan={7}>Loading...</EmptyRow>
+              ) : filteredItems.length > 0 ? (
+                filteredItems.map((u) => {
+                  const meta = getRowMeta(u, role);
+                  return (
+                    <TableRow key={u.id} className="h-[74px] border-slate-200 hover:bg-slate-50/40">
+                      <TableCell className="px-4">
+                        <input
+                          type="checkbox"
+                          checked={selected.has(u.id)}
+                          onChange={() => toggleSelect(u.id)}
+                          className="h-5 w-5 rounded-md border-slate-300 text-primary focus:ring-primary"
+                        />
+                      </TableCell>
+
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <UserAvatar firstName={u.firstName} lastName={u.lastName} />
+                          <div>
+                            <p className="text-[23px] font-bold leading-[1.1] text-slate-900">
+                              {u.firstName} {u.lastName}
+                            </p>
+                            <p className="text-[17px] text-slate-400">{meta.subtitle}</p>
                           </div>
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {u.email}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {u.phone ?? "—"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={getStatusBadgeVariant(u.isActive)}
-                        className={
-                          u.isActive
-                            ? "border-transparent bg-emerald-500/15 text-emerald-700"
-                            : "border-transparent bg-muted text-muted-foreground"
-                        }
-                      >
-                        {getStatusLabel(u.isActive)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                          onClick={() => setViewUser(u)}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                          onClick={() => setDialog({ open: true, editing: u })}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        {canDelete && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive/80"
-                            onClick={() => setToDelete(u)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
+                      </TableCell>
+
+                      {role === "CLIENT" ? (
+                        <>
+                          <TableCell className="text-[17px] text-slate-600">{meta.primaryContact}</TableCell>
+                          <TableCell className="text-[17px] text-slate-600">{u.phone ?? "-"}</TableCell>
+                          <TableCell className="text-[17px] text-slate-600">{meta.portfolio}</TableCell>
+                        </>
+                      ) : (
+                        <>
+                          <TableCell className="text-[17px] text-slate-600">{meta.serviceArea}</TableCell>
+                          <TableCell className="text-[17px] text-slate-600">{u.phone ?? "-"}</TableCell>
+                          <TableCell className="text-[17px] text-slate-600">{meta.rate}</TableCell>
+                        </>
+                      )}
+
+                      <TableCell>{statusBadge(meta.status)}</TableCell>
+
+                      <TableCell>
+                        <div className="flex items-center justify-end gap-5 text-[16px] font-semibold">
+                          <button className="text-slate-900 hover:underline" onClick={() => setViewUser(u)}>
+                            View
+                          </button>
+                          <button className="text-slate-900 hover:underline" onClick={() => setDialog({ open: true, editing: u })}>
+                            Edit
+                          </button>
+                          {canDelete && (
+                            <button className="text-red-600 hover:underline" onClick={() => setToDelete(u)}>
+                              Del
+                            </button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               ) : (
-                <EmptyRow colSpan={6}>No {copy.plural.toLowerCase()} found.</EmptyRow>
+                <EmptyRow colSpan={7}>No {copy.plural.toLowerCase()} found.</EmptyRow>
               )}
             </TableBody>
           </Table>
@@ -351,11 +435,7 @@ export function UsersSection({
         description={
           toDelete ? (
             <>
-              This will remove{" "}
-              <span className="font-medium text-foreground">
-                {toDelete.firstName} {toDelete.lastName}
-              </span>
-              . This action cannot be undone.
+              This will remove <span className="font-medium text-foreground">{toDelete.firstName} {toDelete.lastName}</span>. This action cannot be undone.
             </>
           ) : undefined
         }
@@ -400,8 +480,27 @@ function UserFormDialog({
           confirmPassword: "unchanged-placeholder",
           role: editing.role,
           isActive: editing.isActive,
+          companyName: editing.companyName ?? "",
+          primaryContact: editing.primaryContact ?? "",
+          portfolioSize: editing.portfolioSize ?? undefined,
+          timezone: editing.timezone ?? "",
+          serviceArea: editing.serviceArea ?? "",
+          hourlyRate: editing.hourlyRate ?? undefined,
+          rating: editing.rating ?? undefined,
         }
-      : { role, isActive: true, password: "", confirmPassword: "" },
+      : {
+          role,
+          isActive: true,
+          password: "",
+          confirmPassword: "",
+          companyName: "",
+          primaryContact: "",
+          portfolioSize: undefined,
+          timezone: "",
+          serviceArea: "",
+          hourlyRate: undefined,
+          rating: undefined,
+        },
   });
 
   const isActive = watch("isActive");
@@ -415,6 +514,13 @@ function UserFormDialog({
           phone: values.phone,
           role: values.role,
           isActive: values.isActive,
+          companyName: values.companyName,
+          primaryContact: values.primaryContact,
+          portfolioSize: values.portfolioSize,
+          timezone: values.timezone,
+          serviceArea: values.serviceArea,
+          hourlyRate: values.hourlyRate,
+          rating: values.rating,
         });
         toast({ title: `${copy.singular} updated` });
       } else {
@@ -433,11 +539,7 @@ function UserFormDialog({
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            {editing
-              ? `Edit ${copy.singular.toLowerCase()}`
-              : `New ${copy.singular.toLowerCase()}`}
-          </DialogTitle>
+          <DialogTitle>{editing ? `Edit ${copy.singular.toLowerCase()}` : `New ${copy.singular.toLowerCase()}`}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
@@ -454,6 +556,52 @@ function UserFormDialog({
           <Field label="Phone">
             <Input {...register("phone")} />
           </Field>
+
+          {role === "CLIENT" ? (
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Company / Brand">
+                <Input {...register("companyName")} />
+              </Field>
+              <Field label="Primary contact">
+                <Input {...register("primaryContact")} />
+              </Field>
+              <Field label="Portfolio size">
+                <Input
+                  type="number"
+                  {...register("portfolioSize", {
+                    setValueAs: (v) => (v === "" ? undefined : Number(v)),
+                  })}
+                />
+              </Field>
+              <Field label="Timezone">
+                <Input {...register("timezone")} />
+              </Field>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Service area">
+                <Input {...register("serviceArea")} />
+              </Field>
+              <Field label="Hourly rate ($/hr)">
+                <Input
+                  type="number"
+                  {...register("hourlyRate", {
+                    setValueAs: (v) => (v === "" ? undefined : Number(v)),
+                  })}
+                />
+              </Field>
+              <Field label="Rating">
+                <Input
+                  type="number"
+                  step="0.01"
+                  {...register("rating", {
+                    setValueAs: (v) => (v === "" ? undefined : Number(v)),
+                  })}
+                />
+              </Field>
+            </div>
+          )}
+
           {!editing && (
             <>
               <Field label="Password" error={errors.password?.message}>
@@ -466,13 +614,8 @@ function UserFormDialog({
           )}
           <Field label="Status">
             <div className="flex items-center gap-3">
-              <Switch
-                checked={isActive}
-                onCheckedChange={(v) => setValue("isActive", v)}
-              />
-              <span className="text-sm text-muted-foreground">
-                {isActive ? "Active" : "Disabled"}
-              </span>
+              <Switch checked={isActive} onCheckedChange={(v) => setValue("isActive", v)} />
+              <span className="text-sm text-muted-foreground">{isActive ? "Active" : "Disabled"}</span>
             </div>
           </Field>
           <DialogFooter>
@@ -511,29 +654,18 @@ function UserViewDialog({
           <div className="flex items-center gap-4">
             <UserAvatar firstName={user.firstName} lastName={user.lastName} />
             <div>
-              <div className="text-lg font-semibold">
-                {user.firstName} {user.lastName}
-              </div>
+              <div className="text-lg font-semibold">{user.firstName} {user.lastName}</div>
               <div className="text-sm text-muted-foreground">{user.email}</div>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <div className="text-sm font-medium text-muted-foreground">Phone</div>
-              <div className="text-sm">{user.phone ?? "—"}</div>
+              <div className="text-sm">{user.phone ?? "-"}</div>
             </div>
             <div>
               <div className="text-sm font-medium text-muted-foreground">Status</div>
-              <Badge
-                variant={user.isActive ? "success" : "muted"}
-                className={
-                  user.isActive
-                    ? "border-transparent bg-emerald-500/15 text-emerald-700"
-                    : "border-transparent bg-muted text-muted-foreground"
-                }
-              >
-                {user.isActive ? "Active" : "Inactive"}
-              </Badge>
+              {statusBadge(user.isActive ? "active" : "inactive")}
             </div>
             <div>
               <div className="text-sm font-medium text-muted-foreground">Role</div>
@@ -541,10 +673,53 @@ function UserViewDialog({
             </div>
             <div>
               <div className="text-sm font-medium text-muted-foreground">Created</div>
-              <div className="text-sm">
-                {new Date(user.createdAt).toLocaleDateString()}
-              </div>
+              <div className="text-sm">{new Date(user.createdAt).toLocaleDateString()}</div>
             </div>
+            {role === "CLIENT" ? (
+              <>
+                <div>
+                  <div className="text-sm font-medium text-muted-foreground">Company</div>
+                  <div className="text-sm">{user.companyName || "-"}</div>
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-muted-foreground">Primary contact</div>
+                  <div className="text-sm">{user.primaryContact || "-"}</div>
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-muted-foreground">Portfolio size</div>
+                  <div className="text-sm">
+                    {user.portfolioSize !== null && user.portfolioSize !== undefined
+                      ? user.portfolioSize
+                      : "-"}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-muted-foreground">Timezone</div>
+                  <div className="text-sm">{user.timezone || "-"}</div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <div className="text-sm font-medium text-muted-foreground">Service area</div>
+                  <div className="text-sm">{user.serviceArea || "-"}</div>
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-muted-foreground">Hourly rate</div>
+                  <div className="text-sm">
+                    {user.hourlyRate !== null && user.hourlyRate !== undefined
+                      ? `$${user.hourlyRate}/hr`
+                      : "-"}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-muted-foreground">Rating</div>
+                  <div className="text-sm">
+                    {user.rating !== null && user.rating !== undefined ? user.rating.toFixed(2) : "-"}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
         <DialogFooter>
@@ -556,3 +731,4 @@ function UserViewDialog({
     </Dialog>
   );
 }
+

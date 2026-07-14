@@ -5,12 +5,13 @@ import { parseListParams } from "@/dto/common.dto";
 import { created, ok, handleApiError } from "@/lib/response";
 import { requireActor } from "@/lib/auth";
 import { ForbiddenError } from "@/lib/errors";
-import type { Role } from "@prisma/client";
+import { isRole, type Role } from "@/models/role";
 
 export async function GET(req: NextRequest) {
   try {
     const actor = await requireActor("SUPER_ADMIN", "CLIENT");
-    const roleParam = req.nextUrl.searchParams.get("role") as Role | null;
+    const rawRole = req.nextUrl.searchParams.get("role");
+    const roleParam: Role | null = rawRole && isRole(rawRole) ? rawRole : null;
 
     // Clients may only browse cleaners; super admins may browse anyone.
     if (actor.role !== "SUPER_ADMIN" && roleParam !== "CLEANER") {

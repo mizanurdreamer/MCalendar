@@ -6,6 +6,7 @@ import {
   Sun,
   Link2,
   CalendarDays,
+  UserCircle2,
 } from "lucide-react";
 import type { Role } from "@/models/view";
 
@@ -25,6 +26,7 @@ const SUPER_ADMIN_NAV: NavItem[] = [
 const CLIENT_NAV: NavItem[] = [
   { label: "Today", href: "/client/today", icon: Sun, exact: true },
   { label: "Calendar", href: "/client/calendar", icon: CalendarDays },
+  { label: "Profile", href: "/client/profile", icon: UserCircle2 },
   {
     label: "Booking Endpoints",
     href: "/client/booking-endpoints",
@@ -35,6 +37,7 @@ const CLIENT_NAV: NavItem[] = [
 
 const CLEANER_NAV: NavItem[] = [
   { label: "Today", href: "/cleaner/today", icon: Sun, exact: true },
+  { label: "Profile", href: "/cleaner/profile", icon: UserCircle2 },
 ];
 
 export const NAV_BY_ROLE: Record<Role, NavItem[]> = {

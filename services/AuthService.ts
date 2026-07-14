@@ -1,4 +1,4 @@
-import type { User } from "@prisma/client";
+import type { User } from "@/repositories/UserRepository";
 import { userRepository } from "@/repositories/UserRepository";
 import { refreshTokenRepository } from "@/repositories/RefreshTokenRepository";
 import { hashPassword, verifyPassword, sha256 } from "@/lib/password";
@@ -12,7 +12,27 @@ import {
 import { BadRequestError, ConflictError, UnauthorizedError } from "@/lib/errors";
 import type { LoginDTO, RegisterDTO } from "@/dto/auth.dto";
 
-export type PublicUser = Omit<User, "passwordHash">;
+export type PublicUser = {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone: string | null;
+  role: User["role"];
+  isActive: boolean;
+  companyName: string | null;
+  primaryContact: string | null;
+  portfolioSize: number | null;
+  timezone: string | null;
+  serviceArea: string | null;
+  hourlyRate: number | null;
+  rating: number | null;
+  createdAt: Date;
+  updatedAt: Date;
+  createdBy: string | null;
+  updatedBy: string | null;
+  deletedAt: Date | null;
+};
 
 export type AuthResult = {
   user: PublicUser;
@@ -21,8 +41,30 @@ export type AuthResult = {
 };
 
 function toPublicUser(user: User): PublicUser {
-  const { passwordHash: _passwordHash, ...rest } = user;
-  return rest;
+  const clientProfile = user.clientProfile;
+  const cleanerProfile = user.cleanerProfile;
+
+  return {
+    id: user.id,
+    email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    phone: user.phone,
+    role: user.role,
+    isActive: user.isActive,
+    companyName: clientProfile?.companyName ?? null,
+    primaryContact: clientProfile?.primaryContact ?? null,
+    portfolioSize: clientProfile?.portfolioSize ?? null,
+    timezone: clientProfile?.timezone ?? null,
+    serviceArea: cleanerProfile?.serviceArea ?? null,
+    hourlyRate: cleanerProfile?.hourlyRate ?? null,
+    rating: cleanerProfile?.rating ? Number(cleanerProfile.rating) : null,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+    createdBy: user.createdBy,
+    updatedBy: user.updatedBy,
+    deletedAt: user.deletedAt,
+  };
 }
 
 /** Simple, sortable-ish booking-agnostic id fragment for generated codes. */

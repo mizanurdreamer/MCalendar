@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ACCESS_COOKIE, verifyAccessToken } from "@/lib/jwt";
-import type { Role } from "@prisma/client";
+import type { Role } from "@/models/role";
 
 /**
  * Edge middleware — protects dashboard pages and routes users to the section

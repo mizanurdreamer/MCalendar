@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
+import { TableCell, TableRow } from "@/components/ui/table";
 import { ApiError } from "@/lib/api-client";
 
 export function Field({
@@ -67,15 +67,11 @@ export function Pagination({
 
   const pages: (number | "...")[] = [];
   if (data.totalPages <= 7) {
-    for (let i = 1; i <= data.totalPages; i++) pages.push(i);
+    for (let i = 1; i <= data.totalPages; i += 1) pages.push(i);
   } else {
     pages.push(1);
     if (page > 3) pages.push("...");
-    for (
-      let i = Math.max(2, page - 1);
-      i <= Math.min(data.totalPages - 1, page + 1);
-      i++
-    ) {
+    for (let i = Math.max(2, page - 1); i <= Math.min(data.totalPages - 1, page + 1); i += 1) {
       pages.push(i);
     }
     if (page < data.totalPages - 2) pages.push("...");
@@ -83,21 +79,21 @@ export function Pagination({
   }
 
   return (
-    <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+    <div className="mt-4 flex items-center justify-between px-2 text-sm text-slate-500">
       <span>
-        Showing {start}–{end} of {data.total.toLocaleString()} {itemLabel}
+        Showing {start}-{end} of {data.total.toLocaleString()} {itemLabel}
       </span>
       <div className="flex items-center gap-1">
         <button
-          className="px-2 py-1 text-sm font-medium text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:pointer-events-none"
+          className="px-2 py-1 text-sm font-semibold text-slate-400 hover:text-slate-700 disabled:pointer-events-none disabled:opacity-50"
           disabled={page <= 1}
           onClick={() => onPage(page - 1)}
         >
-          &lt; Prev
+          Prev
         </button>
         {pages.map((p, i) =>
           p === "..." ? (
-            <span key={`dots-${i}`} className="px-2 py-1 text-sm text-muted-foreground">
+            <span key={`dots-${i}`} className="px-2 py-1 text-sm text-slate-400">
               ...
             </span>
           ) : (
@@ -106,20 +102,20 @@ export function Pagination({
               onClick={() => onPage(p)}
               className={
                 p === page
-                  ? "flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-medium text-primary-foreground"
-                  : "flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium text-muted-foreground hover:bg-muted"
+                  ? "flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-sm font-semibold text-primary-foreground"
+                  : "flex h-8 w-8 items-center justify-center rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100"
               }
             >
               {p}
             </button>
-          )
+          ),
         )}
         <button
-          className="px-2 py-1 text-sm font-medium text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:pointer-events-none"
+          className="px-2 py-1 text-sm font-semibold text-slate-600 hover:text-slate-800 disabled:pointer-events-none disabled:opacity-50"
           disabled={page >= data.totalPages}
           onClick={() => onPage(page + 1)}
         >
-          Next &gt;
+          Next
         </button>
       </div>
     </div>
@@ -158,12 +154,7 @@ export function ConfirmDialog({
           <Button type="button" variant="outline" onClick={onClose} disabled={pending}>
             Cancel
           </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={onConfirm}
-            disabled={pending}
-          >
+          <Button type="button" variant="destructive" onClick={onConfirm} disabled={pending}>
             {pending && <Loader2 className="h-4 w-4 animate-spin" />}
             {confirmLabel}
           </Button>

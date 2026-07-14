@@ -39,7 +39,7 @@ type CalendarGridProps = {
 
 export function CalendarGrid({ calendarRef, events, onDateTitleChange, initialDate, viewMode }: CalendarGridProps) {
   return (
-    <div className="booking-fc space-y-4 rounded-2xl border bg-background p-3 shadow-sm">
+    <div className="booking-fc space-y-4 rounded-3xl border border-slate-200 bg-white p-3 shadow-sm">
       <div className="overflow-x-auto">
         <div
           className={cn(
@@ -63,7 +63,7 @@ export function CalendarGrid({ calendarRef, events, onDateTitleChange, initialDa
           />
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-4 px-1 pb-1 text-sm text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-4 px-1 pb-1 text-sm text-slate-500">
         <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-[#2563eb]" />Confirmed</span>
         <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-[#22c55e]" />Checked in</span>
         <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-[#f59e0b]" />Pending</span>

@@ -1,4 +1,4 @@
-import type { Role } from "@prisma/client";
+import type { Role } from "@/models/role";
 import { userRepository } from "@/repositories/UserRepository";
 import { hashPassword } from "@/lib/password";
 import { ConflictError, ForbiddenError, NotFoundError } from "@/lib/errors";
@@ -50,6 +50,17 @@ export class UserService {
       phone: dto.phone || null,
       role: dto.role,
       isActive: dto.isActive,
+      clientProfile: {
+        companyName: dto.companyName || null,
+        primaryContact: dto.primaryContact || null,
+        portfolioSize: dto.portfolioSize ?? null,
+        timezone: dto.timezone || null,
+      },
+      cleanerProfile: {
+        serviceArea: dto.serviceArea || null,
+        hourlyRate: dto.hourlyRate ?? null,
+        rating: dto.rating ?? null,
+      },
       createdBy: actor.userId,
       updatedBy: actor.userId,
     });
@@ -73,6 +84,18 @@ export class UserService {
       phone: dto.phone === "" ? null : dto.phone,
       role: isAdmin ? dto.role : undefined,
       isActive: dto.isActive,
+      clientProfile: {
+        companyName: dto.companyName === undefined ? undefined : dto.companyName || null,
+        primaryContact:
+          dto.primaryContact === undefined ? undefined : dto.primaryContact || null,
+        portfolioSize: dto.portfolioSize,
+        timezone: dto.timezone === undefined ? undefined : dto.timezone || null,
+      },
+      cleanerProfile: {
+        serviceArea: dto.serviceArea === undefined ? undefined : dto.serviceArea || null,
+        hourlyRate: dto.hourlyRate,
+        rating: dto.rating,
+      },
       updatedBy: actor.userId,
     });
 

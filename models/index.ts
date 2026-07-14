@@ -23,10 +23,12 @@ export type AuthUser = {
   email: string;
   firstName: string;
   lastName: string;
-  role: "SUPER_ADMIN" | "CLIENT" | "CLEANER";
+  role: import("@/models/role").Role;
 };
 
 export type ActorContext = {
   userId: string;
-  role: "SUPER_ADMIN" | "CLIENT" | "CLEANER";
+  role: import("@/models/role").Role;
 };
+
+export { ROLE_VALUES, isRole, type Role } from "@/models/role";

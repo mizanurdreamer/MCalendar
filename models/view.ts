@@ -3,8 +3,8 @@
  * intentionally use `string` for timestamps.
  */
 import type { Paginated } from "@/models";
-
-export type Role = "SUPER_ADMIN" | "CLIENT" | "CLEANER";
+import type { Role } from "@/models/role";
+export type { Role } from "@/models/role";
 
 export type UserView = {
   id: string;
@@ -14,6 +14,13 @@ export type UserView = {
   phone: string | null;
   role: Role;
   isActive: boolean;
+  companyName?: string | null;
+  primaryContact?: string | null;
+  portfolioSize?: number | null;
+  timezone?: string | null;
+  serviceArea?: string | null;
+  hourlyRate?: number | null;
+  rating?: number | null;
   createdAt: string;
 };
 

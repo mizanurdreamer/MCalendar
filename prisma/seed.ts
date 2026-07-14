@@ -11,6 +11,21 @@ async function main() {
   console.log("🌱 Seeding bookingCalendar...");
 
   const password = await hash("Password123!");
+  await prisma.role.upsert({
+    where: { name: "SUPER_ADMIN" },
+    update: {},
+    create: { name: "SUPER_ADMIN" },
+  });
+  await prisma.role.upsert({
+    where: { name: "CLIENT" },
+    update: {},
+    create: { name: "CLIENT" },
+  });
+  await prisma.role.upsert({
+    where: { name: "CLEANER" },
+    update: {},
+    create: { name: "CLEANER" },
+  });
 
   await prisma.user.upsert({
     where: { email: "admin@bookingcalendar.com" },
@@ -20,7 +35,7 @@ async function main() {
       passwordHash: password,
       firstName: "Ava",
       lastName: "Admin",
-      role: "SUPER_ADMIN",
+      role: { connect: { name: "SUPER_ADMIN" } },
     },
   });
 

@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import type { NextResponse } from "next/server";
-import type { Role } from "@prisma/client";
+import type { Role } from "@/models/role";
 import {
   ACCESS_COOKIE,
   REFRESH_COOKIE,
