@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, Menu, X, Moon, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { LogOut, Menu, X, Moon, PanelLeftClose, PanelLeftOpen, Sun } from "lucide-react";
 import { cn, initials } from "@/lib/utils";
 import { NAV_BY_ROLE, type NavItem } from "@/components/dashboard/nav";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,35 @@ type SessionUser = {
   email: string;
   role: Role;
 };
+
+type Theme = "light" | "dark";
+
+const THEME_STORAGE_KEY = "bookingcalendar-theme";
+
+function getStoredTheme(): Theme {
+  if (typeof window === "undefined") {
+    return "light";
+  }
+
+  const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+  if (storedTheme === "light" || storedTheme === "dark") {
+    return storedTheme;
+  }
+
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function applyTheme(theme: Theme) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const root = window.document.documentElement;
+  root.classList.remove("light", "dark");
+  root.classList.add(theme);
+  root.style.colorScheme = theme;
+  window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+}
 
 function NavLinks({
   items,
@@ -78,8 +107,27 @@ export function DashboardShell({
 }) {
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [collapsed, setCollapsed] = React.useState(false);
+  const [theme, setTheme] = React.useState<Theme>(() => {
+    if (typeof document === "undefined") {
+      return "light";
+    }
+
+    return document.documentElement.classList.contains("dark") ? "dark" : "light";
+  });
   const logout = useLogout();
   const items = NAV_BY_ROLE[user.role];
+
+  React.useEffect(() => {
+    const initialTheme = getStoredTheme();
+    setTheme(initialTheme);
+    applyTheme(initialTheme);
+  }, []);
+
+  const toggleTheme = () => {
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    setTheme(nextTheme);
+    applyTheme(nextTheme);
+  };
 
   return (
     <div className="flex min-h-screen bg-muted/30">
@@ -130,16 +178,16 @@ export function DashboardShell({
               </div>
             )}
 
-            {/* Dark mode */}
             <button
+              onClick={toggleTheme}
               className={cn(
                 "flex items-center rounded-lg text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                 collapsed ? "justify-center px-2 py-2.5" : "mx-2 gap-3 px-3 py-2.5",
               )}
-              title={collapsed ? "Dark mode" : undefined}
+              title={collapsed ? (theme === "dark" ? "Switch to light mode" : "Switch to dark mode") : undefined}
             >
-              <Moon className="h-4 w-4" />
-              {!collapsed && <span>Dark mode</span>}
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              {!collapsed && <span>{theme === "dark" ? "Light mode" : "Dark mode"}</span>}
             </button>
 
             {/* User */}

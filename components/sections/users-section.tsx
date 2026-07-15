@@ -256,8 +256,8 @@ export function UsersSection({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <h1 className="text-[38px] font-extrabold tracking-tight text-slate-900">{copy.plural}</h1>
-          <span className="rounded-full bg-slate-200 px-3 py-1 text-sm font-semibold text-slate-500">
+          <h1 className="text-[38px] font-extrabold tracking-tight">{copy.plural}</h1>
+          <span className="rounded-full px-3 py-1 text-sm font-semibold text-slate-500 bg-slate-200 dark:text-slate-400 dark:bg-slate-800">
             {(data?.total ?? 0).toLocaleString()} total
           </span>
         </div>
@@ -285,7 +285,7 @@ export function UsersSection({
               setPage(1);
               setSearch(e.target.value);
             }}
-            className="h-11 w-[272px] rounded-xl border-slate-300 bg-white text-[17px]"
+            className="h-11 w-[272px] rounded-xl text-[17px]"
           />
 
           <div className="flex flex-wrap items-center gap-2">
@@ -300,7 +300,7 @@ export function UsersSection({
                   "rounded-full border px-5 py-2 text-[17px] font-semibold transition-colors",
                   status === tab.value
                     ? "border-primary bg-primary text-primary-foreground"
-                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
+                    : "",
                 )}
               >
                 {tab.label}
@@ -310,7 +310,7 @@ export function UsersSection({
         </div>
 
         <Select value={sort} onValueChange={setSort}>
-          <SelectTrigger className="h-10 w-[150px] rounded-xl border-slate-300 bg-white text-[17px] font-semibold text-slate-600">
+          <SelectTrigger className="h-10 w-[150px] rounded-xl text-[17px] font-semibold ">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -323,11 +323,11 @@ export function UsersSection({
         </Select>
       </div>
 
-      <Card className="overflow-hidden rounded-2xl border-slate-200 bg-white">
+      <Card className="overflow-hidden rounded-2xl">
         <CardContent className="p-0">
           <Table>
-            <TableHeader className="bg-slate-50/70">
-              <TableRow className="hover:bg-slate-50/70">
+            <TableHeader className="">
+              <TableRow className="">
                 <TableHead className="w-12 px-4" />
                 <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">{role === "CLIENT" ? "Client" : "Cleaner"}</TableHead>
                 {role === "CLIENT" ? (
