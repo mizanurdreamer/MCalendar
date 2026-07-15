@@ -1,9 +1,10 @@
 ﻿"use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Download, Loader2, Plus } from "lucide-react";
+import { CalendarClock, Download, Eye, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { createUserSchema, type CreateUserDTO } from "@/dto/user.dto";
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from "@/hooks/use-users";
 import { Button } from "@/components/ui/button";
@@ -111,8 +112,6 @@ const COPY: Record<
     statuses: [
       { label: "All", value: "all" },
       { label: "Active", value: "active" },
-      { label: "On leave", value: "on_leave" },
-      { label: "Pending", value: "pending" },
       { label: "Inactive", value: "inactive" },
     ],
     sortOptions: [
@@ -179,11 +178,8 @@ function getRowMeta(user: UserView, role: ManagedRole): UserRowMeta {
   else if (seed % 7 === 0) status = "on_leave";
   else if (seed % 5 === 0) status = "pending";
 
-  const rating = (4.5 + (seed % 50) / 100).toFixed(2);
-  const jobs = 70 + (seed % 290);
-
   return {
-    subtitle: `* ${rating} - ${jobs} jobs`,
+    subtitle: user.email,
     status,
     serviceArea: user.serviceArea || AREA_POOL[seed % AREA_POOL.length],
     rate: `$${user.hourlyRate ?? 24 + (seed % 7)}/hr`,
@@ -207,12 +203,15 @@ export function UsersSection({
   role,
   canCreate = true,
   canDelete = true,
+  availabilityBasePath = "/admin/cleaners",
 }: {
   role: ManagedRole;
   canCreate?: boolean;
   canDelete?: boolean;
+  availabilityBasePath?: string;
 }) {
   const copy = COPY[role];
+  const router = useRouter();
   const [page, setPage] = React.useState(1);
   const [search, setSearch] = React.useState("");
   const [status, setStatus] = React.useState<"all" | UiStatus>("all");
@@ -394,16 +393,45 @@ export function UsersSection({
                       <TableCell>{statusBadge(meta.status)}</TableCell>
 
                       <TableCell>
-                        <div className="flex items-center justify-end gap-5 text-[16px] font-semibold">
-                          <button className="text-slate-900 hover:underline" onClick={() => setViewUser(u)}>
-                            View
+                        <div className="flex items-center justify-end gap-1">
+                          {role === "CLEANER" && (
+                            <button
+                              type="button"
+                              title="View availability"
+                              aria-label="View availability"
+                              className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                              onClick={() => router.push(`${availabilityBasePath}/${u.id}/availability`)}
+                            >
+                              <CalendarClock className="h-5 w-5" />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            title="View"
+                            aria-label="View"
+                            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                            onClick={() => setViewUser(u)}
+                          >
+                            <Eye className="h-5 w-5" />
                           </button>
-                          <button className="text-slate-900 hover:underline" onClick={() => setDialog({ open: true, editing: u })}>
-                            Edit
+                          <button
+                            type="button"
+                            title="Edit"
+                            aria-label="Edit"
+                            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                            onClick={() => setDialog({ open: true, editing: u })}
+                          >
+                            <Pencil className="h-5 w-5" />
                           </button>
                           {canDelete && (
-                            <button className="text-red-600 hover:underline" onClick={() => setToDelete(u)}>
-                              Del
+                            <button
+                              type="button"
+                              title="Delete"
+                              aria-label="Delete"
+                              className="rounded-lg p-2 text-red-500 hover:bg-red-50 hover:text-red-700"
+                              onClick={() => setToDelete(u)}
+                            >
+                              <Trash2 className="h-5 w-5" />
                             </button>
                           )}
                         </div>
