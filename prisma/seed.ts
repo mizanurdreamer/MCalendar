@@ -33,8 +33,7 @@ async function main() {
     create: {
       email: "admin@bookingcalendar.com",
       passwordHash: password,
-      firstName: "Ava",
-      lastName: "Admin",
+      displayName: "Ava Admin",
       role: { connect: { name: "SUPER_ADMIN" } },
     },
   });
