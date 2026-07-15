@@ -5,14 +5,34 @@ import { prisma } from "@/lib/prisma";
  * Data-access for cleaner task schedules (client-cleaner with date range).
  * Prisma queries only, no business logic.
  */
+const taskScheduleInclude = {
+  client: {
+    select: {
+      id: true,
+      userId: true,
+      firstName: true,
+      lastName: true,
+      Email: true,
+      phoneNo: true,
+    },
+  },
+  cleaner: {
+    select: {
+      id: true,
+      userId: true,
+      firstName: true,
+      lastName: true,
+      Email: true,
+      phoneNo: true,
+    },
+  },
+} satisfies Prisma.CleanerTaskScheduleInclude;
+
 export class CleanerTaskScheduleRepository {
   findById(id: string) {
     return prisma.cleanerTaskSchedule.findUnique({
       where: { id },
-      include: {
-        client: { select: { id: true, firstName: true, lastName: true, email: true } },
-        cleaner: { select: { id: true, firstName: true, lastName: true, email: true } },
-      },
+      include: taskScheduleInclude,
     });
   }
 
@@ -37,10 +57,7 @@ export class CleanerTaskScheduleRepository {
         orderBy: { startDate: "desc" },
         skip: (page - 1) * pageSize,
         take: pageSize,
-        include: {
-          client: { select: { id: true, firstName: true, lastName: true, email: true } },
-          cleaner: { select: { id: true, firstName: true, lastName: true, email: true } },
-        },
+        include: taskScheduleInclude,
       }),
       prisma.cleanerTaskSchedule.count({ where }),
     ]);
@@ -58,11 +75,7 @@ export class CleanerTaskScheduleRepository {
         startDate: { lte: now },
         OR: [{ endDate: null }, { endDate: { gte: now } }],
       },
-      include: {
-        cleaner: {
-          select: { id: true, firstName: true, lastName: true, email: true, phone: true },
-        },
-      },
+      include: taskScheduleInclude,
       orderBy: { startDate: "desc" },
     });
   }
@@ -77,11 +90,7 @@ export class CleanerTaskScheduleRepository {
         startDate: { lte: now },
         OR: [{ endDate: null }, { endDate: { gte: now } }],
       },
-      include: {
-        client: {
-          select: { id: true, firstName: true, lastName: true, email: true, phone: true },
-        },
-      },
+      include: taskScheduleInclude,
       orderBy: { startDate: "desc" },
     });
   }
@@ -89,10 +98,7 @@ export class CleanerTaskScheduleRepository {
   create(data: Prisma.CleanerTaskScheduleCreateInput) {
     return prisma.cleanerTaskSchedule.create({
       data,
-      include: {
-        client: { select: { id: true, firstName: true, lastName: true, email: true } },
-        cleaner: { select: { id: true, firstName: true, lastName: true, email: true } },
-      },
+      include: taskScheduleInclude,
     });
   }
 
@@ -100,10 +106,7 @@ export class CleanerTaskScheduleRepository {
     return prisma.cleanerTaskSchedule.update({
       where: { id },
       data,
-      include: {
-        client: { select: { id: true, firstName: true, lastName: true, email: true } },
-        cleaner: { select: { id: true, firstName: true, lastName: true, email: true } },
-      },
+      include: taskScheduleInclude,
     });
   }
 

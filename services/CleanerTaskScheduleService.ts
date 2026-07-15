@@ -3,6 +3,7 @@ import { userRepository } from "@/repositories/UserRepository";
 import { ConflictError, ForbiddenError, NotFoundError } from "@/lib/errors";
 import type { ActorContext, Paginated } from "@/models";
 import type { PaginationDTO } from "@/dto/common.dto";
+import { prisma } from "@/lib/prisma";
 
 export type CleanerTaskScheduleView = {
   id: string;
@@ -23,12 +24,12 @@ export function toTaskScheduleView(
 ): CleanerTaskScheduleView {
   return {
     id: item.id,
-    clientId: item.clientId,
+    clientId: item.client.userId,
     clientName: `${item.client.firstName} ${item.client.lastName}`,
-    clientEmail: item.client.email,
-    cleanerId: item.cleanerId,
+    clientEmail: item.client.Email,
+    cleanerId: item.cleaner.userId,
     cleanerName: `${item.cleaner.firstName} ${item.cleaner.lastName}`,
-    cleanerEmail: item.cleaner.email,
+    cleanerEmail: item.cleaner.Email,
     startDate: item.startDate.toISOString(),
     endDate: item.endDate?.toISOString() ?? null,
     isActive: item.isActive,
@@ -40,13 +41,41 @@ export function toTaskScheduleView(
  * Cleaner task schedule management. Clients assign cleaners for date ranges.
  */
 export class CleanerTaskScheduleService {
+  private async resolveClientProfileId(userId: string) {
+    const profile = await prisma.clientProfile.findUnique({
+      where: { userId },
+      select: { id: true, userId: true },
+    });
+    if (!profile) throw new NotFoundError("Client profile not found");
+    return profile;
+  }
+
+  private async resolveCleanerProfileId(userId: string) {
+    const profile = await prisma.cleanerProfile.findUnique({
+      where: { userId },
+      select: { id: true, userId: true },
+    });
+    if (!profile) throw new NotFoundError("Cleaner profile not found");
+    return profile;
+  }
+
   async list(
     params: PaginationDTO & { clientId?: string; cleanerId?: string; activeOnly?: boolean },
     actor: ActorContext,
   ): Promise<Paginated<CleanerTaskScheduleView>> {
     // Clients can only see their own task schedules
-    const clientId = actor.role === "CLIENT" ? actor.userId : params.clientId;
-    const cleanerId = actor.role === "CLEANER" ? actor.userId : params.cleanerId;
+    const clientId =
+      actor.role === "CLIENT"
+        ? (await this.resolveClientProfileId(actor.userId)).id
+        : params.clientId
+          ? (await this.resolveClientProfileId(params.clientId)).id
+          : undefined;
+    const cleanerId =
+      actor.role === "CLEANER"
+        ? (await this.resolveCleanerProfileId(actor.userId)).id
+        : params.cleanerId
+          ? (await this.resolveCleanerProfileId(params.cleanerId)).id
+          : undefined;
 
     const { items, total } = await cleanerTaskScheduleRepository.list({
       page: params.page,
@@ -66,13 +95,17 @@ export class CleanerTaskScheduleService {
   }
 
   async getActiveForClient(clientId: string, date?: Date) {
-    const taskSchedules = await cleanerTaskScheduleRepository.findActiveForClient(clientId, date);
+    const clientProfileId = (await this.resolveClientProfileId(clientId)).id;
+    const taskSchedules = await cleanerTaskScheduleRepository.findActiveForClient(
+      clientProfileId,
+      date,
+    );
     return taskSchedules.map((a) => ({
       id: a.id,
-      cleanerId: a.cleanerId,
+      cleanerId: a.cleaner.userId,
       cleanerName: `${a.cleaner.firstName} ${a.cleaner.lastName}`,
-      cleanerEmail: a.cleaner.email,
-      cleanerPhone: a.cleaner.phone,
+      cleanerEmail: a.cleaner.Email,
+      cleanerPhone: a.cleaner.phoneNo || null,
       startDate: a.startDate.toISOString(),
       endDate: a.endDate?.toISOString() ?? null,
     }));
@@ -103,9 +136,12 @@ export class CleanerTaskScheduleService {
       throw new ConflictError("End date must be after start date");
     }
 
+    const clientProfile = await this.resolveClientProfileId(params.clientId);
+    const cleanerProfile = await this.resolveCleanerProfileId(params.cleanerId);
+
     const taskSchedule = await cleanerTaskScheduleRepository.create({
-      client: { connect: { id: params.clientId } },
-      cleaner: { connect: { id: params.cleanerId } },
+      client: { connect: { id: clientProfile.id } },
+      cleaner: { connect: { id: cleanerProfile.id } },
       startDate: params.startDate,
       endDate: params.endDate ?? null,
       createdBy: actor.userId,
@@ -124,7 +160,7 @@ export class CleanerTaskScheduleService {
     if (!existing) throw new NotFoundError("Task schedule not found");
 
     // Non-admins can only update their own task schedules
-    if (actor.role !== "SUPER_ADMIN" && actor.userId !== existing.clientId) {
+    if (actor.role !== "SUPER_ADMIN" && actor.userId !== existing.client.userId) {
       throw new ForbiddenError();
     }
 
@@ -142,7 +178,7 @@ export class CleanerTaskScheduleService {
     if (!existing) throw new NotFoundError("Task schedule not found");
 
     // Non-admins can only remove their own task schedules
-    if (actor.role !== "SUPER_ADMIN" && actor.userId !== existing.clientId) {
+    if (actor.role !== "SUPER_ADMIN" && actor.userId !== existing.client.userId) {
       throw new ForbiddenError();
     }
 

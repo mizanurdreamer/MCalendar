@@ -6,7 +6,35 @@ type UserWithRelations = Prisma.UserGetPayload<{
   include: { role: true; clientProfile: true; cleanerProfile: true };
 }>;
 
-export type User = Omit<UserWithRelations, "role"> & { role: Role };
+type MappedProfile = {
+  companyName: string | null;
+  primaryContact: string | null;
+  portfolioSize: number | null;
+  timezone: string | null;
+  serviceArea: string | null;
+  hourlyRate: number | null;
+  rating: Prisma.Decimal | null;
+};
+
+export type User = {
+  id: string;
+  email: string;
+  passwordHash: string;
+  displayName: string;
+  role: Role;
+  isActive: boolean;
+  isDeleted: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  createdBy: string | null;
+  updatedBy: string | null;
+  deletedAt: Date | null;
+  firstName: string;
+  lastName: string;
+  phone: string | null;
+  clientProfile: MappedProfile | null;
+  cleanerProfile: MappedProfile | null;
+};
 
 type CreateUserInput = {
   email: string;
@@ -68,10 +96,80 @@ export class UserRepository {
     return trimmed ? trimmed : null;
   }
 
+  private splitDisplayName(displayName: string): { firstName: string; lastName: string } {
+    const normalized = displayName.trim().replace(/\s+/g, " ");
+    if (!normalized) return { firstName: "", lastName: "" };
+    const parts = normalized.split(" ");
+    if (parts.length === 1) return { firstName: parts[0], lastName: "" };
+    return { firstName: parts[0], lastName: parts.slice(1).join(" ") };
+  }
+
+  private joinName(firstName?: string | null, lastName?: string | null): string {
+    const full = [firstName?.trim(), lastName?.trim()].filter(Boolean).join(" ").trim();
+    return full || "Unnamed User";
+  }
+
   private mapUser(user: UserWithRelations | null): User | null {
     if (!user) return null;
-    const { role, ...rest } = user;
-    return { ...rest, role: role.name as Role };
+    const { firstName, lastName } = user.clientProfile
+      ? {
+          firstName: user.clientProfile.firstName,
+          lastName: user.clientProfile.lastName,
+        }
+      : user.cleanerProfile
+        ? {
+            firstName: user.cleanerProfile.firstName,
+            lastName: user.cleanerProfile.lastName,
+          }
+        : this.splitDisplayName(user.displayName);
+
+    const phoneFromProfile =
+      this.emptyToNull(user.clientProfile?.phoneNo) ??
+      this.emptyToNull(user.cleanerProfile?.phoneNo) ??
+      null;
+
+    return {
+      id: user.id,
+      email: user.email,
+      passwordHash: user.passwordHash,
+      displayName: user.displayName,
+      role: user.role.name as Role,
+      isActive: user.isActive,
+      isDeleted: user.isDeleted,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      createdBy: user.createdBy,
+      updatedBy: user.updatedBy,
+      deletedAt: user.deletedAt,
+      firstName,
+      lastName,
+      phone: phoneFromProfile,
+      clientProfile: user.clientProfile
+        ? {
+            companyName: user.clientProfile.companyName,
+            primaryContact: this.joinName(
+              user.clientProfile.firstName,
+              user.clientProfile.lastName,
+            ),
+            portfolioSize: user.clientProfile.portfolioSize,
+            timezone: user.clientProfile.timezone,
+            serviceArea: null,
+            hourlyRate: null,
+            rating: null,
+          }
+        : null,
+      cleanerProfile: user.cleanerProfile
+        ? {
+            companyName: null,
+            primaryContact: null,
+            portfolioSize: null,
+            timezone: null,
+            serviceArea: user.cleanerProfile.serviceArea,
+            hourlyRate: user.cleanerProfile.hourlyRate,
+            rating: user.cleanerProfile.rating,
+          }
+        : null,
+    };
   }
 
   async findById(id: string) {
@@ -109,9 +207,12 @@ export class UserRepository {
       ...(search
         ? {
             OR: [
-              { firstName: { contains: search, mode: "insensitive" } },
-              { lastName: { contains: search, mode: "insensitive" } },
+              { displayName: { contains: search, mode: "insensitive" } },
               { email: { contains: search, mode: "insensitive" } },
+              { clientProfile: { is: { firstName: { contains: search, mode: "insensitive" } } } },
+              { clientProfile: { is: { lastName: { contains: search, mode: "insensitive" } } } },
+              { cleanerProfile: { is: { firstName: { contains: search, mode: "insensitive" } } } },
+              { cleanerProfile: { is: { lastName: { contains: search, mode: "insensitive" } } } },
             ],
           }
         : {}),
@@ -134,7 +235,7 @@ export class UserRepository {
   async listByRole(role: Role) {
     const users = await prisma.user.findMany({
       where: { role: { name: role }, isActive: true, ...this.notDeleted },
-      orderBy: { firstName: "asc" },
+      orderBy: { displayName: "asc" },
       include: this.withRole,
     });
 
@@ -147,9 +248,7 @@ export class UserRepository {
         data: {
           email: data.email.toLowerCase(),
           passwordHash: data.passwordHash,
-          firstName: data.firstName,
-          lastName: data.lastName,
-          phone: data.phone ?? null,
+          displayName: this.joinName(data.firstName, data.lastName),
           isActive: data.isActive ?? true,
           createdBy: data.createdBy,
           updatedBy: data.updatedBy,
@@ -158,8 +257,11 @@ export class UserRepository {
             ? {
                 clientProfile: {
                   create: {
+                    Email: data.email.toLowerCase(),
+                    firstName: data.firstName,
+                    lastName: data.lastName,
+                    phoneNo: this.emptyToNull(data.phone) ?? "",
                     companyName: this.emptyToNull(data.clientProfile?.companyName) ?? null,
-                    primaryContact: this.emptyToNull(data.clientProfile?.primaryContact) ?? null,
                     portfolioSize: data.clientProfile?.portfolioSize ?? null,
                     timezone: this.emptyToNull(data.clientProfile?.timezone) ?? null,
                     createdBy: data.createdBy,
@@ -172,6 +274,10 @@ export class UserRepository {
             ? {
                 cleanerProfile: {
                   create: {
+                    Email: data.email.toLowerCase(),
+                    firstName: data.firstName,
+                    lastName: data.lastName,
+                    phoneNo: this.emptyToNull(data.phone) ?? "",
                     serviceArea: this.emptyToNull(data.cleanerProfile?.serviceArea) ?? null,
                     hourlyRate: data.cleanerProfile?.hourlyRate ?? null,
                     rating: data.cleanerProfile?.rating ?? null,
@@ -189,12 +295,29 @@ export class UserRepository {
 
   async update(id: string, data: UpdateUserInput) {
     return prisma.$transaction(async (tx) => {
+      const currentUser = await tx.user.findUnique({
+        where: { id },
+        include: this.withRole,
+      });
+      if (!currentUser) {
+        throw new Error("User not found");
+      }
+      const mappedCurrent = this.mapUser(currentUser) as User;
+      const nextFirstName =
+        data.firstName === undefined ? mappedCurrent.firstName : data.firstName;
+      const nextLastName = data.lastName === undefined ? mappedCurrent.lastName : data.lastName;
+
       await tx.user.update({
         where: { id },
         data: {
-          firstName: data.firstName,
-          lastName: data.lastName,
-          phone: data.phone,
+          ...(data.firstName !== undefined || data.lastName !== undefined
+            ? {
+                displayName: this.joinName(
+                  nextFirstName,
+                  nextLastName,
+                ),
+              }
+            : {}),
           isActive: data.isActive,
           updatedBy: data.updatedBy,
           ...(data.role ? { role: { connect: { name: data.role } } } : {}),
@@ -205,8 +328,12 @@ export class UserRepository {
         await tx.clientProfile.upsert({
           where: { userId: id },
           update: {
+            firstName: data.firstName,
+            lastName: data.lastName,
+            ...(data.phone !== undefined
+              ? { phoneNo: this.emptyToNull(data.phone) ?? "" }
+              : {}),
             companyName: this.emptyToNull(data.clientProfile?.companyName),
-            primaryContact: this.emptyToNull(data.clientProfile?.primaryContact),
             portfolioSize: data.clientProfile?.portfolioSize,
             timezone: this.emptyToNull(data.clientProfile?.timezone),
             deletedAt: null,
@@ -214,8 +341,11 @@ export class UserRepository {
           },
           create: {
             userId: id,
+            Email: currentUser.email,
+            firstName: data.firstName ?? mappedCurrent.firstName,
+            lastName: data.lastName ?? mappedCurrent.lastName,
+            phoneNo: this.emptyToNull(data.phone) ?? "",
             companyName: this.emptyToNull(data.clientProfile?.companyName) ?? null,
-            primaryContact: this.emptyToNull(data.clientProfile?.primaryContact) ?? null,
             portfolioSize: data.clientProfile?.portfolioSize ?? null,
             timezone: this.emptyToNull(data.clientProfile?.timezone) ?? null,
             createdBy: data.updatedBy,
@@ -231,6 +361,11 @@ export class UserRepository {
         await tx.cleanerProfile.upsert({
           where: { userId: id },
           update: {
+            firstName: data.firstName,
+            lastName: data.lastName,
+            ...(data.phone !== undefined
+              ? { phoneNo: this.emptyToNull(data.phone) ?? "" }
+              : {}),
             serviceArea: this.emptyToNull(data.cleanerProfile?.serviceArea),
             hourlyRate: data.cleanerProfile?.hourlyRate,
             rating: data.cleanerProfile?.rating,
@@ -239,6 +374,10 @@ export class UserRepository {
           },
           create: {
             userId: id,
+            Email: currentUser.email,
+            firstName: data.firstName ?? mappedCurrent.firstName,
+            lastName: data.lastName ?? mappedCurrent.lastName,
+            phoneNo: this.emptyToNull(data.phone) ?? "",
             serviceArea: this.emptyToNull(data.cleanerProfile?.serviceArea) ?? null,
             hourlyRate: data.cleanerProfile?.hourlyRate ?? null,
             rating: data.cleanerProfile?.rating ?? null,

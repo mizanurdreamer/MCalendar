@@ -113,6 +113,23 @@ export class AuthService {
       lastName: dto.lastName,
       phone: dto.phone || null,
       role: dto.role,
+      clientProfile:
+        dto.role === "CLIENT"
+          ? {
+              companyName: null,
+              primaryContact: null,
+              portfolioSize: null,
+              timezone: null,
+            }
+          : undefined,
+      cleanerProfile:
+        dto.role === "CLEANER"
+          ? {
+              serviceArea: null,
+              hourlyRate: null,
+              rating: null,
+            }
+          : undefined,
     });
 
     const tokens = await this.issueTokens(user);

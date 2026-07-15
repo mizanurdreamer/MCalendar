@@ -11,7 +11,10 @@ export class ClientBookingEndpointRepository {
   } satisfies Prisma.ClientBookingEndpointWhereInput;
 
   findById(id: string) {
-    return prisma.clientBookingEndpoint.findFirst({ where: { id, ...this.notDeleted } });
+    return prisma.clientBookingEndpoint.findFirst({
+      where: { id, ...this.notDeleted },
+      include: { client: { select: { id: true, userId: true } } },
+    });
   }
 
   async list(params: ListParams & { clientId: string }) {
@@ -37,6 +40,7 @@ export class ClientBookingEndpointRepository {
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * pageSize,
         take: pageSize,
+        include: { client: { select: { id: true, userId: true } } },
       }),
       prisma.clientBookingEndpoint.count({ where }),
     ]);
@@ -45,11 +49,18 @@ export class ClientBookingEndpointRepository {
   }
 
   create(data: Prisma.ClientBookingEndpointCreateInput) {
-    return prisma.clientBookingEndpoint.create({ data });
+    return prisma.clientBookingEndpoint.create({
+      data,
+      include: { client: { select: { id: true, userId: true } } },
+    });
   }
 
   update(id: string, data: Prisma.ClientBookingEndpointUpdateInput) {
-    return prisma.clientBookingEndpoint.update({ where: { id }, data });
+    return prisma.clientBookingEndpoint.update({
+      where: { id },
+      data,
+      include: { client: { select: { id: true, userId: true } } },
+    });
   }
 
   softDelete(id: string, deletedBy?: string) {

@@ -1,6 +1,8 @@
 import type { ActorContext } from "@/models";
 import type { CalendarDataView, CalendarEventView } from "@/models/view";
 import { guestBookingInfoRepository } from "@/repositories/GuestBookingInfoRepository";
+import { prisma } from "@/lib/prisma";
+import { NotFoundError } from "@/lib/errors";
 
 const STATUS_CLASS: Record<string, string> = {
   confirmed: "evt-blue",
@@ -25,12 +27,18 @@ type CalendarRow = Awaited<
 
 export class ClientCalendarService {
   async getCalendarData(actor: ActorContext): Promise<CalendarDataView> {
+    const clientProfile = await prisma.clientProfile.findUnique({
+      where: { userId: actor.userId },
+      select: { id: true },
+    });
+    if (!clientProfile) throw new NotFoundError("Client profile not found");
+
     const now = new Date();
     const from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const to = new Date(now.getFullYear(), now.getMonth() + 2, 0, 23, 59, 59, 999);
 
     const rows = await guestBookingInfoRepository.listForClientCalendar({
-      clientId: actor.userId,
+      clientId: clientProfile.id,
       from,
       to,
     });

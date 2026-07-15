@@ -1,5 +1,5 @@
-import type { ClientBookingEndpoint } from "@prisma/client";
 import { clientBookingEndpointRepository } from "@/repositories/ClientBookingEndpointRepository";
+import { prisma } from "@/lib/prisma";
 import { ForbiddenError, NotFoundError } from "@/lib/errors";
 import type {
   CreateBookingEndpointDTO,
@@ -17,14 +17,20 @@ export type BookingEndpointView = {
   createdAt: string;
 };
 
-export function toBookingEndpointView(e: ClientBookingEndpoint): BookingEndpointView {
+type EndpointWithClient = Awaited<
+  ReturnType<typeof clientBookingEndpointRepository.findById>
+>;
+
+function mapEndpointView(
+  endpoint: NonNullable<EndpointWithClient>,
+): BookingEndpointView {
   return {
-    id: e.id,
-    clientId: e.clientId,
-    name: e.name,
-    url: e.url,
-    isActive: e.isActive,
-    createdAt: e.createdAt.toISOString(),
+    id: endpoint.id,
+    clientId: endpoint.client?.userId ?? endpoint.clientId,
+    name: endpoint.name,
+    url: endpoint.url,
+    isActive: endpoint.isActive,
+    createdAt: endpoint.createdAt.toISOString(),
   };
 }
 
@@ -33,20 +39,30 @@ export function toBookingEndpointView(e: ClientBookingEndpoint): BookingEndpoint
  * endpoints; ownership is enforced against the authenticated actor.
  */
 export class ClientBookingEndpointService {
+  private async resolveClientProfileId(userId: string): Promise<string> {
+    const client = await prisma.clientProfile.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+    if (!client) throw new NotFoundError("Client profile not found");
+    return client.id;
+  }
+
   async list(
     params: PaginationDTO,
     actor: ActorContext,
   ): Promise<Paginated<BookingEndpointView>> {
+    const clientProfileId = await this.resolveClientProfileId(actor.userId);
     const { items, total } = await clientBookingEndpointRepository.list({
       page: params.page,
       pageSize: params.pageSize,
       search: params.search,
       status: params.status,
-      clientId: actor.userId,
+      clientId: clientProfileId,
     });
 
     return {
-      items: items.map(toBookingEndpointView),
+      items: items.map((item) => mapEndpointView(item)),
       total,
       page: params.page,
       pageSize: params.pageSize,
@@ -56,23 +72,24 @@ export class ClientBookingEndpointService {
 
   async getById(id: string, actor: ActorContext): Promise<BookingEndpointView> {
     const endpoint = await this.requireOwned(id, actor);
-    return toBookingEndpointView(endpoint);
+    return mapEndpointView(endpoint);
   }
 
   async create(
     dto: CreateBookingEndpointDTO,
     actor: ActorContext,
   ): Promise<BookingEndpointView> {
+    const clientProfileId = await this.resolveClientProfileId(actor.userId);
     const endpoint = await clientBookingEndpointRepository.create({
       name: dto.name,
       url: dto.url,
       isActive: dto.isActive,
-      client: { connect: { id: actor.userId } },
+      client: { connect: { id: clientProfileId } },
       createdBy: actor.userId,
       updatedBy: actor.userId,
     });
 
-    return toBookingEndpointView(endpoint);
+    return mapEndpointView(endpoint);
   }
 
   async update(
@@ -89,7 +106,7 @@ export class ClientBookingEndpointService {
       updatedBy: actor.userId,
     });
 
-    return toBookingEndpointView(endpoint);
+    return mapEndpointView(endpoint);
   }
 
   async remove(id: string, actor: ActorContext): Promise<void> {
@@ -100,10 +117,10 @@ export class ClientBookingEndpointService {
   private async requireOwned(
     id: string,
     actor: ActorContext,
-  ): Promise<ClientBookingEndpoint> {
+  ): Promise<NonNullable<EndpointWithClient>> {
     const endpoint = await clientBookingEndpointRepository.findById(id);
     if (!endpoint) throw new NotFoundError("Booking endpoint not found");
-    if (endpoint.clientId !== actor.userId) throw new ForbiddenError();
+    if (endpoint.client?.userId !== actor.userId) throw new ForbiddenError();
     return endpoint;
   }
 }
