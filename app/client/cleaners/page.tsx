@@ -1,5 +1,12 @@
 import { UsersSection } from "@/components/sections/users-section";
 
 export default function Page() {
-  return <UsersSection role="CLEANER" canCreate={false} canDelete={false} />;
+  return (
+    <UsersSection
+      role="CLEANER"
+      canCreate
+      canDelete
+      availabilityBasePath="/client/cleaners"
+    />
+  );
 }

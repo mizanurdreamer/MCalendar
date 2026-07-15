@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, Menu, X, Moon, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { LogOut, Menu, X, Moon, PanelLeftClose, PanelLeftOpen, UserCircle2 } from "lucide-react";
 import { cn, initials } from "@/lib/utils";
 import { NAV_BY_ROLE, type NavItem } from "@/components/dashboard/nav";
 import { Button } from "@/components/ui/button";
@@ -80,6 +80,11 @@ export function DashboardShell({
   const [collapsed, setCollapsed] = React.useState(false);
   const logout = useLogout();
   const items = NAV_BY_ROLE[user.role];
+  const profileHrefByRole: Partial<Record<Role, string>> = {
+    CLIENT: "/client/profile",
+    CLEANER: "/cleaner/profile",
+  };
+  const profileHref = profileHrefByRole[user.role];
 
   return (
     <div className="flex min-h-screen bg-muted/30">
@@ -236,6 +241,14 @@ export function DashboardShell({
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
+              {profileHref && (
+                <DropdownMenuItem asChild>
+                  <Link href={profileHref}>
+                    <UserCircle2 className="h-4 w-4" />
+                    Profile
+                  </Link>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem
                 onClick={() => logout.mutate()}
                 className="text-destructive"

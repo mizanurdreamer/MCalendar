@@ -47,6 +47,18 @@ export type CleanerTaskScheduleView = {
   createdAt: string;
 };
 
+export type CleanerAvailabilityView = {
+  id: string;
+  cleanerId: string;
+  cleanerName: string;
+  cleanerEmail: string;
+  fromDate: string;
+  toDate: string | null;
+  note: string | null;
+  isActive: boolean;
+  createdAt: string;
+};
+
 export type CalendarEventView = {
   id: string;
   title: string;

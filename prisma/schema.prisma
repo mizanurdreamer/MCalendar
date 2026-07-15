@@ -82,6 +82,7 @@ model CleanerProfile {
   updatedBy String?  @db.Uuid
   deletedAt DateTime?
   cleanerTaskSchedules CleanerTaskSchedule[]
+  availabilities       CleanerAvailability[]
   @@index([deletedAt], map: "cleanerProfile_deletedAt_idx")
   @@map("cleanerProfile")
 }
@@ -186,4 +187,27 @@ model CleanerTaskSchedule {
   @@index([startDate, endDate], map: "cleanerTaskSchedules_startDate_endDate_idx")
   @@index([deletedAt], map: "cleanerTaskSchedule_deletedAt_idx")
   @@map("cleanerTaskSchedule")
+}
+
+model CleanerAvailability {
+  id        String   @id @default(uuid()) @db.Uuid
+  cleanerId String   @db.Uuid
+  cleaner   CleanerProfile @relation(fields: [cleanerId], references: [id], onDelete: Cascade)
+
+  fromDate  DateTime
+  toDate    DateTime?
+  note      String?
+
+  isActive  Boolean  @default(true)
+  isDeleted Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?  @db.Uuid
+  updatedBy String?  @db.Uuid
+  deletedAt DateTime?
+
+  @@index([cleanerId], map: "cleanerAvailability_cleanerId_idx")
+  @@index([fromDate], map: "cleanerAvailability_fromDate_idx")
+  @@index([deletedAt], map: "cleanerAvailability_deletedAt_idx")
+  @@map("cleanerAvailability")
 }
