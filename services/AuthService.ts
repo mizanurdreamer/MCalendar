@@ -138,11 +138,11 @@ export class AuthService {
 
   async login(dto: LoginDTO): Promise<AuthResult> {
     const user = await userRepository.findByEmail(dto.email);
-    if (!user) throw new UnauthorizedError("Invalid email or password");
+    if (!user) throw new UnauthorizedError("Invalid email");
     if (!user.isActive) throw new UnauthorizedError("This account is disabled");
 
     const valid = await verifyPassword(dto.password, user.passwordHash);
-    if (!valid) throw new UnauthorizedError("Invalid email or password");
+    if (!valid) throw new UnauthorizedError("Invalid password");
 
     const tokens = await this.issueTokens(user);
     return { user: toPublicUser(user), ...tokens };
