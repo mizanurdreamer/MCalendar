@@ -17,34 +17,10 @@ export async function GET(req: NextRequest) {
     }
 
     const status = cronJobScheduler.getStatus();
-    return ok({ jobs: status });
-  } catch (error) {
-    return handleApiError(error);
-  }
-}
-
-/**
- * POST /api/cron/status
- * Execute a specific cron job by name.
- */
-export async function POST(req: NextRequest) {
-  try {
-    const authHeader = req.headers.get("authorization");
-    const token = authHeader?.replace("Bearer ", "");
-
-    if (CRON_CONFIG.CRON_API_SECRET && token !== CRON_CONFIG.CRON_API_SECRET) {
-      return fail("UNAUTHORIZED", "Invalid cron secret", 401);
-    }
-
-    const body = await req.json();
-    const { jobName } = body as { jobName?: string };
-
-    if (!jobName) {
-      return fail("BAD_REQUEST", "jobName is required", 400);
-    }
-
-    const success = await cronJobScheduler.executeJob(jobName);
-    return ok({ success, jobName });
+    return ok({
+      jobs: status,
+      schedule: CRON_CONFIG.BOOKING_DATA_FETCH_CRON_SCHEDULE,
+    });
   } catch (error) {
     return handleApiError(error);
   }

@@ -58,19 +58,6 @@ export class CronJobScheduler {
   }
 
   /**
-   * Execute a single job by name. Used by API triggers.
-   */
-  async executeJob(name: string): Promise<boolean> {
-    const job = this.jobs.get(name);
-    if (!job) {
-      console.error(`[Cron] Job "${name}" not found`);
-      return false;
-    }
-
-    return this.runJob(job);
-  }
-
-  /**
    * Get status of all registered jobs.
    */
   getStatus() {

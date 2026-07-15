@@ -204,23 +204,12 @@ bookingCalendar/
 
 | Method | Endpoint | Description |
 | --- | --- | --- |
-| POST | `/api/cron/booking-data-fetch` | Trigger data fetch job |
-| GET | `/api/cron/status` | Get job status |
-| POST | `/api/cron/status` | Execute a specific job |
+| GET | `/api/cron/status` | Get job status (monitoring only) |
 
-## Cron Jobs
-
-```bash
-curl -X POST http://localhost:3000/api/cron/booking-data-fetch \
-  -H "Authorization: Bearer your-cron-secret"
-```
-
-**External cron services** (Vercel, GitHub Actions, cron-job.org):
-
-```
-POST https://yourapp.com/api/cron/booking-data-fetch
-Header: Authorization: Bearer YOUR_CRON_API_SECRET
-```
+The booking data fetch job starts automatically on server boot (see
+`instrumentation.ts` → `bootstrapCron`). Its schedule is configured via
+`CRON_BOOKING_DATA_FETCH_SCHEDULE_IN_MINUTES` (default `10`, i.e.
+`*/10 * * * *`) and is logged at startup.
 
 ## Cleaner Task Schedules
 

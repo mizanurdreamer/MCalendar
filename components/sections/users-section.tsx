@@ -255,7 +255,7 @@ export function UsersSection({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <h1 className="text-[38px] font-extrabold tracking-tight text-slate-900">{copy.plural}</h1>
+          <h1 className="text-[30px] font-extrabold tracking-tight text-slate-900">{copy.plural}</h1>
           <span className="rounded-full bg-slate-200 px-3 py-1 text-sm font-semibold text-slate-500">
             {(data?.total ?? 0).toLocaleString()} total
           </span>

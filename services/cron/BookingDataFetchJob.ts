@@ -52,14 +52,9 @@ export class BookingDataFetchJob {
     name: string;
   }): Promise<boolean> {
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), CRON_CONFIG.FETCH_TIMEOUT_MS);
-
       const response = await fetch(endpoint.url, {
-        signal: controller.signal,
         headers: { "User-Agent": "BookingCalendar/1.0" },
       });
-      clearTimeout(timeout);
 
       if (!response.ok) {
         console.warn(
@@ -110,9 +105,6 @@ export class BookingDataFetchJob {
 
       return true;
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") {
-        console.warn(`[BookingDataFetch] Endpoint "${endpoint.name}" timed out`);
-      }
       throw error;
     }
   }

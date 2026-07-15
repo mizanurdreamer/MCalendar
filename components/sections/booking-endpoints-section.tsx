@@ -163,23 +163,31 @@ export function BookingEndpointsSection() {
       </div>
 
       {/* Table */}
-      <Card>
+      <Card className="overflow-hidden rounded-2xl border-slate-200 bg-white">
         <CardContent className="p-0">
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12">
+            <TableHeader className="bg-slate-50/70">
+              <TableRow className="hover:bg-slate-50/70">
+                <TableHead className="w-12 px-4">
                   <input
                     type="checkbox"
                     checked={!!allSelected}
                     onChange={toggleSelectAll}
-                    className="h-4 w-4 rounded border-gray-300"
+                    className="h-5 w-5 rounded-md border-slate-300 text-primary focus:ring-primary"
                   />
                 </TableHead>
-                <TableHead>ENDPOINT</TableHead>
-                <TableHead>URL</TableHead>
-                <TableHead>STATUS</TableHead>
-                <TableHead className="text-right">ACTIONS</TableHead>
+                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+                  Endpoint
+                </TableHead>
+                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+                  URL
+                </TableHead>
+                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+                  Status
+                </TableHead>
+                <TableHead className="text-right text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+                  Actions
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -187,57 +195,61 @@ export function BookingEndpointsSection() {
                 <EmptyRow colSpan={5}>Loading…</EmptyRow>
               ) : data && data.items.length > 0 ? (
                 data.items.map((e) => (
-                  <TableRow key={e.id}>
-                    <TableCell>
+                  <TableRow key={e.id} className="h-[74px] border-slate-200 hover:bg-slate-50/40">
+                    <TableCell className="px-4">
                       <input
                         type="checkbox"
                         checked={selected.has(e.id)}
                         onChange={() => toggleSelect(e.id)}
-                        className="h-4 w-4 rounded border-gray-300"
+                        className="h-5 w-5 rounded-md border-slate-300 text-primary focus:ring-primary"
                       />
                     </TableCell>
-                    <TableCell className="font-medium">{e.name}</TableCell>
-                    <TableCell className="max-w-md truncate text-muted-foreground">
+                    <TableCell className="text-[17px] font-medium text-slate-900">
+                      {e.name}
+                    </TableCell>
+                    <TableCell className="max-w-md truncate text-[17px] text-slate-600">
                       {e.url}
                     </TableCell>
                     <TableCell>
                       <Badge
-                        variant={e.isActive ? "success" : "muted"}
                         className={
                           e.isActive
-                            ? "border-transparent bg-emerald-500/15 text-emerald-700"
-                            : "border-transparent bg-muted text-muted-foreground"
+                            ? "rounded-full border-transparent bg-emerald-500/20 px-3 py-1 text-[13px] font-semibold text-emerald-700"
+                            : "rounded-full border-transparent bg-slate-200 px-3 py-1 text-[13px] font-semibold text-slate-600"
                         }
                       >
                         {e.isActive ? "Active" : "Inactive"}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell>
                       <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                        <button
+                          type="button"
+                          title="View"
+                          aria-label="View"
+                          className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
                           onClick={() => setViewEndpoint(e)}
                         >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                          <Eye className="h-5 w-5" />
+                        </button>
+                        <button
+                          type="button"
+                          title="Edit"
+                          aria-label="Edit"
+                          className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
                           onClick={() => setDialog({ open: true, editing: e })}
                         >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive/80"
+                          <Pencil className="h-5 w-5" />
+                        </button>
+                        <button
+                          type="button"
+                          title="Delete"
+                          aria-label="Delete"
+                          className="rounded-lg p-2 text-red-500 hover:bg-red-50 hover:text-red-700"
                           onClick={() => setToDelete(e)}
                         >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                          <Trash2 className="h-5 w-5" />
+                        </button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -341,12 +353,6 @@ function EndpointFormDialog({
                 placeholder="https://www.airbnb.com/calendar/ical/<listing-id>.ics?t=<token>"
                 {...register("url")}
               />
-              <p className="text-xs text-slate-500">
-                Airbnb example: https://www.airbnb.com/calendar/ical/1505374101975637733.ics?t=ff970f261dc6471792ef4f5996d46acc
-              </p>
-              <p className="text-xs text-slate-500">
-                VRBO example: https://www.vrbo.com/icalendar/d6381199be784af1a05a88492413e278.ics?nonTentative
-              </p>
             </div>
           </Field>
           <Field label="Status">

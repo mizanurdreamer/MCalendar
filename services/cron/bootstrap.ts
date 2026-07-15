@@ -20,5 +20,7 @@ export function bootstrapCron() {
     { intervalMs: CRON_CONFIG.BOOKING_DATA_FETCH_INTERVAL_MS },
   );
 
+  console.log(`[Cron] booking-data-fetch schedule: ${CRON_CONFIG.BOOKING_DATA_FETCH_CRON_SCHEDULE}`);
+
   cronJobScheduler.startAll();
 }

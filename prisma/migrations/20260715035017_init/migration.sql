@@ -147,9 +147,6 @@ CREATE TABLE "cleanerTaskSchedule" (
 CREATE UNIQUE INDEX "role_name_key" ON "role"("name");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "user_email_key" ON "user"("email");
-
--- CreateIndex
 CREATE INDEX "user_roleId_idx" ON "user"("roleId");
 
 -- CreateIndex
