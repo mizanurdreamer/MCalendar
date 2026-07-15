@@ -190,8 +190,8 @@ export class UserRepository {
 
   /** Includes soft-deleted; used to enforce email uniqueness at registration. */
   async findAnyByEmail(email: string) {
-    const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
+    const user = await prisma.user.findFirst({
+      where: { email: email.toLowerCase(), isActive: true, isDeleted: false },
       include: this.withRole,
     });
     return this.mapUser(user);
