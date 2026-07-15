@@ -27,16 +27,26 @@ async function main() {
     create: { name: "CLEANER" },
   });
 
-  await prisma.user.upsert({
-    where: { email: "admin@bookingcalendar.com" },
-    update: {},
-    create: {
+ const existingUser = await prisma.user.findFirst({
+    where: {
       email: "admin@bookingcalendar.com",
-      passwordHash: password,
-      displayName: "Ava Admin",
-      role: { connect: { name: "SUPER_ADMIN" } },
     },
   });
+ 
+  if (!existingUser) {
+    await prisma.user.create({
+      data: {
+        email: "admin@bookingcalendar.com",
+        passwordHash: password,
+        displayName: "Ava Admin",
+        role: {
+          connect: {
+            name: "SUPER_ADMIN",
+          },
+        },
+      },
+    });
+  }
 
   console.log("✅ Seed complete.");
   console.log("   Super Admin: admin@bookingcalendar.com / Password123!");
