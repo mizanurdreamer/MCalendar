@@ -46,6 +46,8 @@ model ClientProfile {
   Email     String
   firstName String
   lastName String
+  smsGatewayId String? @db.Uuid
+  smsGateway SmsGateway? @relation("ClientSmsGateway", fields: [smsGatewayId], references: [id], onDelete: SetNull)
   phoneNo  String
   companyName String?
   portfolioSize Int?
@@ -60,6 +62,7 @@ model ClientProfile {
   bookingFetchDatas BookingFetchData[]
   guestBookingInfos GuestBookingInfo[]
   cleanerTaskSchedules CleanerTaskSchedule[]
+  @@index([smsGatewayId], map: "clientProfile_smsGatewayId_idx")
   @@index([deletedAt], map: "clientProfile_deletedAt_idx")
   @@map("clientProfile")
 }
@@ -71,6 +74,8 @@ model CleanerProfile {
   Email     String
   firstName String
   lastName String
+  smsGatewayId String? @db.Uuid
+  smsGateway SmsGateway? @relation("CleanerSmsGateway", fields: [smsGatewayId], references: [id], onDelete: SetNull)
   phoneNo  String
   serviceArea String?
   hourlyRate Int?
@@ -83,6 +88,7 @@ model CleanerProfile {
   deletedAt DateTime?
   cleanerTaskSchedules CleanerTaskSchedule[]
   availabilities       CleanerAvailability[]
+  @@index([smsGatewayId], map: "cleanerProfile_smsGatewayId_idx")
   @@index([deletedAt], map: "cleanerProfile_deletedAt_idx")
   @@map("cleanerProfile")
 }
@@ -216,6 +222,8 @@ model SmsGateway {
   id        String   @id @default(uuid()) @db.Uuid
   name      String   @unique
   domain    String   @unique
+  clientProfiles ClientProfile[] @relation("ClientSmsGateway")
+  cleanerProfiles CleanerProfile[] @relation("CleanerSmsGateway")
   isActive  Boolean  @default(true)
   isDeleted Boolean  @default(false)
   createdAt DateTime @default(now())

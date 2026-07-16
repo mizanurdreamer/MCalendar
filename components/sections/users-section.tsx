@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { CalendarClock, Download, Eye, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { createUserSchema, type CreateUserDTO } from "@/dto/user.dto";
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from "@/hooks/use-users";
+import { useSmsGateways } from "@/hooks/use-sms-gateways";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -332,12 +333,14 @@ export function UsersSection({
                 {role === "CLIENT" ? (
                   <>
                     <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Primary contact</TableHead>
+                    <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">SMS gateway</TableHead>
                     <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Phone</TableHead>
                     <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Portfolio</TableHead>
                   </>
                 ) : (
                   <>
                     <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Service area</TableHead>
+                    <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">SMS gateway</TableHead>
                     <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Phone</TableHead>
                     <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Rate</TableHead>
                   </>
@@ -349,7 +352,7 @@ export function UsersSection({
 
             <TableBody>
               {isLoading ? (
-                <EmptyRow colSpan={7}>Loading...</EmptyRow>
+                <EmptyRow colSpan={8}>Loading...</EmptyRow>
               ) : filteredItems.length > 0 ? (
                 filteredItems.map((u) => {
                   const meta = getRowMeta(u, role);
@@ -379,12 +382,14 @@ export function UsersSection({
                       {role === "CLIENT" ? (
                         <>
                           <TableCell className="text-[17px] text-slate-600">{meta.primaryContact}</TableCell>
+                          <TableCell className="text-[17px] text-slate-600">{u.smsGatewayName ?? "-"}</TableCell>
                           <TableCell className="text-[17px] text-slate-600">{u.phone ?? "-"}</TableCell>
                           <TableCell className="text-[17px] text-slate-600">{meta.portfolio}</TableCell>
                         </>
                       ) : (
                         <>
                           <TableCell className="text-[17px] text-slate-600">{meta.serviceArea}</TableCell>
+                          <TableCell className="text-[17px] text-slate-600">{u.smsGatewayName ?? "-"}</TableCell>
                           <TableCell className="text-[17px] text-slate-600">{u.phone ?? "-"}</TableCell>
                           <TableCell className="text-[17px] text-slate-600">{meta.rate}</TableCell>
                         </>
@@ -440,7 +445,7 @@ export function UsersSection({
                   );
                 })
               ) : (
-                <EmptyRow colSpan={7}>No {copy.plural.toLowerCase()} found.</EmptyRow>
+                <EmptyRow colSpan={8}>No {copy.plural.toLowerCase()} found.</EmptyRow>
               )}
             </TableBody>
           </Table>
@@ -489,6 +494,7 @@ function UserFormDialog({
   const copy = COPY[role];
   const create = useCreateUser();
   const update = useUpdateUser(editing?.id ?? "");
+  const { data: smsGatewayData } = useSmsGateways({ page: 1, pageSize: 100 });
 
   const {
     register,
@@ -503,6 +509,7 @@ function UserFormDialog({
           firstName: editing.firstName,
           lastName: editing.lastName,
           email: editing.email,
+          smsGatewayId: editing.smsGatewayId ?? "",
           phone: editing.phone ?? "",
           password: "unchanged-placeholder",
           confirmPassword: "unchanged-placeholder",
@@ -519,6 +526,7 @@ function UserFormDialog({
       : {
           role,
           isActive: true,
+          smsGatewayId: "",
           password: "",
           confirmPassword: "",
           companyName: "",
@@ -532,6 +540,7 @@ function UserFormDialog({
   });
 
   const isActive = watch("isActive");
+  const smsGatewayId = watch("smsGatewayId");
 
   const onSubmit = async (values: CreateUserDTO) => {
     try {
@@ -540,6 +549,7 @@ function UserFormDialog({
           firstName: values.firstName,
           lastName: values.lastName,
           phone: values.phone,
+          smsGatewayId: values.smsGatewayId,
           role: values.role,
           isActive: values.isActive,
           companyName: values.companyName,
@@ -580,6 +590,24 @@ function UserFormDialog({
           </div>
           <Field label="Email" error={errors.email?.message}>
             <Input type="email" disabled={!!editing} {...register("email")} />
+          </Field>
+          <Field label="SMS gateway" error={errors.smsGatewayId?.message}>
+            <Select
+              value={smsGatewayId || "__none"}
+              onValueChange={(v) => setValue("smsGatewayId", v === "__none" ? "" : v)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select SMS gateway" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none">None</SelectItem>
+                {(smsGatewayData?.items ?? []).map((item) => (
+                  <SelectItem key={item.id} value={item.id}>
+                    {item.name} ({item.domain})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Field>
           <Field label="Phone">
             <Input {...register("phone")} />
@@ -687,6 +715,10 @@ function UserViewDialog({
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
+            <div>
+              <div className="text-sm font-medium text-muted-foreground">SMS gateway</div>
+              <div className="text-sm">{user.smsGatewayName ?? "-"}</div>
+            </div>
             <div>
               <div className="text-sm font-medium text-muted-foreground">Phone</div>
               <div className="text-sm">{user.phone ?? "-"}</div>

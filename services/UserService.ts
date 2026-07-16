@@ -47,6 +47,7 @@ export class UserService {
       passwordHash: await hashPassword(dto.password),
       firstName: dto.firstName,
       lastName: dto.lastName,
+      smsGatewayId: dto.smsGatewayId || null,
       phone: dto.phone || null,
       role: dto.role,
       isActive: dto.isActive,
@@ -81,6 +82,7 @@ export class UserService {
     const user = await userRepository.update(id, {
       firstName: dto.firstName,
       lastName: dto.lastName,
+      smsGatewayId: dto.smsGatewayId === undefined ? undefined : dto.smsGatewayId || null,
       phone: dto.phone === "" ? null : dto.phone,
       role: isAdmin ? dto.role : undefined,
       isActive: dto.isActive,

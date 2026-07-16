@@ -3,7 +3,11 @@ import { prisma } from "@/lib/prisma";
 import type { ListParams, Role } from "@/models";
 
 type UserWithRelations = Prisma.UserGetPayload<{
-  include: { role: true; clientProfile: true; cleanerProfile: true };
+  include: {
+    role: true;
+    clientProfile: { include: { smsGateway: true } };
+    cleanerProfile: { include: { smsGateway: true } };
+  };
 }>;
 
 type MappedProfile = {
@@ -31,6 +35,8 @@ export type User = {
   deletedAt: Date | null;
   firstName: string;
   lastName: string;
+  smsGatewayId: string | null;
+  smsGatewayName: string | null;
   phone: string | null;
   clientProfile: MappedProfile | null;
   cleanerProfile: MappedProfile | null;
@@ -41,6 +47,7 @@ type CreateUserInput = {
   passwordHash: string;
   firstName: string;
   lastName: string;
+  smsGatewayId?: string | null;
   phone?: string | null;
   role: Role;
   isActive?: boolean;
@@ -62,6 +69,7 @@ type CreateUserInput = {
 type UpdateUserInput = {
   firstName?: string;
   lastName?: string;
+  smsGatewayId?: string | null;
   phone?: string | null;
   role?: Role;
   isActive?: boolean;
@@ -86,8 +94,8 @@ export class UserRepository {
   private notDeleted = { deletedAt: null } satisfies Prisma.UserWhereInput;
   private withRole = {
     role: true,
-    clientProfile: true,
-    cleanerProfile: true,
+    clientProfile: { include: { smsGateway: true } },
+    cleanerProfile: { include: { smsGateway: true } },
   } satisfies Prisma.UserInclude;
 
   private emptyToNull(value?: string | null) {
@@ -143,6 +151,9 @@ export class UserRepository {
       deletedAt: user.deletedAt,
       firstName,
       lastName,
+      smsGatewayId: user.clientProfile?.smsGatewayId ?? user.cleanerProfile?.smsGatewayId ?? null,
+      smsGatewayName:
+        user.clientProfile?.smsGateway?.name ?? user.cleanerProfile?.smsGateway?.name ?? null,
       phone: phoneFromProfile,
       clientProfile: user.clientProfile
         ? {
@@ -260,6 +271,7 @@ export class UserRepository {
                     Email: data.email.toLowerCase(),
                     firstName: data.firstName,
                     lastName: data.lastName,
+                    smsGatewayId: data.smsGatewayId ?? null,
                     phoneNo: this.emptyToNull(data.phone) ?? "",
                     companyName: this.emptyToNull(data.clientProfile?.companyName) ?? null,
                     portfolioSize: data.clientProfile?.portfolioSize ?? null,
@@ -277,6 +289,7 @@ export class UserRepository {
                     Email: data.email.toLowerCase(),
                     firstName: data.firstName,
                     lastName: data.lastName,
+                    smsGatewayId: data.smsGatewayId ?? null,
                     phoneNo: this.emptyToNull(data.phone) ?? "",
                     serviceArea: this.emptyToNull(data.cleanerProfile?.serviceArea) ?? null,
                     hourlyRate: data.cleanerProfile?.hourlyRate ?? null,
@@ -330,6 +343,7 @@ export class UserRepository {
           update: {
             firstName: data.firstName,
             lastName: data.lastName,
+            smsGatewayId: data.smsGatewayId ?? undefined,
             ...(data.phone !== undefined
               ? { phoneNo: this.emptyToNull(data.phone) ?? "" }
               : {}),
@@ -344,6 +358,7 @@ export class UserRepository {
             Email: currentUser.email,
             firstName: data.firstName ?? mappedCurrent.firstName,
             lastName: data.lastName ?? mappedCurrent.lastName,
+            smsGatewayId: data.smsGatewayId ?? null,
             phoneNo: this.emptyToNull(data.phone) ?? "",
             companyName: this.emptyToNull(data.clientProfile?.companyName) ?? null,
             portfolioSize: data.clientProfile?.portfolioSize ?? null,
@@ -363,6 +378,7 @@ export class UserRepository {
           update: {
             firstName: data.firstName,
             lastName: data.lastName,
+            smsGatewayId: data.smsGatewayId ?? undefined,
             ...(data.phone !== undefined
               ? { phoneNo: this.emptyToNull(data.phone) ?? "" }
               : {}),
@@ -377,6 +393,7 @@ export class UserRepository {
             Email: currentUser.email,
             firstName: data.firstName ?? mappedCurrent.firstName,
             lastName: data.lastName ?? mappedCurrent.lastName,
+            smsGatewayId: data.smsGatewayId ?? null,
             phoneNo: this.emptyToNull(data.phone) ?? "",
             serviceArea: this.emptyToNull(data.cleanerProfile?.serviceArea) ?? null,
             hourlyRate: data.cleanerProfile?.hourlyRate ?? null,

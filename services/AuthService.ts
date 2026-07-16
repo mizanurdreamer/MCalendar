@@ -17,6 +17,8 @@ export type PublicUser = {
   email: string;
   firstName: string;
   lastName: string;
+  smsGatewayId: string | null;
+  smsGatewayName: string | null;
   phone: string | null;
   role: User["role"];
   isActive: boolean;
@@ -49,6 +51,8 @@ function toPublicUser(user: User): PublicUser {
     email: user.email,
     firstName: user.firstName,
     lastName: user.lastName,
+    smsGatewayId: user.smsGatewayId,
+    smsGatewayName: user.smsGatewayName,
     phone: user.phone,
     role: user.role,
     isActive: user.isActive,

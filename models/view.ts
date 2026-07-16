@@ -11,6 +11,8 @@ export type UserView = {
   email: string;
   firstName: string;
   lastName: string;
+  smsGatewayId?: string | null;
+  smsGatewayName?: string | null;
   phone: string | null;
   role: Role;
   isActive: boolean;

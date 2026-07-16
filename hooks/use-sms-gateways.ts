@@ -7,10 +7,11 @@ import type { Paginated, SmsGatewayView } from "@/models/view";
 const KEY = "sms-gateways";
 
 export function useSmsGateways(
-  params: { page?: number; search?: string; status?: string } = {},
+  params: { page?: number; pageSize?: number; search?: string; status?: string } = {},
 ) {
   const query = new URLSearchParams();
   query.set("page", String(params.page ?? 1));
+  if (params.pageSize) query.set("pageSize", String(params.pageSize));
   if (params.search) query.set("search", params.search);
   if (params.status && params.status !== "all") query.set("status", params.status);
   return useQuery({

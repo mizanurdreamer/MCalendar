@@ -6,6 +6,7 @@ export const createUserSchema = z
     firstName: z.string().trim().min(1).max(80),
     lastName: z.string().trim().min(1).max(80),
     email: z.string().email(),
+    smsGatewayId: z.string().uuid().optional().or(z.literal("")),
     phone: z.string().trim().max(30).optional().or(z.literal("")),
     password: z.string().min(8).max(100),
     confirmPassword: z.string().min(8).max(100),
@@ -27,6 +28,7 @@ export const createUserSchema = z
 export const updateUserSchema = z.object({
   firstName: z.string().trim().min(1).max(80).optional(),
   lastName: z.string().trim().min(1).max(80).optional(),
+  smsGatewayId: z.string().uuid().optional().or(z.literal("")),
   phone: z.string().trim().max(30).optional().or(z.literal("")),
   role: z.enum(ROLE_VALUES).optional(),
   isActive: z.boolean().optional(),
