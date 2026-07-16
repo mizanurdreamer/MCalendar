@@ -5,6 +5,7 @@ import {
   Sparkles,
   Sun,
   Link2,
+  MessageSquareText,
   CalendarDays,
   UserCircle2,
   CalendarClock,
@@ -22,6 +23,7 @@ const SUPER_ADMIN_NAV: NavItem[] = [
   { label: "Overview", href: "/admin/dashboard", icon: LayoutDashboard, exact: true },
   { label: "Clients", href: "/admin/clients", icon: Users },
   { label: "Cleaners", href: "/admin/cleaners", icon: Sparkles },
+  { label: "SMS Gateways", href: "/admin/sms-gateways", icon: MessageSquareText },
 ];
 
 const CLIENT_NAV: NavItem[] = [

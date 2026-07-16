@@ -33,6 +33,14 @@ export type BookingEndpointView = {
   createdAt: string;
 };
 
+export type SmsGatewayView = {
+  id: string;
+  name: string;
+  domain: string;
+  isActive: boolean;
+  createdAt: string;
+};
+
 export type CleanerTaskScheduleView = {
   id: string;
   clientId: string;

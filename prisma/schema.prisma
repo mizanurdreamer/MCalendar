@@ -211,3 +211,19 @@ model CleanerAvailability {
   @@index([deletedAt], map: "cleanerAvailability_deletedAt_idx")
   @@map("cleanerAvailability")
 }
+
+model SmsGateway {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique
+  domain    String   @unique
+  isActive  Boolean  @default(true)
+  isDeleted Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?  @db.Uuid
+  updatedBy String?  @db.Uuid
+  deletedAt DateTime?
+
+  @@index([deletedAt], map: "smsGateway_deletedAt_idx")
+  @@map("smsGateway")
+}

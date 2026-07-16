@@ -345,12 +345,12 @@ function EndpointFormDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <Field label="Name" error={errors.name?.message}>
-            <Input placeholder="e.g. Airbnb — Main listing" {...register("name")} />
+            <Input placeholder="Enter endpoint name" {...register("name")} />
           </Field>
           <Field label="URL" error={errors.url?.message}>
             <div className="space-y-2">
               <Input
-                placeholder="https://www.airbnb.com/calendar/ical/<listing-id>.ics?t=<token>"
+                placeholder="Enter endpoint URL"
                 {...register("url")}
               />
             </div>
@@ -434,3 +434,4 @@ function EndpointViewDialog({
     </Dialog>
   );
 }
+
