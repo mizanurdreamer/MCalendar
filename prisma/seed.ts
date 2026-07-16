@@ -50,19 +50,24 @@ async function main() {
   await prisma.smsGateway.upsert({
     where: { name: "T-Mobile" },
     update: { domain: "tmomail.net", isActive: true, isDeleted: false, deletedAt: null },
-    create: { name: "T-Mobile", domain: "@tmomail.net", isActive: true },
+    create: { name: "T-Mobile", domain: "tmomail.net", isActive: true },
   });
 
   await prisma.smsGateway.upsert({
     where: { name: "AT&T" },
-    update: { domain: "@txt.att.net", isActive: true, isDeleted: false, deletedAt: null },
-    create: { name: "AT&T", domain: "@txt.att.net", isActive: true },
+    update: { domain: "txt.att.net", isActive: true, isDeleted: false, deletedAt: null },
+    create: { name: "AT&T", domain: "txt.att.net", isActive: true },
   });
 
   await prisma.smsGateway.upsert({
     where: { name: "Verizon" },
-    update: { domain: "@vtext.com", isActive: true, isDeleted: false, deletedAt: null },
-    create: { name: "Verizon", domain: "@vtext.com", isActive: true },
+    update: { domain: "vtext.com", isActive: true, isDeleted: false, deletedAt: null },
+    create: { name: "Verizon", domain: "vtext.com", isActive: true },
+  });
+   await prisma.smsGateway.upsert({
+    where: { name: "TextMagic" },
+    update: { domain: "textmagic.com", isActive: true, isDeleted: false, deletedAt: null },
+    create: { name: "TextMagic", domain: "textmagic.com", isActive: true },
   });
   console.log("✅ Seed complete.");
   console.log("   Super Admin: admin@bookingcalendar.com / Password123!");
