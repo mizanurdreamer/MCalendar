@@ -96,4 +96,37 @@ export type CalendarDataView = {
   upcomingCleanings: UpcomingCleaningView[];
 };
 
+export type CleaningStatus =
+  | "ASSIGNED"
+  | "CONFIRMED"
+  | "IN_PROGRESS"
+  | "DONE"
+  | "CANCELLED";
+
+export type CleanerCalendarEventView = {
+  id: string;
+  kind: "booking" | "availability";
+  title: string;
+  start: string;
+  end?: string;
+  allDay: boolean;
+  property: string | null;
+  clientName: string | null;
+  cleaningStatus: CleaningStatus | null;
+};
+
+export type CleanerCalendarAssignmentView = {
+  id: string;
+  clientId: string;
+  clientName: string;
+  startDate: string;
+  endDate: string | null;
+  status: CleaningStatus;
+};
+
+export type CleanerCalendarDataView = {
+  events: CleanerCalendarEventView[];
+  assignments: CleanerCalendarAssignmentView[];
+};
+
 export type { Paginated };

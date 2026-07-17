@@ -18,6 +18,16 @@ function BookingEvent({ event }: EventContentArg) {
     return <span className="text-xs font-semibold">{`* ${event.title}`}</span>;
   }
 
+  if (event.classNames.includes("evt-availability")) {
+    return (
+      <span className="inline-flex items-center gap-1 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-medium">
+        <span className="h-1.5 w-1.5 rounded-full bg-slate-500" />
+        {event.title}
+      </span>
+    );
+  }
+
+  const status = event.extendedProps?.cleaningStatus as string | undefined;
   const guest = event.title[0] ?? "G";
   return (
     <span className="inline-flex items-center gap-2 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold">
@@ -25,6 +35,11 @@ function BookingEvent({ event }: EventContentArg) {
         {guest}
       </span>
       {event.title}
+      {status && status !== "ASSIGNED" && (
+        <span className="ml-auto rounded-full bg-white/30 px-1.5 text-[10px] font-bold uppercase tracking-wide">
+          {status.replace("_", " ")}
+        </span>
+      )}
     </span>
   );
 }

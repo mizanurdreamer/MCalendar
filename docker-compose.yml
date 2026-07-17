@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: bookingcalendar
     ports:
-      - "5433:5432"
+      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -32,7 +32,7 @@ services:
       JWT_REFRESH_SECRET: "prod-refresh-secret-change-me-in-production-32chars!!"
       JWT_ACCESS_TTL: "15m"
       JWT_REFRESH_TTL: "7d"
-      NODE_ENV: "production"
+      NODE_ENV: "${NODE_ENV:-production}"
       SMS_SMTP_HOST: "${SMS_SMTP_HOST:-}"
       SMS_SMTP_PORT: "${SMS_SMTP_PORT:-587}"
       SMS_SMTP_SECURE: "${SMS_SMTP_SECURE:-false}"
@@ -43,7 +43,7 @@ services:
       SMS_EMAIL_FROM: "${SMS_EMAIL_FROM:-}"
       BOOKING_DATA_FETCH_ENABLED: "true"
       CRON_BOOKING_DATA_FETCH_SCHEDULE_IN_MINUTES: "10"
-      CRON_API_SECRET: ""
+      CRON_API_SECRET: "${CRON_API_SECRET:-}"
     depends_on:
       db:
         condition: service_healthy

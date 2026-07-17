@@ -1,9 +1,32 @@
 import { cleanerTaskScheduleRepository } from "@/repositories/CleanerTaskScheduleRepository";
+import { guestBookingInfoRepository } from "@/repositories/GuestBookingInfoRepository";
+import { cleanerAvailabilityRepository } from "@/repositories/CleanerAvailabilityRepository";
 import { userRepository } from "@/repositories/UserRepository";
 import { ConflictError, ForbiddenError, NotFoundError } from "@/lib/errors";
 import type { ActorContext, Paginated } from "@/models";
+import type {
+  CleaningStatus,
+  CleanerCalendarDataView,
+  CleanerCalendarEventView,
+} from "@/models/view";
 import type { PaginationDTO } from "@/dto/common.dto";
 import { prisma } from "@/lib/prisma";
+
+export const CLEANING_STATUSES: CleaningStatus[] = [
+  "ASSIGNED",
+  "CONFIRMED",
+  "IN_PROGRESS",
+  "DONE",
+  "CANCELLED",
+];
+
+const STATUS_RANK: Record<CleaningStatus, number> = {
+  ASSIGNED: 0,
+  CONFIRMED: 1,
+  IN_PROGRESS: 2,
+  DONE: 3,
+  CANCELLED: 4,
+};
 
 export type CleanerTaskScheduleView = {
   id: string;
@@ -15,6 +38,7 @@ export type CleanerTaskScheduleView = {
   cleanerEmail: string;
   startDate: string;
   endDate: string | null;
+  status: CleaningStatus;
   isActive: boolean;
   createdAt: string;
 };
@@ -32,6 +56,7 @@ export function toTaskScheduleView(
     cleanerEmail: item.cleaner.Email,
     startDate: item.startDate.toISOString(),
     endDate: item.endDate?.toISOString() ?? null,
+    status: (item.status as CleaningStatus) ?? "ASSIGNED",
     isActive: item.isActive,
     createdAt: item.createdAt.toISOString(),
   };
@@ -112,7 +137,7 @@ export class CleanerTaskScheduleService {
   }
 
   async create(
-    params: { clientId: string; cleanerId: string; startDate: Date; endDate?: Date },
+    params: { clientId: string; cleanerId: string; startDate: Date; endDate?: Date; status?: CleaningStatus },
     actor: ActorContext,
   ) {
     // Verify both users exist with correct roles
@@ -144,6 +169,7 @@ export class CleanerTaskScheduleService {
       cleaner: { connect: { id: cleanerProfile.id } },
       startDate: params.startDate,
       endDate: params.endDate ?? null,
+      status: params.status ?? "ASSIGNED",
       createdBy: actor.userId,
       updatedBy: actor.userId,
     });
@@ -153,20 +179,29 @@ export class CleanerTaskScheduleService {
 
   async update(
     id: string,
-    params: { endDate?: Date; isActive?: boolean },
+    params: { endDate?: Date; isActive?: boolean; status?: CleaningStatus },
     actor: ActorContext,
   ) {
     const existing = await cleanerTaskScheduleRepository.findById(id);
     if (!existing) throw new NotFoundError("Task schedule not found");
 
-    // Non-admins can only update their own task schedules
-    if (actor.role !== "SUPER_ADMIN" && actor.userId !== existing.client.userId) {
+    // Clients own the schedule; cleaners may only advance the cleaning status.
+    if (actor.role === "CLEANER") {
+      if (actor.userId !== existing.cleaner.userId) throw new ForbiddenError();
+      if (params.status === undefined && params.isActive === undefined && params.endDate === undefined) {
+        throw new ForbiddenError("Cleaners may only update cleaning status");
+      }
+      if (params.status === undefined && (params.isActive !== undefined || params.endDate !== undefined)) {
+        throw new ForbiddenError("Cleaners may only update cleaning status");
+      }
+    } else if (actor.role !== "SUPER_ADMIN" && actor.userId !== existing.client.userId) {
       throw new ForbiddenError();
     }
 
     const taskSchedule = await cleanerTaskScheduleRepository.update(id, {
       endDate: params.endDate,
       isActive: params.isActive,
+      status: params.status,
       updatedBy: actor.userId,
     });
 
@@ -183,6 +218,95 @@ export class CleanerTaskScheduleService {
     }
 
     await cleanerTaskScheduleRepository.softDelete(id, actor.userId);
+  }
+
+  /**
+   * Calendar data scoped to a cleaner: their own availability plus the client
+   * bookings for every client they are assigned to (within an active date
+   * range), each annotated with the cleaning status the client/cleaner set.
+   */
+  async getCleanerCalendarData(actor: ActorContext): Promise<CleanerCalendarDataView> {
+    const cleanerProfile = await prisma.cleanerProfile.findUnique({
+      where: { userId: actor.userId },
+      select: { id: true },
+    });
+    if (!cleanerProfile) throw new NotFoundError("Cleaner profile not found");
+
+    const now = new Date();
+    const from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const to = new Date(now.getFullYear(), now.getMonth() + 2, 0, 23, 59, 59, 999);
+
+    const schedules = await cleanerTaskScheduleRepository.findActiveForCleaner(cleanerProfile.id);
+    const assignedClientIds = Array.from(new Set(schedules.map((s) => s.clientId)));
+
+    // Best (most advanced) cleaning status per assigned client.
+    const statusByClient = new Map<string, CleaningStatus>();
+    for (const s of schedules) {
+      const prev = statusByClient.get(s.clientId);
+      const next = (s.status as CleaningStatus) ?? "ASSIGNED";
+      if (!prev || STATUS_RANK[next] > STATUS_RANK[prev]) statusByClient.set(s.clientId, next);
+    }
+
+    const [bookings, availability] = await Promise.all([
+      guestBookingInfoRepository.listForCleanerClientsCalendar({
+        clientIds: assignedClientIds,
+        from,
+        to,
+      }),
+      cleanerAvailabilityRepository.list({
+        page: 1,
+        pageSize: 200,
+        cleanerId: cleanerProfile.id,
+        activeOnly: true,
+      }),
+    ]);
+
+    const events: CleanerCalendarEventView[] = [];
+
+    for (const row of bookings) {
+      if (!row.startDate && !row.endDate) continue;
+      const clientId = row.clientId;
+      const property = row.endpoint?.name ?? "Property";
+      const title = row.summary?.trim() || property;
+      const cleaningStatus = statusByClient.get(clientId) ?? "ASSIGNED";
+      events.push({
+        id: `booking:${row.id}`,
+        kind: "booking",
+        title,
+        start: (row.startDate ?? row.endDate)!.toISOString(),
+        end: row.endDate?.toISOString() ?? undefined,
+        allDay: true,
+        property,
+        clientName: `${row.client.firstName} ${row.client.lastName}`,
+        cleaningStatus,
+      });
+    }
+
+    for (const slot of availability.items) {
+      events.push({
+        id: `avail:${slot.id}`,
+        kind: "availability",
+        title: "Available",
+        start: slot.fromDate.toISOString(),
+        end: slot.toDate?.toISOString() ?? undefined,
+        allDay: true,
+        property: null,
+        clientName: null,
+        cleaningStatus: null,
+      });
+    }
+
+    return {
+      events,
+      assignments: schedules.map((s) => ({
+        id: s.id,
+        clientId: s.client.userId,
+        clientName: `${s.client.firstName} ${s.client.lastName}`,
+        startDate: s.startDate.toISOString(),
+        endDate: (s.endDate?.toISOString() ?? null) as string | null,
+        status: (s.status as CleaningStatus) ?? "ASSIGNED",
+      })),
+    };
   }
 }
 

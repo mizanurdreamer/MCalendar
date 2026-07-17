@@ -6,14 +6,14 @@ import { requireActor } from "@/lib/auth";
 import { z } from "zod";
 
 const createAvailabilitySchema = z.object({
-  cleanerId: z.string().uuid(),
+  cleanerId: z.string().min(1, "cleanerId is required"),
   fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD"),
   toDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD")
     .optional()
     .nullable(),
-  note: z.string().trim().max(500).optional(),
+  note: z.string().trim().max(500).nullable().optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
         cleanerId: dto.cleanerId,
         fromDate: new Date(`${dto.fromDate}T00:00:00.000Z`),
         toDate: dto.toDate ? new Date(`${dto.toDate}T00:00:00.000Z`) : null,
-        note: dto.note,
+        note: dto.note ?? undefined,
       },
       actor,
     );

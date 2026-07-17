@@ -179,6 +179,7 @@ model CleanerTaskSchedule {
 
   startDate DateTime
   endDate   DateTime?
+  status    String   @default("ASSIGNED")
   isActive  Boolean  @default(true)
   isDeleted    Boolean @default(false)
   createdAt DateTime  @default(now())
@@ -190,6 +191,7 @@ model CleanerTaskSchedule {
   @@unique([clientId, cleanerId, startDate], map: "cleanerTaskSchedule_clientId_cleanerId_startDate_key")
   @@index([clientId], map: "cleanerTaskSchedule_clientId_idx")
   @@index([cleanerId], map: "cleanerTaskSchedule_cleanerId_idx")
+  @@index([status], map: "cleanerTaskSchedule_status_idx")
   @@index([startDate, endDate], map: "cleanerTaskSchedules_startDate_endDate_idx")
   @@index([deletedAt], map: "cleanerTaskSchedule_deletedAt_idx")
   @@map("cleanerTaskSchedule")

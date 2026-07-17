@@ -92,6 +92,31 @@ export class GuestBookingInfoRepository {
     });
   }
 
+  listForCleanerClientsCalendar(params: {
+    clientIds: string[];
+    from: Date;
+    to: Date;
+  }) {
+    if (!params.clientIds.length) return Promise.resolve([]);
+    return prisma.guestBookingInfo.findMany({
+      where: {
+        clientId: { in: params.clientIds },
+        OR: [
+          { startDate: { gte: params.from, lte: params.to } },
+          { endDate: { gte: params.from, lte: params.to } },
+          { startDate: { lte: params.from }, endDate: { gte: params.to } },
+        ],
+      },
+      include: {
+        endpoint: { select: { id: true, name: true } },
+        client: { select: { firstName: true, lastName: true } },
+        fetchData: { select: { fetchedAt: true } },
+      },
+      orderBy: [{ fetchData: { fetchedAt: "desc" } }, { createdAt: "desc" }],
+      take: 2000,
+    });
+  }
+
   listForClientCalendar(params: {
     clientId: string;
     from: Date;

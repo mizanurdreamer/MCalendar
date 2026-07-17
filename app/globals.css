@@ -164,3 +164,28 @@
   background: #ede9fe;
   color: #6d28d9;
 }
+
+.booking-fc .evt-availability {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.booking-fc .evt-assigned {
+  background: #6366f1;
+}
+
+.booking-fc .evt-confirmed {
+  background: #0ea5e9;
+}
+
+.booking-fc .evt-inprogress {
+  background: #f59e0b;
+}
+
+.booking-fc .evt-done {
+  background: #22c55e;
+}
+
+.booking-fc .evt-cancelled {
+  background: #ef4444;
+}

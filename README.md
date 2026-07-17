@@ -27,7 +27,7 @@ This is the easiest way to run the full stack.
 docker compose up -d
 
 # 2. (First run only) Seed the initial super admin account manually
-docker compose exec app node prisma/seed.mjs
+docker compose exec app npx tsx prisma/seed.ts
 
 # 3. Open http://localhost:3000
 ```
@@ -44,7 +44,7 @@ To reset the database:
 docker compose down -v
 docker compose up -d
 # Re-seed after a reset
-docker compose exec app node prisma/seed.mjs
+docker compose exec app npx tsx prisma/seed.ts
 ```
 
 ### Option 2: Local Development
@@ -266,7 +266,7 @@ docker compose build
 docker compose up -d
 
 # Seed the initial super admin (first run only)
-docker compose exec app node prisma/seed.mjs
+docker compose exec app npx tsx prisma/seed.ts
 ```
 
 

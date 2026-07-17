@@ -1,6 +1,7 @@
 import type { ActorContext } from "@/models";
 import type { CalendarDataView, CalendarEventView } from "@/models/view";
 import { guestBookingInfoRepository } from "@/repositories/GuestBookingInfoRepository";
+import { cleanerTaskScheduleRepository } from "@/repositories/CleanerTaskScheduleRepository";
 import { prisma } from "@/lib/prisma";
 import { NotFoundError } from "@/lib/errors";
 
@@ -48,9 +49,26 @@ export class ClientCalendarService {
       new Set(latestRows.map((row) => row.endpoint?.name?.trim()).filter(Boolean)),
     ) as string[];
 
-    const events = latestRows
+    const bookingEvents = latestRows
       .map((row) => this.toCalendarEvent(row))
       .filter((item): item is CalendarEventView => item !== null);
+
+    // Cleaning assignments the client created for their cleaners.
+    const schedules = await cleanerTaskScheduleRepository.findActiveForClient(clientProfile.id);
+    const cleaningEvents: CalendarEventView[] = schedules.map((s) => ({
+      id: `cleaning:${s.id}`,
+      title: `Cleaning · ${s.cleaner.firstName} ${s.cleaner.lastName}`,
+      start: s.startDate.toISOString(),
+      end: s.endDate?.toISOString() ?? undefined,
+      allDay: true,
+      classNames: ["evt-cleaning"],
+      extendedProps: {
+        property: "Assigned cleaning",
+        status: (s.status as string) ?? "ASSIGNED",
+      },
+    }));
+
+    const events = [...bookingEvents, ...cleaningEvents];
 
     const upcomingCleanings = latestRows
       .filter((row) => row.endDate)

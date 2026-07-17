@@ -41,6 +41,7 @@ const CLIENT_NAV: NavItem[] = [
 
 const CLEANER_NAV: NavItem[] = [
   { label: "Today", href: "/cleaner/today", icon: Sun, exact: true },
+  { label: "Calendar", href: "/cleaner/calendar", icon: CalendarDays },
   { label: "Availability", href: "/cleaner/availability", icon: CalendarClock }
 ];
 

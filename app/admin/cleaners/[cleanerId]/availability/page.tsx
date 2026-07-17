@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { requireRole } from "@/lib/auth";
-import { CleanerAvailabilityView } from "@/components/sections/cleaner-availability-view";
+import { CleanerAvailabilityManager } from "@/components/sections/cleaner-availability-manager";
 
 export default async function CleanerAvailabilityScreen({
   params,
@@ -20,7 +20,7 @@ export default async function CleanerAvailabilityScreen({
       >
         <ArrowLeft className="h-5 w-5" />
       </Link>
-      <CleanerAvailabilityView cleanerId={cleanerId} />
+      <CleanerAvailabilityManager cleanerId={cleanerId} />
     </div>
   );
 }
