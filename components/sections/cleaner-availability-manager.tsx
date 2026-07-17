@@ -49,8 +49,8 @@ function formatRange(from: string, to: string | null) {
   return to ? `${fmt(from)} – ${fmt(to)}` : `${fmt(from)} (open-ended)`;
 }
 
-export function CleanerAvailabilityManager() {
-  const { data, isLoading } = useCleanerAvailability();
+export function CleanerAvailabilityManager({ cleanerId }: { cleanerId?: string }) {
+  const { data, isLoading } = useCleanerAvailability(cleanerId ? { cleanerId } : {});
   const { data: profile } = useCleanerProfile();
   const create = useCreateAvailability();
   const update = useUpdateAvailability("");
@@ -86,10 +86,10 @@ export function CleanerAvailabilityManager() {
 
   const onSubmit = async (values: FormValues) => {
     try {
-      const cleanerId = profile?.userId;
-      if (!cleanerId) throw new Error("Cleaner profile not found");
+      const targetCleanerId = cleanerId ?? profile?.userId;
+      if (!targetCleanerId) throw new Error("Cleaner profile not found");
       const payload: CreateAvailabilityDTO = {
-        cleanerId,
+        cleanerId: targetCleanerId,
         fromDate: values.fromDate,
         toDate: values.toDate ? values.toDate : null,
         note: values.note,
