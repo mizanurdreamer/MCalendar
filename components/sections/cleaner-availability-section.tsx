@@ -34,7 +34,7 @@ export function CleanerAvailabilitySection() {
   return (
     <Card className="rounded-2xl border-slate-200 bg-white">
       <CardHeader className="pb-3">
-        <CardTitle className="text-2xl font-bold text-slate-900">Cleaner Availability</CardTitle>
+          <CardTitle className="text-2xl font-bold text-slate-900">My Availability</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {(cleaners.data ?? []).map((cleaner) => {

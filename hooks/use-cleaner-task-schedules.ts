@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
 import type { CleanerTaskScheduleView, Paginated } from "@/models/view";
 
@@ -16,5 +16,29 @@ export function useCleanerTaskSchedules(params: { page?: number; activeOnly?: bo
       api.get<Paginated<CleanerTaskScheduleView>>(
         `/api/cleaner-task-schedules?${query.toString()}`,
       ),
+  });
+}
+
+export type CreateTaskScheduleDTO = {
+  clientId: string;
+  cleanerId: string;
+  startDate: string;
+  endDate?: string | null;
+};
+
+export function useCreateTaskSchedule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: CreateTaskScheduleDTO) =>
+      api.post<CleanerTaskScheduleView>("/api/cleaner-task-schedules", body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["cleaner-task-schedules"] }),
+  });
+}
+
+export function useDeleteTaskSchedule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.del(`/api/cleaner-task-schedules/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["cleaner-task-schedules"] }),
   });
 }

@@ -37,6 +37,7 @@ const CLIENT_NAV: NavItem[] = [
     icon: Link2,
   },
   { label: "Cleaners", href: "/client/cleaners", icon: Sparkles },
+  { label: "Assign Cleaners", href: "/client/cleaners/assignments", icon: CalendarClock },
 ];
 
 const CLEANER_NAV: NavItem[] = [

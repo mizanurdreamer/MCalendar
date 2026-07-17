@@ -53,6 +53,7 @@ export type CleanerTaskScheduleView = {
   cleanerEmail: string;
   startDate: string;
   endDate: string | null;
+  status: CleaningStatus;
   isActive: boolean;
   createdAt: string;
 };
