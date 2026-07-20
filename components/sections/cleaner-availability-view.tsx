@@ -33,7 +33,7 @@ export function CleanerAvailabilityView({ cleanerId }: { cleanerId: string }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-[38px] font-extrabold tracking-tight text-slate-900">
+        <h1 className="text-[38px] font-extrabold tracking-tight ">
           Availability
           {cleaner && (
             <span className="ml-2 text-base font-normal text-slate-500">
@@ -42,12 +42,12 @@ export function CleanerAvailabilityView({ cleanerId }: { cleanerId: string }) {
             </span>
           )}
         </h1>
-        <span className="rounded-full bg-slate-200 px-3 py-1 text-sm font-semibold text-slate-500">
+        <span className="rounded-full px-3 py-1 text-sm font-semibold text-slate-500">
           {slots.length.toLocaleString()} total
         </span>
       </div>
 
-      <Card className="overflow-hidden rounded-2xl border-slate-200 bg-white">
+      <Card className="overflow-hidden rounded-2xl">
         <CardContent className="p-0">
           <Table>
             <TableHeader className="bg-slate-50/70">
@@ -73,7 +73,7 @@ export function CleanerAvailabilityView({ cleanerId }: { cleanerId: string }) {
                 slots.map((slot) => (
                   <TableRow key={slot.id} className="h-[74px] border-slate-200 hover:bg-slate-50/40">
                     <TableCell>
-                      <p className="text-[17px] font-semibold text-slate-900">
+                      <p className="text-[17px] font-semibold ">
                         {formatRange(slot.fromDate, slot.toDate)}
                       </p>
                     </TableCell>

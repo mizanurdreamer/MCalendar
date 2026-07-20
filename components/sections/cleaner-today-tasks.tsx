@@ -69,10 +69,10 @@ export function CleanerTodayTasks() {
           assignments.map((a) => (
             <div
               key={a.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4"
+              className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border p-4"
             >
               <div>
-                <p className="text-[17px] font-semibold text-slate-900">{a.clientName}</p>
+                <p className="text-[17px] font-semibold ">{a.clientName}</p>
                 <p className="text-sm text-slate-500">{fmtRange(a.startDate, a.endDate)}</p>
               </div>
               <div className="flex items-center gap-3">

@@ -128,7 +128,7 @@ export function CleanerCalendar() {
   };
 
   return (
-    <div className="grid gap-4 rounded-3xl bg-[#f4f7fb] p-4 2xl:grid-cols-[minmax(0,1fr)_340px]">
+    <div className="grid gap-4 rounded-3xl p-4 2xl:grid-cols-[minmax(0,1fr)_340px]">
       <section className="space-y-3 md:space-y-4">
         <CalendarToolbar
           title={title}
@@ -143,7 +143,7 @@ export function CleanerCalendar() {
         />
 
         {isLoading ? (
-          <div className="flex min-h-[560px] items-center justify-center rounded-3xl border border-slate-200 bg-white">
+          <div className="flex min-h-[560px] items-center justify-center rounded-3xl border">
             <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
           </div>
         ) : (

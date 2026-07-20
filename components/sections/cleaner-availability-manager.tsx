@@ -124,8 +124,8 @@ export function CleanerAvailabilityManager({ cleanerId }: { cleanerId?: string }
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <h1 className="text-[38px] font-extrabold tracking-tight text-slate-900">My Availability</h1>
-          <span className="rounded-full bg-slate-200 px-3 py-1 text-sm font-semibold text-slate-500">
+          <h1 className="text-[38px] font-extrabold tracking-tight ">My Availability</h1>
+          <span className="rounded-full px-3 py-1 text-sm font-semibold text-slate-500">
             {slots.length} total
           </span>
         </div>
@@ -135,10 +135,10 @@ export function CleanerAvailabilityManager({ cleanerId }: { cleanerId?: string }
         </Button>
       </div>
 
-      <Card className="overflow-hidden rounded-2xl border-slate-200 bg-white">
+      <Card className="overflow-hidden rounded-2xl">
         <Table>
           <TableHeader>
-            <TableRow className="border-b border-slate-200 bg-slate-50/70 hover:bg-slate-50/70">
+            <TableRow className="border-b">
               <TableHead className="h-12 px-6 text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
                 Date range
               </TableHead>
@@ -167,9 +167,9 @@ export function CleanerAvailabilityManager({ cleanerId }: { cleanerId?: string }
               slots.map((slot) => (
                 <TableRow
                   key={slot.id}
-                  className="h-[74px] border-b border-slate-200 transition-colors last:border-b-0 hover:bg-slate-50/60"
+                  className="border-b transition-colors last:border-b-0"
                 >
-                  <TableCell className="px-6 text-[17px] font-medium text-slate-900">
+                  <TableCell className="px-6 text-[17px] font-medium ">
                     {formatRange(slot.fromDate, slot.toDate)}
                   </TableCell>
                   <TableCell className="text-[17px] text-slate-500">
@@ -186,7 +186,7 @@ export function CleanerAvailabilityManager({ cleanerId }: { cleanerId?: string }
                         type="button"
                         title="Edit"
                         aria-label="Edit"
-                        className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                        className="rounded-lg p-2 text-slate-500 hover:bg-slate-400 hover:text-slate-900"
                         onClick={() => openEdit(slot)}
                       >
                         <Pencil className="h-5 w-5" />

@@ -256,8 +256,8 @@ export function UsersSection({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <h1 className="text-[30px] font-extrabold tracking-tight text-slate-900">{copy.plural}</h1>
-          <span className="rounded-full bg-slate-200 px-3 py-1 text-sm font-semibold text-slate-500">
+          <h1 className="text-[30px] font-extrabold tracking-tight ">{copy.plural}</h1>
+          <span className="rounded-full px-3 py-1 text-sm font-semibold text-slate-500 dark:text-slate-300 bg-slate-200 dark:bg-slate-800 ">
             {(data?.total ?? 0).toLocaleString()} total
           </span>
         </div>
@@ -371,7 +371,7 @@ export function UsersSection({
                         <div className="flex items-center gap-3">
                           <UserAvatar firstName={u.firstName} lastName={u.lastName} />
                           <div>
-                            <p className="text-[23px] font-bold leading-[1.1] text-slate-900">
+                            <p className="text-[23px] font-bold leading-[1.1] ">
                               {u.firstName} {u.lastName}
                             </p>
                             <p className="text-[17px] text-slate-400">{meta.subtitle}</p>

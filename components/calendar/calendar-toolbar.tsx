@@ -35,7 +35,7 @@ export function CalendarToolbar({
   return (
     <>
       <div className="flex flex-wrap items-center gap-2.5 md:gap-3">
-        <h2 className="text-5xl font-extrabold tracking-tight text-slate-900">
+        <h2 className="text-5xl font-extrabold tracking-tight ">
           {heading}
         </h2>
         <div className="inline-flex items-center gap-1 rounded-full p-1">
@@ -52,9 +52,9 @@ export function CalendarToolbar({
             placeholder="Search guests, properties..."
             value={search}
             onChange={(event) => onChangeSearch(event.target.value)}
-            className="h-12 w-full rounded-2xl border-slate-300 bg-white text-[17px] sm:w-[290px]"
+            className="h-12 w-full rounded-2xl text-[17px] sm:w-[290px]"
           />
-          <div className="inline-flex items-center rounded-2xl bg-slate-200 p-1">
+          <div className="inline-flex items-center rounded-2xl p-1">
             <Button
               size="sm"
               variant={viewMode === "month" ? "default" : "ghost"}
@@ -106,7 +106,7 @@ export function CalendarToolbar({
                 "cursor-pointer whitespace-nowrap rounded-2xl border px-5 py-2.5 text-[17px] font-semibold",
                 activeProperty === property
                   ? "border-primary bg-primary text-primary-foreground"
-                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
+                  : "text-slate-600",
               )}
               onClick={() => onChangeProperty(property)}
             >

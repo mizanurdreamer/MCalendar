@@ -110,11 +110,11 @@ export function SmsGatewaysSection() {
         </div>
       </div>
 
-      <Card className="overflow-hidden rounded-2xl border-slate-200 bg-white">
+      <Card className="overflow-hidden rounded-2xl">
         <CardContent className="p-0">
           <Table>
-            <TableHeader className="bg-slate-50/70">
-              <TableRow className="hover:bg-slate-50/70">
+            <TableHeader className="">
+              <TableRow className="">
                 <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
                   Name
                 </TableHead>
@@ -134,8 +134,8 @@ export function SmsGatewaysSection() {
                 <EmptyRow colSpan={4}>Loading...</EmptyRow>
               ) : data && data.items.length > 0 ? (
                 data.items.map((item) => (
-                  <TableRow key={item.id} className="h-[74px] border-slate-200 hover:bg-slate-50/40">
-                    <TableCell className="text-[17px] font-medium text-slate-900">
+                  <TableRow key={item.id} className="">
+                    <TableCell className="text-[17px] font-medium ">
                       {item.name}
                     </TableCell>
                     <TableCell className="text-[17px] text-slate-600">{item.domain}</TableCell>

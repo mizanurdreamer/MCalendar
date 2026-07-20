@@ -163,17 +163,17 @@ export function BookingEndpointsSection() {
       </div>
 
       {/* Table */}
-      <Card className="overflow-hidden rounded-2xl border-slate-200 bg-white">
+      <Card className="overflow-hidden rounded-2xl">
         <CardContent className="p-0">
           <Table>
-            <TableHeader className="bg-slate-50/70">
-              <TableRow className="hover:bg-slate-50/70">
+            <TableHeader className="">
+              <TableRow className="">
                 <TableHead className="w-12 px-4">
                   <input
                     type="checkbox"
                     checked={!!allSelected}
                     onChange={toggleSelectAll}
-                    className="h-5 w-5 rounded-md border-slate-300 text-primary focus:ring-primary"
+                    className="h-5 w-5 rounded-md text-primary focus:ring-primary"
                   />
                 </TableHead>
                 <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
@@ -195,16 +195,16 @@ export function BookingEndpointsSection() {
                 <EmptyRow colSpan={5}>Loading…</EmptyRow>
               ) : data && data.items.length > 0 ? (
                 data.items.map((e) => (
-                  <TableRow key={e.id} className="h-[74px] border-slate-200 hover:bg-slate-50/40">
+                  <TableRow key={e.id} className="hover:bg-slate-50/40">
                     <TableCell className="px-4">
                       <input
                         type="checkbox"
                         checked={selected.has(e.id)}
                         onChange={() => toggleSelect(e.id)}
-                        className="h-5 w-5 rounded-md border-slate-300 text-primary focus:ring-primary"
+                        className="h-5 w-5 rounded-md text-primary focus:ring-primary"
                       />
                     </TableCell>
-                    <TableCell className="text-[17px] font-medium text-slate-900">
+                    <TableCell className="text-[17px] font-medium ">
                       {e.name}
                     </TableCell>
                     <TableCell className="max-w-md truncate text-[17px] text-slate-600">

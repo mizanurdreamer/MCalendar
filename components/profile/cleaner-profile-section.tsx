@@ -46,7 +46,7 @@ export function CleanerProfileSection() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Cleaner Profile</h1>
+          <h1 className="text-3xl font-extrabold tracking-tight ">Cleaner Profile</h1>
           <Badge className="rounded-full border-transparent bg-emerald-500/15 px-3 py-1 text-emerald-700">
             CLEANER
           </Badge>
@@ -77,9 +77,9 @@ export function CleanerProfileSection() {
         )}
       </div>
 
-      <Card className="rounded-2xl border-slate-200 bg-white">
+      <Card className="rounded-2xl">
         <CardHeader>
-          <CardTitle className="text-lg text-slate-900">Account</CardTitle>
+          <CardTitle className="text-lg ">Account</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           <ProfileInput label="First name" disabled={!editing} {...register("firstName")} />
@@ -89,9 +89,9 @@ export function CleanerProfileSection() {
         </CardContent>
       </Card>
 
-      <Card className="rounded-2xl border-slate-200 bg-white">
+      <Card className="rounded-2xl">
         <CardHeader>
-          <CardTitle className="text-lg text-slate-900">CleanerProfile</CardTitle>
+          <CardTitle className="text-lg ">CleanerProfile</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           <ProfileInput label="Service area" disabled={!editing} {...register("serviceArea")} />
@@ -125,9 +125,9 @@ function ProfileInput(
 ) {
   const { label, ...inputProps } = props;
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+    <div className="rounded-xl border p-3">
       <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">{label}</p>
-      <Input className="mt-2 h-10 bg-white" {...inputProps} />
+      <Input className="mt-2 h-10" {...inputProps} />
     </div>
   );
 }
