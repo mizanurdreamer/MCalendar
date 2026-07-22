@@ -8,7 +8,6 @@ import {
   MessageSquareText,
   SendHorizontal,
   CalendarDays,
-  UserCircle2,
   CalendarClock,
 } from "lucide-react";
 import type { Role } from "@/models/view";
@@ -37,7 +36,6 @@ const CLIENT_NAV: NavItem[] = [
     icon: Link2,
   },
   { label: "Cleaners", href: "/client/cleaners", icon: Sparkles },
-  { label: "Assign Cleaners", href: "/client/cleaners/assignments", icon: CalendarClock },
 ];
 
 const CLEANER_NAV: NavItem[] = [
