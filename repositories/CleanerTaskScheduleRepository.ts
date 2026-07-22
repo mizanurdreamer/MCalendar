@@ -72,7 +72,7 @@ export class CleanerTaskScheduleRepository {
         clientId,
         isActive: true,
         deletedAt: null,
-        assignedDate: { lte: now },
+        assignedDate: { gte: now },
       },
       include: taskScheduleInclude,
       orderBy: { assignedDate: "desc" },

@@ -35,11 +35,11 @@ function BookingEvent({ event }: EventContentArg) {
         {guest}
       </span>
       {event.title}
-      {status && status !== "ASSIGNED" && (
+      {/* {status && status !== "ASSIGNED" && (
         <span className="ml-auto rounded-full bg-white/30 px-1.5 text-[10px] font-bold uppercase tracking-wide">
           {status.replace("_", " ")}
         </span>
-      )}
+      )} */}
     </span>
   );
 }

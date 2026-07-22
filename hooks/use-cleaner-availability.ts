@@ -6,7 +6,9 @@ import type { CleanerAvailabilityView, Paginated } from "@/models/view";
 
 const KEY = "cleaner-availability";
 
-export function useCleanerAvailability(params: { clientId?: string; cleanerId?: string; activeOnly?: boolean } = {}) {
+export function useCleanerAvailability(
+  params: { clientId?: string; cleanerId?: string; activeOnly?: boolean } = {},
+) {
   const query = new URLSearchParams();
   query.set("page", "1");
   query.set("pageSize", "100");
@@ -17,7 +19,9 @@ export function useCleanerAvailability(params: { clientId?: string; cleanerId?: 
   return useQuery({
     queryKey: [KEY, params],
     queryFn: () =>
-      api.get<Paginated<CleanerAvailabilityView>>(`/api/cleaner-availability?${query.toString()}`),
+      api.get<Paginated<CleanerAvailabilityView>>(
+        `/api/cleaner-availability?${query.toString()}`,
+      ),
   });
 }
 
@@ -38,11 +42,27 @@ export function useCreateAvailability() {
   });
 }
 
-export function useUpdateAvailability(id: string) {
+// export function useUpdateAvailability(id: string) {
+//   const qc = useQueryClient();
+//   return useMutation({
+//     mutationFn: (body: Partial<CreateAvailabilityDTO & { isActive?: boolean }>) =>
+//       api.patch<CleanerAvailabilityView>(`/api/cleaner-availability/${id}`, body),
+//     onSuccess: () => qc.invalidateQueries({ queryKey: [KEY] }),
+//   });
+// }
+
+export function useUpdateAvailability() {
   const qc = useQueryClient();
+
   return useMutation({
-    mutationFn: (body: Partial<CreateAvailabilityDTO & { isActive?: boolean }>) =>
-      api.patch<CleanerAvailabilityView>(`/api/cleaner-availability/${id}`, body),
+    mutationFn: ({
+      id,
+      body,
+    }: {
+      id: string;
+      body: Partial<CreateAvailabilityDTO & { isActive?: boolean }>;
+    }) => api.patch<CleanerAvailabilityView>(`/api/cleaner-availability/${id}`, body),
+
     onSuccess: () => qc.invalidateQueries({ queryKey: [KEY] }),
   });
 }

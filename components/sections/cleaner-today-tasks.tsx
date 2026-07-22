@@ -50,7 +50,7 @@ export function CleanerTodayTasks() {
   if (isLoading) {
     return (
       <Card>
-        <CardContent className="flex items-center gap-2 py-8 text-sm text-slate-500">
+        <CardContent className="flex items-center gap-2 py-8 text-sm">
           <Loader2 className="h-4 w-4 animate-spin" /> Loading your assignments…
         </CardContent>
       </Card>
@@ -72,7 +72,7 @@ export function CleanerTodayTasks() {
               className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border p-4"
             >
               <div>
-                <p className="text-[17px] font-semibold text-slate-900">{a.clientName}</p>
+                <p className="text-[17px] font-semibold">{a.clientName}</p>
                 <p className="text-sm text-slate-500">{fmtDate(a.assignedDate)}</p>
               </div>
               <div className="flex items-center gap-3">

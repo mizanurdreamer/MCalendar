@@ -45,19 +45,35 @@ function joinName(firstName?: string, lastName?: string) {
 
 export class ProfileService {
   async getClient(actor: ActorContext): Promise<ClientProfileView> {
-    const user = await prisma.user.findUniqueOrThrow({ where: { id: actor.userId } });
-    const fallbackName = splitName(user.displayName);
-    const profile = await prisma.clientProfile.upsert({
-      where: { userId: actor.userId },
-      update: {},
-      create: {
-        userId: actor.userId,
-        Email: user.email,
-        firstName: fallbackName.firstName,
-        lastName: fallbackName.lastName,
-        phoneNo: "",
-        createdBy: actor.userId,
-        updatedBy: actor.userId,
+    let clientProfileId: string;
+
+    if (actor.role === "CLIENT") {
+      const clientProfile = await prisma.clientProfile.findUniqueOrThrow({
+        where: {
+          userId: actor.userId,
+        },
+      });
+
+      clientProfileId = clientProfile.id;
+    } else if (actor.role === "CLEANER") {
+      const cleanerProfile = await prisma.cleanerProfile.findUniqueOrThrow({
+        where: {
+          userId: actor.userId,
+        },
+      });
+
+      if (!cleanerProfile.clientId) {
+        throw new Error("Cleaner is not assigned to a client");
+      }
+
+      clientProfileId = cleanerProfile.clientId;
+    } else {
+      throw new Error("Invalid actor role");
+    }
+
+    const profile = await prisma.clientProfile.findUniqueOrThrow({
+      where: {
+        id: clientProfileId,
       },
     });
 
@@ -74,8 +90,13 @@ export class ProfileService {
     };
   }
 
-  async updateClient(actor: ActorContext, dto: UpdateClientProfileDTO): Promise<ClientProfileView> {
-    const currentUser = await prisma.user.findUniqueOrThrow({ where: { id: actor.userId } });
+  async updateClient(
+    actor: ActorContext,
+    dto: UpdateClientProfileDTO,
+  ): Promise<ClientProfileView> {
+    const currentUser = await prisma.user.findUniqueOrThrow({
+      where: { id: actor.userId },
+    });
     const [user, profile] = await prisma.$transaction([
       prisma.user.update({
         where: { id: actor.userId },
@@ -155,8 +176,13 @@ export class ProfileService {
     };
   }
 
-  async updateCleaner(actor: ActorContext, dto: UpdateCleanerProfileDTO): Promise<CleanerProfileView> {
-    const currentUser = await prisma.user.findUniqueOrThrow({ where: { id: actor.userId } });
+  async updateCleaner(
+    actor: ActorContext,
+    dto: UpdateCleanerProfileDTO,
+  ): Promise<CleanerProfileView> {
+    const currentUser = await prisma.user.findUniqueOrThrow({
+      where: { id: actor.userId },
+    });
     const [user, profile] = await prisma.$transaction([
       prisma.user.update({
         where: { id: actor.userId },

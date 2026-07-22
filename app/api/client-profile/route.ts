@@ -6,7 +6,7 @@ import { profileService } from "@/services/ProfileService";
 
 export async function GET() {
   try {
-    const actor = await requireActor("CLIENT");
+    const actor = await requireActor("CLIENT", "CLEANER");
     const profile = await profileService.getClient(actor);
     return ok(profile);
   } catch (error) {

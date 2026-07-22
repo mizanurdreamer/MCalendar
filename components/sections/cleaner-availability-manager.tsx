@@ -17,8 +17,21 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { toast } from "@/hooks/use-toast";
 import { msg, Field, EmptyRow } from "@/components/sections/shared-utils";
 import type { CleanerAvailabilityView } from "@/models/view";
@@ -49,12 +62,18 @@ function formatRange(from: string, to: string | null) {
   return to ? `${fmt(from)} – ${fmt(to)}` : `${fmt(from)} (open-ended)`;
 }
 
-export function CleanerAvailabilityManager({ cleanerId, clientId: propClientId }: { cleanerId?: string; clientId?: string }) {
+export function CleanerAvailabilityManager({
+  cleanerId,
+  clientId: propClientId,
+}: {
+  cleanerId?: string;
+  clientId?: string;
+}) {
   const { data, isLoading } = useCleanerAvailability(cleanerId ? { cleanerId } : {});
   const { data: profile } = useCleanerProfile();
   const { data: clientProfile } = useClientProfile();
   const create = useCreateAvailability();
-  const update = useUpdateAvailability("");
+  const update = useUpdateAvailability();
   const remove = useDeleteAvailability();
 
   const targetClientId = propClientId ?? clientProfile?.userId ?? "";
@@ -92,6 +111,7 @@ export function CleanerAvailabilityManager({ cleanerId, clientId: propClientId }
       const targetCleanerId = cleanerId ?? profile?.userId;
       if (!targetCleanerId) throw new Error("Cleaner profile not found");
       if (!targetClientId) throw new Error("Client is required");
+      console.log(targetCleanerId);
       const payload: CreateAvailabilityDTO = {
         clientId: targetClientId,
         cleanerId: targetCleanerId,
@@ -99,8 +119,12 @@ export function CleanerAvailabilityManager({ cleanerId, clientId: propClientId }
         toDate: values.toDate ? values.toDate : null,
         note: values.note,
       };
+      console.log(payload);
       if (editing) {
-        await update.mutateAsync(payload);
+        await update.mutateAsync({
+          id: editing.id,
+          body: payload,
+        });
         toast({ title: "Availability updated" });
       } else {
         await create.mutateAsync(payload);
@@ -134,7 +158,11 @@ export function CleanerAvailabilityManager({ cleanerId, clientId: propClientId }
             {slots.length} total
           </span>
         </div>
-        <Button size="sm" onClick={openNew} className="h-10 rounded-xl px-4 text-[16px] font-semibold">
+        <Button
+          size="sm"
+          onClick={openNew}
+          className="h-10 rounded-xl px-4 text-[16px] font-semibold"
+        >
           <Plus className="mr-1 h-4 w-4" />
           Add availability
         </Button>
@@ -166,7 +194,8 @@ export function CleanerAvailabilityManager({ cleanerId, clientId: propClientId }
               </EmptyRow>
             ) : slots.length === 0 ? (
               <EmptyRow colSpan={4}>
-                No availability set yet. Use “Add availability” to enter your availability.
+                No availability set yet. Use “Add availability” to enter your
+                availability.
               </EmptyRow>
             ) : (
               slots.map((slot) => (
@@ -217,7 +246,9 @@ export function CleanerAvailabilityManager({ cleanerId, clientId: propClientId }
       <Dialog open={open} onOpenChange={(o) => !o && setOpen(false)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{editing ? "Edit availability" : "Add availability"}</DialogTitle>
+            <DialogTitle>
+              {editing ? "Edit availability" : "Add availability"}
+            </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <Field label="From date" error={errors.fromDate?.message}>
@@ -234,7 +265,9 @@ export function CleanerAvailabilityManager({ cleanerId, clientId: propClientId }
                 Cancel
               </Button>
               <Button type="submit" disabled={create.isPending || update.isPending}>
-                {(create.isPending || update.isPending) && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+                {(create.isPending || update.isPending) && (
+                  <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                )}
                 {editing ? "Save changes" : "Add"}
               </Button>
             </DialogFooter>
@@ -242,7 +275,12 @@ export function CleanerAvailabilityManager({ cleanerId, clientId: propClientId }
         </DialogContent>
       </Dialog>
 
-      <ConfirmDelete open={!!toDelete} pending={remove.isPending} onConfirm={onDelete} onClose={() => setToDelete(null)} />
+      <ConfirmDelete
+        open={!!toDelete}
+        pending={remove.isPending}
+        onConfirm={onDelete}
+        onClose={() => setToDelete(null)}
+      />
     </div>
   );
 }
@@ -269,7 +307,12 @@ function ConfirmDelete({
           <Button type="button" variant="outline" onClick={onClose} disabled={pending}>
             Cancel
           </Button>
-          <Button type="button" variant="destructive" onClick={onConfirm} disabled={pending}>
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={onConfirm}
+            disabled={pending}
+          >
             {pending && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
             Delete
           </Button>
