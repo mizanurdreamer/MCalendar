@@ -6,10 +6,11 @@ import type { CleanerAvailabilityView, Paginated } from "@/models/view";
 
 const KEY = "cleaner-availability";
 
-export function useCleanerAvailability(params: { cleanerId?: string; activeOnly?: boolean } = {}) {
+export function useCleanerAvailability(params: { clientId?: string; cleanerId?: string; activeOnly?: boolean } = {}) {
   const query = new URLSearchParams();
   query.set("page", "1");
   query.set("pageSize", "100");
+  if (params.clientId) query.set("clientId", params.clientId);
   if (params.cleanerId) query.set("cleanerId", params.cleanerId);
   if (params.activeOnly) query.set("activeOnly", "true");
 
@@ -21,6 +22,7 @@ export function useCleanerAvailability(params: { cleanerId?: string; activeOnly?
 }
 
 export type CreateAvailabilityDTO = {
+  clientId: string;
   cleanerId: string;
   fromDate: string;
   toDate?: string | null;

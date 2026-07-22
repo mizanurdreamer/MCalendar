@@ -19,6 +19,7 @@ export const createUserSchema = z
     serviceArea: z.string().trim().max(160).optional().or(z.literal("")),
     hourlyRate: z.coerce.number().int().min(0).max(10000).optional(),
     rating: z.coerce.number().min(0).max(5).optional(),
+    clientId: z.string().uuid().optional().or(z.literal("")),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
@@ -39,6 +40,7 @@ export const updateUserSchema = z.object({
   serviceArea: z.string().trim().max(160).optional().or(z.literal("")),
   hourlyRate: z.coerce.number().int().min(0).max(10000).optional(),
   rating: z.coerce.number().min(0).max(5).optional(),
+  clientId: z.string().uuid().optional().or(z.literal("")),
 });
 
 export type CreateUserDTO = z.infer<typeof createUserSchema>;

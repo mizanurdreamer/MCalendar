@@ -7,6 +7,8 @@ import { prisma } from "@/lib/prisma";
 
 export type CleanerAvailabilityView = {
   id: string;
+  clientId: string;
+  clientName: string;
   cleanerId: string;
   cleanerName: string;
   cleanerEmail: string;
@@ -22,6 +24,8 @@ export function toAvailabilityView(
 ): CleanerAvailabilityView {
   return {
     id: item.id,
+    clientId: item.client.userId,
+    clientName: `${item.client.firstName} ${item.client.lastName}`,
     cleanerId: item.cleaner.userId,
     cleanerName: `${item.cleaner.firstName} ${item.cleaner.lastName}`,
     cleanerEmail: item.cleaner.Email,
@@ -48,9 +52,10 @@ export class CleanerAvailabilityService {
   }
 
   async list(
-    params: PaginationDTO & { cleanerId?: string; fromDate?: Date; toDate?: Date; activeOnly?: boolean },
+    params: PaginationDTO & { clientId?: string; cleanerId?: string; fromDate?: Date; toDate?: Date; activeOnly?: boolean },
     actor: ActorContext,
   ): Promise<Paginated<CleanerAvailabilityView>> {
+    const clientId = params.clientId;
     const cleanerId =
       actor.role === "CLEANER"
         ? (await this.resolveCleanerProfileId(actor.userId)).id
@@ -61,6 +66,7 @@ export class CleanerAvailabilityService {
     const { items, total } = await cleanerAvailabilityRepository.list({
       page: params.page,
       pageSize: params.pageSize,
+      clientId,
       cleanerId,
       fromDate: params.fromDate,
       toDate: params.toDate,
@@ -77,9 +83,14 @@ export class CleanerAvailabilityService {
   }
 
   async create(
-    params: { cleanerId: string; fromDate: Date; toDate?: Date | null; note?: string },
+    params: { clientId: string; cleanerId: string; fromDate: Date; toDate?: Date | null; note?: string },
     actor: ActorContext,
   ) {
+    const client = await userRepository.findById(params.clientId);
+    if (!client || client.role !== "CLIENT") {
+      throw new NotFoundError("Client not found");
+    }
+
     const cleaner = await userRepository.findById(params.cleanerId);
     if (!cleaner || cleaner.role !== "CLEANER") {
       throw new NotFoundError("Cleaner not found");
@@ -93,9 +104,16 @@ export class CleanerAvailabilityService {
       throw new ConflictError("To date must be on or after from date");
     }
 
+    const clientProfile = await prisma.clientProfile.findUnique({
+      where: { userId: params.clientId },
+      select: { id: true },
+    });
+    if (!clientProfile) throw new NotFoundError("Client profile not found");
+
     const cleanerProfile = await this.resolveCleanerProfileId(params.cleanerId);
 
     const availability = await cleanerAvailabilityRepository.create({
+      client: { connect: { id: clientProfile.id } },
       cleaner: { connect: { id: cleanerProfile.id } },
       fromDate: params.fromDate,
       toDate: params.toDate ?? null,

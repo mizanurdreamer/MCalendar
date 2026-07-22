@@ -12,7 +12,7 @@ import {
   useDeleteAvailability,
   type CreateAvailabilityDTO,
 } from "@/hooks/use-cleaner-availability";
-import { useCleanerProfile } from "@/hooks/use-profiles";
+import { useCleanerProfile, useClientProfile } from "@/hooks/use-profiles";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -49,12 +49,15 @@ function formatRange(from: string, to: string | null) {
   return to ? `${fmt(from)} – ${fmt(to)}` : `${fmt(from)} (open-ended)`;
 }
 
-export function CleanerAvailabilityManager({ cleanerId }: { cleanerId?: string }) {
+export function CleanerAvailabilityManager({ cleanerId, clientId: propClientId }: { cleanerId?: string; clientId?: string }) {
   const { data, isLoading } = useCleanerAvailability(cleanerId ? { cleanerId } : {});
   const { data: profile } = useCleanerProfile();
+  const { data: clientProfile } = useClientProfile();
   const create = useCreateAvailability();
   const update = useUpdateAvailability("");
   const remove = useDeleteAvailability();
+
+  const targetClientId = propClientId ?? clientProfile?.userId ?? "";
 
   const [editing, setEditing] = React.useState<{ id: string } | null>(null);
   const [open, setOpen] = React.useState(false);
@@ -88,7 +91,9 @@ export function CleanerAvailabilityManager({ cleanerId }: { cleanerId?: string }
     try {
       const targetCleanerId = cleanerId ?? profile?.userId;
       if (!targetCleanerId) throw new Error("Cleaner profile not found");
+      if (!targetClientId) throw new Error("Client is required");
       const payload: CreateAvailabilityDTO = {
+        clientId: targetClientId,
         cleanerId: targetCleanerId,
         fromDate: values.fromDate,
         toDate: values.toDate ? values.toDate : null,

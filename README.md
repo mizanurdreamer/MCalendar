@@ -27,7 +27,7 @@ This is the easiest way to run the full stack.
 docker compose up -d
 
 # 2. (First run only) Seed the initial super admin account manually
-docker compose exec app npx tsx prisma/seed.ts
+docker compose exec app npx tsx prisma/seedData/seed.ts
 
 # 3. Open http://localhost:3000
 ```
@@ -44,7 +44,7 @@ To reset the database:
 docker compose down -v
 docker compose up -d
 # Re-seed after a reset
-docker compose exec app npx tsx prisma/seed.ts
+docker compose exec app npx tsx prisma/seedData/seed.ts
 ```
 
 ### Option 2: Local Development
@@ -152,7 +152,8 @@ bookingCalendar/
 │   ├── prisma.ts                 # Prisma client
 │   └── cron/                     # Cron configuration
 │       └── config.ts             # Env-based cron settings
-├── prisma/                       # Schema, migrations, seed
+├── prisma/                       # Schema, migrations
+│   └── seedData/                 # Seed scripts (seed.ts)
 ├── Dockerfile                    # Multi-stage production build
 ├── docker-compose.yml            # PostgreSQL + app
 └── docker-entrypoint.sh          # Runs migrations on startup
@@ -266,7 +267,7 @@ docker compose build
 docker compose up -d
 
 # Seed the initial super admin (first run only)
-docker compose exec app npx tsx prisma/seed.ts
+docker compose exec app npx tsx prisma/seedData/seed.ts
 ```
 
 

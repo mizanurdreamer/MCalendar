@@ -6,6 +6,7 @@ import { requireActor } from "@/lib/auth";
 import { z } from "zod";
 
 const createAvailabilitySchema = z.object({
+  clientId: z.string().min(1, "clientId is required"),
   cleanerId: z.string().min(1, "cleanerId is required"),
   fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD"),
   toDate: z
@@ -19,12 +20,13 @@ const createAvailabilitySchema = z.object({
 export async function GET(req: NextRequest) {
   try {
     const actor = await requireActor("SUPER_ADMIN", "CLIENT", "CLEANER");
-    const params = parseListParams(req.nextUrl.searchParams);
+    const listParams = parseListParams(req.nextUrl.searchParams);
+    const clientId = req.nextUrl.searchParams.get("clientId") ?? undefined;
     const cleanerId = req.nextUrl.searchParams.get("cleanerId") ?? undefined;
     const activeOnly = req.nextUrl.searchParams.get("activeOnly") === "true";
 
     const result = await cleanerAvailabilityService.list(
-      { ...params, cleanerId, activeOnly },
+      { ...listParams, clientId, cleanerId, activeOnly },
       actor,
     );
     return ok(result);
@@ -41,6 +43,7 @@ export async function POST(req: NextRequest) {
 
     const result = await cleanerAvailabilityService.create(
       {
+        clientId: dto.clientId,
         cleanerId: dto.cleanerId,
         fromDate: new Date(`${dto.fromDate}T00:00:00.000Z`),
         toDate: dto.toDate ? new Date(`${dto.toDate}T00:00:00.000Z`) : null,

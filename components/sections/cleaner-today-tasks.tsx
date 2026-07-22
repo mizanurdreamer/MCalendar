@@ -8,20 +8,21 @@ import { Button } from "@/components/ui/button";
 import { useCleanerCalendarData, useUpdateTaskScheduleStatus } from "@/hooks/use-cleaner-calendar";
 import { STATUS_LABEL } from "@/components/calendar/cleaner-calendar";
 import type { CleaningStatus } from "@/models/view";
+import { CleanerTaskStatus } from "@/lib/enums/CleanerTaskStatus";
 import { toast } from "@/hooks/use-toast";
 
 const NEXT_STATUS: Partial<Record<CleaningStatus, CleaningStatus>> = {
-  ASSIGNED: "CONFIRMED",
-  CONFIRMED: "IN_PROGRESS",
-  IN_PROGRESS: "DONE",
+  [CleanerTaskStatus.ASSIGNED]: CleanerTaskStatus.CONFIRMED,
+  [CleanerTaskStatus.CONFIRMED]: CleanerTaskStatus.IN_PROGRESS,
+  [CleanerTaskStatus.IN_PROGRESS]: CleanerTaskStatus.DONE,
 };
 
 const STATUS_VARIANT: Record<CleaningStatus, string> = {
-  ASSIGNED: "bg-indigo-500/20 text-indigo-700",
-  CONFIRMED: "bg-sky-500/20 text-sky-700",
-  IN_PROGRESS: "bg-amber-500/20 text-amber-700",
-  DONE: "bg-emerald-500/20 text-emerald-700",
-  CANCELLED: "bg-red-500/20 text-red-700",
+  [CleanerTaskStatus.ASSIGNED]: "bg-indigo-500/20 text-indigo-700",
+  [CleanerTaskStatus.CONFIRMED]: "bg-sky-500/20 text-sky-700",
+  [CleanerTaskStatus.IN_PROGRESS]: "bg-amber-500/20 text-amber-700",
+  [CleanerTaskStatus.DONE]: "bg-emerald-500/20 text-emerald-700",
+  [CleanerTaskStatus.CANCELLED]: "bg-red-500/20 text-red-700",
 };
 
 function fmtDate(dateStr: string) {

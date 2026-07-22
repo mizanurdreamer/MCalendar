@@ -62,6 +62,8 @@ model ClientProfile {
   bookingFetchDatas BookingFetchData[]
   guestBookingInfos GuestBookingInfo[]
   cleanerTaskSchedules CleanerTaskSchedule[]
+  cleanerAvailabilities CleanerAvailability[]
+  cleaners             CleanerProfile[]
   @@index([smsGatewayId], map: "clientProfile_smsGatewayId_idx")
   @@index([deletedAt], map: "clientProfile_deletedAt_idx")
   @@map("clientProfile")
@@ -71,6 +73,8 @@ model CleanerProfile {
   id        String   @id @default(uuid()) @db.Uuid
   userId    String   @unique @db.Uuid
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientId  String?  @db.Uuid
+  client    ClientProfile? @relation(fields: [clientId], references: [id], onDelete: SetNull)
   Email     String
   firstName String
   lastName String
@@ -88,6 +92,7 @@ model CleanerProfile {
   deletedAt DateTime?
   cleanerTaskSchedules CleanerTaskSchedule[]
   availabilities       CleanerAvailability[]
+  @@index([clientId], map: "cleanerProfile_clientId_idx")
   @@index([smsGatewayId], map: "cleanerProfile_smsGatewayId_idx")
   @@index([deletedAt], map: "cleanerProfile_deletedAt_idx")
   @@map("cleanerProfile")
@@ -178,7 +183,9 @@ model CleanerTaskSchedule {
   cleaner   CleanerProfile     @relation(fields: [cleanerId], references: [id], onDelete: Cascade)
 
   assignedDate DateTime
-  status    String   @default("ASSIGNED")
+  status    Int @default(0)
+  isSentSms Boolean  @default(false)
+  smsSentDate DateTime?
   isActive  Boolean  @default(true)
   isDeleted    Boolean @default(false)
   createdAt DateTime  @default(now())
@@ -192,12 +199,15 @@ model CleanerTaskSchedule {
   @@index([cleanerId], map: "cleanerTaskSchedule_cleanerId_idx")
   @@index([status], map: "cleanerTaskSchedule_status_idx")
   @@index([assignedDate], map: "cleanerTaskSchedule_assignedDate_idx")
+  @@index([isSentSms], map: "cleanerTaskSchedule_isSentSms_idx")
   @@index([deletedAt], map: "cleanerTaskSchedule_deletedAt_idx")
   @@map("cleanerTaskSchedule")
 }
 
 model CleanerAvailability {
   id        String   @id @default(uuid()) @db.Uuid
+  clientId  String   @db.Uuid
+  client    ClientProfile @relation(fields: [clientId], references: [id], onDelete: Cascade)
   cleanerId String   @db.Uuid
   cleaner   CleanerProfile @relation(fields: [cleanerId], references: [id], onDelete: Cascade)
 
@@ -213,6 +223,7 @@ model CleanerAvailability {
   updatedBy String?  @db.Uuid
   deletedAt DateTime?
 
+  @@index([clientId], map: "cleanerAvailability_clientId_idx")
   @@index([cleanerId], map: "cleanerAvailability_cleanerId_idx")
   @@index([fromDate], map: "cleanerAvailability_fromDate_idx")
   @@index([deletedAt], map: "cleanerAvailability_deletedAt_idx")

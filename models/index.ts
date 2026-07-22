@@ -16,6 +16,7 @@ export type ListParams = {
   pageSize: number;
   search?: string;
   status?: string;
+  clientId?: string;
 };
 
 export type AuthUser = {

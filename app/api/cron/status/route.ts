@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
     const authHeader = req.headers.get("authorization");
     const token = authHeader?.replace("Bearer ", "");
 
-    if (CRON_CONFIG.CRON_API_SECRET && token !== CRON_CONFIG.CRON_API_SECRET) {
+    if (CRON_CONFIG.CRON_BOOKING_ENDPOINT_API_SECRET && token !== CRON_CONFIG.CRON_BOOKING_ENDPOINT_API_SECRET) {
       return fail("UNAUTHORIZED", "Invalid cron secret", 401);
     }
 

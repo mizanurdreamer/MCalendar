@@ -5,7 +5,7 @@
 import type { Paginated } from "@/models";
 import type { Role } from "@/models/role";
 export type { Role } from "@/models/role";
-
+import { CleanerTaskStatus } from "@/lib/enums/CleanerTaskStatus";
 export type UserView = {
   id: string;
   email: string;
@@ -23,6 +23,8 @@ export type UserView = {
   serviceArea?: string | null;
   hourlyRate?: number | null;
   rating?: number | null;
+  clientId?: string | null;
+  clientProfileId?: string | null;
   createdAt: string;
 };
 
@@ -53,12 +55,16 @@ export type CleanerTaskScheduleView = {
   cleanerEmail: string;
   assignedDate: string;
   status: CleaningStatus;
+  isSentSms: boolean;
+  smsSentDate: string | null;
   isActive: boolean;
   createdAt: string;
 };
 
 export type CleanerAvailabilityView = {
   id: string;
+  clientId: string;
+  clientName: string;
   cleanerId: string;
   cleanerName: string;
   cleanerEmail: string;
@@ -96,12 +102,7 @@ export type CalendarDataView = {
   upcomingCleanings: UpcomingCleaningView[];
 };
 
-export type CleaningStatus =
-  | "ASSIGNED"
-  | "CONFIRMED"
-  | "IN_PROGRESS"
-  | "DONE"
-  | "CANCELLED";
+export type CleaningStatus = CleanerTaskStatus;
 
 export type CleanerCalendarEventView = {
   id: string;

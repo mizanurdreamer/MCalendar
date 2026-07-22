@@ -2,6 +2,7 @@ import { cleanerTaskScheduleRepository } from "@/repositories/CleanerTaskSchedul
 import { guestBookingInfoRepository } from "@/repositories/GuestBookingInfoRepository";
 import { cleanerAvailabilityRepository } from "@/repositories/CleanerAvailabilityRepository";
 import { userRepository } from "@/repositories/UserRepository";
+import { CleanerTaskStatus } from "@/lib/enums/CleanerTaskStatus";
 import { ConflictError, ForbiddenError, NotFoundError } from "@/lib/errors";
 import type { ActorContext, Paginated } from "@/models";
 import type {
@@ -13,19 +14,19 @@ import type { PaginationDTO } from "@/dto/common.dto";
 import { prisma } from "@/lib/prisma";
 
 export const CLEANING_STATUSES: CleaningStatus[] = [
-  "ASSIGNED",
-  "CONFIRMED",
-  "IN_PROGRESS",
-  "DONE",
-  "CANCELLED",
+  CleanerTaskStatus.ASSIGNED,
+  CleanerTaskStatus.CONFIRMED,
+  CleanerTaskStatus.IN_PROGRESS,
+  CleanerTaskStatus.DONE,
+  CleanerTaskStatus.CANCELLED,
 ];
 
 const STATUS_RANK: Record<CleaningStatus, number> = {
-  ASSIGNED: 0,
-  CONFIRMED: 1,
-  IN_PROGRESS: 2,
-  DONE: 3,
-  CANCELLED: 4,
+  [CleanerTaskStatus.ASSIGNED]: 0,
+  [CleanerTaskStatus.CONFIRMED]: 1,
+  [CleanerTaskStatus.IN_PROGRESS]: 2,
+  [CleanerTaskStatus.DONE]: 3,
+  [CleanerTaskStatus.CANCELLED]: 4,
 };
 
 export type CleanerTaskScheduleView = {
@@ -38,6 +39,8 @@ export type CleanerTaskScheduleView = {
   cleanerEmail: string;
   assignedDate: string;
   status: CleaningStatus;
+  isSentSms: boolean;
+  smsSentDate: string | null;
   isActive: boolean;
   createdAt: string;
 };
@@ -54,7 +57,9 @@ export function toTaskScheduleView(
     cleanerName: `${item.cleaner.firstName} ${item.cleaner.lastName}`,
     cleanerEmail: item.cleaner.Email,
     assignedDate: item.assignedDate.toISOString(),
-    status: (item.status as CleaningStatus) ?? "ASSIGNED",
+    status: item.status as CleaningStatus,
+    isSentSms: item.isSentSms,
+    smsSentDate: item.smsSentDate?.toISOString() ?? null,
     isActive: item.isActive,
     createdAt: item.createdAt.toISOString(),
   };
@@ -160,7 +165,7 @@ export class CleanerTaskScheduleService {
       client: { connect: { id: clientProfile.id } },
       cleaner: { connect: { id: cleanerProfile.id } },
       assignedDate: params.assignedDate,
-      status: params.status ?? "ASSIGNED",
+      status: params.status ?? CleanerTaskStatus.ASSIGNED,
       createdBy: actor.userId,
       updatedBy: actor.userId,
     });
@@ -231,7 +236,7 @@ export class CleanerTaskScheduleService {
     const statusByClient = new Map<string, CleaningStatus>();
     for (const s of schedules) {
       const prev = statusByClient.get(s.clientId);
-      const next = (s.status as CleaningStatus) ?? "ASSIGNED";
+      const next = (s.status as CleaningStatus) ?? CleanerTaskStatus.ASSIGNED;
       if (!prev || STATUS_RANK[next] > STATUS_RANK[prev]) statusByClient.set(s.clientId, next);
     }
 
@@ -262,7 +267,7 @@ export class CleanerTaskScheduleService {
       const clientId = row.clientId;
       const property = row.endpoint?.name ?? "Property";
       const title = row.summary?.trim() || property;
-      const cleaningStatus = statusByClient.get(clientId) ?? "ASSIGNED";
+      const cleaningStatus = statusByClient.get(clientId) ?? CleanerTaskStatus.ASSIGNED;
       events.push({
         id: `booking:${row.id}`,
         kind: "booking",
@@ -297,7 +302,7 @@ export class CleanerTaskScheduleService {
         clientId: s.client.userId,
         clientName: `${s.client.firstName} ${s.client.lastName}`,
         assignedDate: s.assignedDate.toISOString(),
-        status: (s.status as CleaningStatus) ?? "ASSIGNED",
+        status: (s.status as CleaningStatus) ?? CleanerTaskStatus.ASSIGNED,
       })),
     };
   }

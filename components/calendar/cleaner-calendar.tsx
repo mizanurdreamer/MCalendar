@@ -14,21 +14,22 @@ import {
 import { UpcomingCleanings } from "@/components/calendar/upcoming-cleanings";
 import { useCleanerCalendarData } from "@/hooks/use-cleaner-calendar";
 import type { CleanerCalendarEventView, CleaningStatus } from "@/models/view";
+import { CleanerTaskStatus } from "@/lib/enums/CleanerTaskStatus";
 
 const STATUS_CLASS: Record<CleaningStatus, string> = {
-  ASSIGNED: "evt-assigned",
-  CONFIRMED: "evt-confirmed",
-  IN_PROGRESS: "evt-inprogress",
-  DONE: "evt-done",
-  CANCELLED: "evt-cancelled",
+  [CleanerTaskStatus.ASSIGNED]: "evt-assigned",
+  [CleanerTaskStatus.CONFIRMED]: "evt-confirmed",
+  [CleanerTaskStatus.IN_PROGRESS]: "evt-inprogress",
+  [CleanerTaskStatus.DONE]: "evt-done",
+  [CleanerTaskStatus.CANCELLED]: "evt-cancelled",
 };
 
 export const STATUS_LABEL: Record<CleaningStatus, string> = {
-  ASSIGNED: "Assigned",
-  CONFIRMED: "Confirmed",
-  IN_PROGRESS: "In progress",
-  DONE: "Done",
-  CANCELLED: "Cancelled",
+  [CleanerTaskStatus.ASSIGNED]: "Assigned",
+  [CleanerTaskStatus.CONFIRMED]: "Confirmed",
+  [CleanerTaskStatus.IN_PROGRESS]: "In progress",
+  [CleanerTaskStatus.DONE]: "Done",
+  [CleanerTaskStatus.CANCELLED]: "Cancelled",
 };
 
 const DEFAULT_PROPERTY = "All properties";
@@ -46,7 +47,7 @@ function toEventInput(event: CleanerCalendarEventView): EventInput {
     };
   }
 
-  const status = event.cleaningStatus ?? "ASSIGNED";
+  const status = event.cleaningStatus ?? CleanerTaskStatus.ASSIGNED;
   return {
     id: event.id,
     title: event.title,
@@ -110,8 +111,8 @@ export function CleanerCalendar() {
           day: new Date(e.end!).getDate().toString().padStart(2, "0"),
           month: new Date(e.end!).toLocaleString("en-US", { month: "short" }).toUpperCase(),
           property: e.property ?? "Property",
-          note: `${e.clientName ?? "Client"} · ${STATUS_LABEL[e.cleaningStatus ?? "ASSIGNED"]}`,
-          status: e.cleaningStatus ?? "ASSIGNED",
+          note: `${e.clientName ?? "Client"} · ${STATUS_LABEL[e.cleaningStatus ?? CleanerTaskStatus.ASSIGNED]}`,
+          status: String(e.cleaningStatus ?? CleanerTaskStatus.ASSIGNED),
         })),
     [data?.events],
   );

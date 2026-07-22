@@ -8,6 +8,7 @@ import { CalendarClock, Download, Eye, Loader2, Pencil, Plus, Trash2 } from "luc
 import { createUserSchema, type CreateUserDTO } from "@/dto/user.dto";
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from "@/hooks/use-users";
 import { useSmsGateways } from "@/hooks/use-sms-gateways";
+import { useClients } from "@/hooks/use-lookups";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -42,7 +43,7 @@ import type { Role, UserView } from "@/models/view";
 
 type ManagedRole = Extract<Role, "CLIENT" | "CLEANER">;
 
-type UiStatus = "active" | "inactive" | "pending" | "on_leave";
+type UiStatus = "active" | "inactive";
 
 type UserRowMeta = {
   subtitle: string;
@@ -53,31 +54,7 @@ type UserRowMeta = {
   rate?: string;
 };
 
-const CONTACT_POOL = [
-  "Nora Whitfield",
-  "Devon Park",
-  "Ada Okafor",
-  "Sam Reyes",
-  "Milo Trent",
-  "Iris Chen",
-  "Ray Delgado",
-  "Lena Voss",
-  "Ravi Das",
-  "Kian Morris",
-];
 
-const AREA_POOL = [
-  "Mission / SoMa",
-  "Oakland",
-  "Sunset / Richmond",
-  "Berkeley",
-  "Daly City",
-  "San Mateo",
-  "Marina / Pacific Hts",
-  "South Bay",
-  "Inner Sunset",
-  "North Beach",
-];
 
 const COPY: Record<
   ManagedRole,
@@ -96,7 +73,6 @@ const COPY: Record<
     statuses: [
       { label: "All", value: "all" },
       { label: "Active", value: "active" },
-      { label: "Pending", value: "pending" },
       { label: "Inactive", value: "inactive" },
     ],
     sortOptions: [
@@ -124,15 +100,6 @@ const COPY: Record<
   },
 };
 
-function hashCode(input: string): number {
-  let h = 0;
-  for (let i = 0; i < input.length; i += 1) {
-    h = (h << 5) - h + input.charCodeAt(i);
-    h |= 0;
-  }
-  return Math.abs(h);
-}
-
 function getInitials(firstName: string, lastName: string) {
   return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
 }
@@ -159,31 +126,22 @@ function UserAvatar({ firstName, lastName }: { firstName: string; lastName: stri
 }
 
 function getRowMeta(user: UserView, role: ManagedRole): UserRowMeta {
-  const seed = hashCode(user.id);
+  const status: UiStatus = user.isActive ? "active" : "inactive";
 
   if (role === "CLIENT") {
-    let status: UiStatus = "active";
-    if (!user.isActive) status = "inactive";
-    else if (seed % 4 === 0) status = "pending";
-
     return {
       subtitle: user.email,
       status,
-      primaryContact: user.primaryContact || CONTACT_POOL[seed % CONTACT_POOL.length],
-      portfolio: `${user.portfolioSize ?? (seed % 14) + 1} properties`,
+      primaryContact: user.primaryContact ?? undefined,
+      portfolio: user.portfolioSize != null ? `${user.portfolioSize} properties` : undefined,
     };
   }
-
-  let status: UiStatus = "active";
-  if (!user.isActive) status = "inactive";
-  else if (seed % 7 === 0) status = "on_leave";
-  else if (seed % 5 === 0) status = "pending";
 
   return {
     subtitle: user.email,
     status,
-    serviceArea: user.serviceArea || AREA_POOL[seed % AREA_POOL.length],
-    rate: `$${user.hourlyRate ?? 24 + (seed % 7)}/hr`,
+    serviceArea: user.serviceArea ?? undefined,
+    rate: user.hourlyRate != null ? `$${user.hourlyRate}/hr` : undefined,
   };
 }
 
@@ -191,13 +149,7 @@ function statusBadge(status: UiStatus) {
   if (status === "active") {
     return <Badge className="rounded-full border-transparent bg-emerald-500/20 px-3 py-1 text-[13px] font-semibold text-emerald-700">Active</Badge>;
   }
-  if (status === "pending") {
-    return <Badge className="rounded-full border-transparent bg-amber-500/25 px-3 py-1 text-[13px] font-semibold text-amber-700">Pending</Badge>;
-  }
-  if (status === "on_leave") {
-    return <Badge className="rounded-full border-transparent bg-amber-500/25 px-3 py-1 text-[13px] font-semibold text-amber-700">On leave</Badge>;
-  }
-  return <Badge className="rounded-full border-transparent bg-slate-200 px-3 py-1 text-[13px] font-semibold text-slate-600">Inactive</Badge>;
+  return <Badge className="rounded-full border-transparent bg-red-500/20 px-3 py-1 text-[13px] font-semibold text-red-700">Inactive</Badge>;
 }
 
 export function UsersSection({
@@ -205,11 +157,13 @@ export function UsersSection({
   canCreate = true,
   canDelete = true,
   availabilityBasePath = "/admin/cleaners",
+  clientId,
 }: {
   role: ManagedRole;
   canCreate?: boolean;
   canDelete?: boolean;
   availabilityBasePath?: string;
+  clientId?: string;
 }) {
   const copy = COPY[role];
   const router = useRouter();
@@ -223,7 +177,7 @@ export function UsersSection({
   const [toDelete, setToDelete] = React.useState<UserView | null>(null);
 
   const queryStatus = status === "active" || status === "inactive" ? status : "all";
-  const { data, isLoading } = useUsers({ page, search, role, status: queryStatus, sort });
+  const { data, isLoading } = useUsers({ page, search, role, status: queryStatus, sort, clientId });
   const del = useDeleteUser();
 
   const filteredItems = React.useMemo(() => {
@@ -458,6 +412,7 @@ export function UsersSection({
         <UserFormDialog
           role={role}
           editing={dialog.editing}
+          clientId={clientId}
           onClose={() => setDialog({ open: false })}
         />
       )}
@@ -485,16 +440,19 @@ export function UsersSection({
 function UserFormDialog({
   role,
   editing,
+  clientId,
   onClose,
 }: {
   role: ManagedRole;
   editing?: UserView;
+  clientId?: string;
   onClose: () => void;
 }) {
   const copy = COPY[role];
   const create = useCreateUser();
   const update = useUpdateUser(editing?.id ?? "");
   const { data: smsGatewayData } = useSmsGateways({ page: 1, pageSize: 100 });
+  const { data: clientData } = useClients(role === "CLEANER" && !clientId && !editing);
 
   const {
     register,
@@ -522,6 +480,7 @@ function UserFormDialog({
           serviceArea: editing.serviceArea ?? "",
           hourlyRate: editing.hourlyRate ?? undefined,
           rating: editing.rating ?? undefined,
+          clientId: editing.clientId ?? "",
         }
       : {
           role,
@@ -536,11 +495,13 @@ function UserFormDialog({
           serviceArea: "",
           hourlyRate: undefined,
           rating: undefined,
+          clientId: clientId ?? "",
         },
   });
 
   const isActive = watch("isActive");
   const smsGatewayId = watch("smsGatewayId");
+  const clientIdValue = watch("clientId");
 
   const onSubmit = async (values: CreateUserDTO) => {
     try {
@@ -559,6 +520,7 @@ function UserFormDialog({
           serviceArea: values.serviceArea,
           hourlyRate: values.hourlyRate,
           rating: values.rating,
+          clientId: values.clientId || null,
         });
         toast({ title: `${copy.singular} updated` });
       } else {
@@ -591,6 +553,26 @@ function UserFormDialog({
           <Field label="Email" error={errors.email?.message}>
             <Input type="email" disabled={!!editing} {...register("email")} />
           </Field>
+          {role === "CLEANER" && !clientId && !editing && (
+            <Field label="Client" error={errors.clientId?.message}>
+              <Select
+                value={clientIdValue || "__none"}
+                onValueChange={(v) => setValue("clientId", v === "__none" ? "" : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select client" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none">None</SelectItem>
+                  {(clientData ?? []).map((c) => (
+                    <SelectItem key={c.id} value={c.clientProfileId ?? ""}>
+                      {c.firstName} {c.lastName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          )}
           <Field label="SMS gateway" error={errors.smsGatewayId?.message}>
             <Select
               value={smsGatewayId || "__none"}
@@ -671,7 +653,7 @@ function UserFormDialog({
           <Field label="Status">
             <div className="flex items-center gap-3">
               <Switch checked={isActive} onCheckedChange={(v) => setValue("isActive", v)} />
-              <span className="text-sm text-muted-foreground">{isActive ? "Active" : "Disabled"}</span>
+              <span className="text-sm text-muted-foreground">{isActive ? "Active" : "Inactive"}</span>
             </div>
           </Field>
           <DialogFooter>

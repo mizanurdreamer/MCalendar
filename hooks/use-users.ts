@@ -13,6 +13,7 @@ export function useUsers(
     role?: string;
     status?: string;
     sort?: string;
+    clientId?: string;
   } = {}
 ) {
   const query = new URLSearchParams();
@@ -21,6 +22,7 @@ export function useUsers(
   if (params.role) query.set("role", params.role);
   if (params.status && params.status !== "all") query.set("status", params.status);
   if (params.sort) query.set("sort", params.sort);
+  if (params.clientId) query.set("clientId", params.clientId);
   return useQuery({
     queryKey: [KEY, params],
     queryFn: () => api.get<Paginated<UserView>>(`/api/users?${query.toString()}`),

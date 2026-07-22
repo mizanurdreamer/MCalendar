@@ -11,6 +11,7 @@ type UserWithRelations = Prisma.UserGetPayload<{
 }>;
 
 type MappedProfile = {
+  id: string | null;
   companyName: string | null;
   primaryContact: string | null;
   portfolioSize: number | null;
@@ -18,6 +19,7 @@ type MappedProfile = {
   serviceArea: string | null;
   hourlyRate: number | null;
   rating: Prisma.Decimal | null;
+  clientId: string | null;
 };
 
 export type User = {
@@ -63,6 +65,7 @@ type CreateUserInput = {
     serviceArea?: string | null;
     hourlyRate?: number | null;
     rating?: number | null;
+    clientId?: string | null;
   };
 };
 
@@ -84,6 +87,7 @@ type UpdateUserInput = {
     serviceArea?: string | null;
     hourlyRate?: number | null;
     rating?: number | null;
+    clientId?: string | null;
   };
 };
 
@@ -157,6 +161,7 @@ export class UserRepository {
       phone: phoneFromProfile,
       clientProfile: user.clientProfile
         ? {
+            id: user.clientProfile.id,
             companyName: user.clientProfile.companyName,
             primaryContact: this.joinName(
               user.clientProfile.firstName,
@@ -167,10 +172,12 @@ export class UserRepository {
             serviceArea: null,
             hourlyRate: null,
             rating: null,
+            clientId: null,
           }
         : null,
       cleanerProfile: user.cleanerProfile
         ? {
+            id: user.cleanerProfile.id,
             companyName: null,
             primaryContact: null,
             portfolioSize: null,
@@ -178,6 +185,7 @@ export class UserRepository {
             serviceArea: user.cleanerProfile.serviceArea,
             hourlyRate: user.cleanerProfile.hourlyRate,
             rating: user.cleanerProfile.rating,
+            clientId: user.cleanerProfile.clientId,
           }
         : null,
     };
@@ -209,12 +217,13 @@ export class UserRepository {
   }
 
   async list(params: ListParams & { role?: Role }) {
-    const { page, pageSize, search, role, status } = params;
+    const { page, pageSize, search, role, status, clientId } = params;
     const where: Prisma.UserWhereInput = {
       ...this.notDeleted,
       ...(role ? { role: { name: role } } : {}),
       ...(status === "active" ? { isActive: true } : {}),
       ...(status === "inactive" ? { isActive: false } : {}),
+      ...(clientId ? { cleanerProfile: { clientId } } : {}),
       ...(search
         ? {
             OR: [
@@ -243,9 +252,16 @@ export class UserRepository {
     return { items: items.map((u) => this.mapUser(u) as User), total };
   }
 
-  async listByRole(role: Role) {
+  async listByRole(role: Role, clientId?: string) {
+    const where: Prisma.UserWhereInput = {
+      role: { name: role },
+      isActive: true,
+      ...this.notDeleted,
+      ...(clientId ? { cleanerProfile: { clientId } } : {}),
+    };
+
     const users = await prisma.user.findMany({
-      where: { role: { name: role }, isActive: true, ...this.notDeleted },
+      where,
       orderBy: { displayName: "asc" },
       include: this.withRole,
     });
@@ -294,6 +310,7 @@ export class UserRepository {
                     serviceArea: this.emptyToNull(data.cleanerProfile?.serviceArea) ?? null,
                     hourlyRate: data.cleanerProfile?.hourlyRate ?? null,
                     rating: data.cleanerProfile?.rating ?? null,
+                    clientId: data.cleanerProfile?.clientId ?? null,
                     createdBy: data.createdBy,
                     updatedBy: data.updatedBy,
                   },
@@ -385,6 +402,7 @@ export class UserRepository {
             serviceArea: this.emptyToNull(data.cleanerProfile?.serviceArea),
             hourlyRate: data.cleanerProfile?.hourlyRate,
             rating: data.cleanerProfile?.rating,
+            clientId: data.cleanerProfile?.clientId ?? undefined,
             deletedAt: null,
             updatedBy: data.updatedBy,
           },
@@ -398,6 +416,7 @@ export class UserRepository {
             serviceArea: this.emptyToNull(data.cleanerProfile?.serviceArea) ?? null,
             hourlyRate: data.cleanerProfile?.hourlyRate ?? null,
             rating: data.cleanerProfile?.rating ?? null,
+            clientId: data.cleanerProfile?.clientId ?? null,
             createdBy: data.updatedBy,
             updatedBy: data.updatedBy,
           },

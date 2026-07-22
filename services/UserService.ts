@@ -12,13 +12,14 @@ import type { PaginationDTO } from "@/dto/common.dto";
  * authorized as SUPER_ADMIN at the API boundary, except the role-list helpers.
  */
 export class UserService {
-  async list(params: PaginationDTO & { role?: Role }): Promise<Paginated<PublicUser>> {
+  async list(params: PaginationDTO & { role?: Role; clientId?: string }): Promise<Paginated<PublicUser>> {
     const { items, total } = await userRepository.list({
       page: params.page,
       pageSize: params.pageSize,
       search: params.search,
       role: params.role,
       status: params.status,
+      clientId: params.clientId,
     });
 
     return {
@@ -61,6 +62,7 @@ export class UserService {
         serviceArea: dto.serviceArea || null,
         hourlyRate: dto.hourlyRate ?? null,
         rating: dto.rating ?? null,
+        clientId: dto.clientId ?? null,
       },
       createdBy: actor.userId,
       updatedBy: actor.userId,
@@ -97,6 +99,7 @@ export class UserService {
         serviceArea: dto.serviceArea === undefined ? undefined : dto.serviceArea || null,
         hourlyRate: dto.hourlyRate,
         rating: dto.rating,
+        clientId: dto.clientId === undefined ? undefined : dto.clientId || null,
       },
       updatedBy: actor.userId,
     });
@@ -119,9 +122,9 @@ export class UserService {
     await userRepository.softDelete(id, actor.userId);
   }
 
-  /** Active cleaners, for assignment dropdowns. */
-  listCleaners() {
-    return userRepository.listByRole("CLEANER").then((users) => users.map(toPublicUser));
+  /** Active cleaners, for assignment dropdowns. Optionally filter by clientId. */
+  listCleaners(clientId?: string) {
+    return userRepository.listByRole("CLEANER", clientId).then((users) => users.map(toPublicUser));
   }
 
   listClients() {

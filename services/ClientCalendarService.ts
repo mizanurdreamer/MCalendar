@@ -64,7 +64,7 @@ export class ClientCalendarService {
       classNames: ["evt-cleaning"],
       extendedProps: {
         property: "Assigned cleaning",
-        status: (s.status as string) ?? "ASSIGNED",
+        status: String(s.status ?? 0),
       },
     }));
 

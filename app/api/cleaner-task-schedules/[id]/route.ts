@@ -4,9 +4,13 @@ import { ok, handleApiError } from "@/lib/response";
 import { requireActor } from "@/lib/auth";
 import { z } from "zod";
 
+const STATUS_VALUES = [0, 1, 2, 3, 4] as const;
+
 const updateTaskScheduleSchema = z.object({
   isActive: z.boolean().optional(),
-  status: z.enum(["ASSIGNED", "CONFIRMED", "IN_PROGRESS", "DONE", "CANCELLED"]).optional(),
+  status: z.number().int().refine((v) => (STATUS_VALUES as readonly number[]).includes(v), {
+    message: "Status must be 0 (ASSIGNED), 1 (CONFIRMED), 2 (IN_PROGRESS), 3 (DONE), or 4 (CANCELLED)",
+  }).optional(),
 });
 
 export async function PATCH(

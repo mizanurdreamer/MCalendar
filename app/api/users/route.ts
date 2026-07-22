@@ -19,10 +19,12 @@ export async function GET(req: NextRequest) {
     }
 
     const params = parseListParams(req.nextUrl.searchParams);
+    const clientId = req.nextUrl.searchParams.get("clientId") || undefined;
     const result = await userService.list({
       ...params,
       role: roleParam ?? undefined,
       status: params.status,
+      clientId,
     });
     return ok(result);
   } catch (error) {

@@ -5,6 +5,14 @@ import { prisma } from "@/lib/prisma";
  * Data-access for cleaner availability slots. Prisma queries only.
  */
 const availabilityInclude = {
+  client: {
+    select: {
+      id: true,
+      userId: true,
+      firstName: true,
+      lastName: true,
+    },
+  },
   cleaner: {
     select: {
       id: true,
@@ -28,14 +36,16 @@ export class CleanerAvailabilityRepository {
   async list(params: {
     page: number;
     pageSize: number;
+    clientId?: string;
     cleanerId?: string;
     fromDate?: Date;
     toDate?: Date;
     activeOnly?: boolean;
   }) {
-    const { page, pageSize, cleanerId, fromDate, toDate, activeOnly } = params;
+    const { page, pageSize, clientId, cleanerId, fromDate, toDate, activeOnly } = params;
     const where: Prisma.CleanerAvailabilityWhereInput = {
       deletedAt: null,
+      ...(clientId ? { clientId } : {}),
       ...(cleanerId ? { cleanerId } : {}),
       ...(activeOnly ? { isActive: true } : {}),
       ...(fromDate || toDate

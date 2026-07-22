@@ -29,6 +29,8 @@ export type PublicUser = {
   serviceArea: string | null;
   hourlyRate: number | null;
   rating: number | null;
+  clientId: string | null;
+  clientProfileId: string | null;
   createdAt: Date;
   updatedAt: Date;
   createdBy: string | null;
@@ -63,6 +65,8 @@ function toPublicUser(user: User): PublicUser {
     serviceArea: cleanerProfile?.serviceArea ?? null,
     hourlyRate: cleanerProfile?.hourlyRate ?? null,
     rating: cleanerProfile?.rating ? Number(cleanerProfile.rating) : null,
+    clientId: cleanerProfile?.clientId ?? null,
+    clientProfileId: clientProfile?.id ?? null,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
     createdBy: user.createdBy,
