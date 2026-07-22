@@ -54,7 +54,7 @@ type CalendarGridProps = {
 
 export function CalendarGrid({ calendarRef, events, onDateTitleChange, initialDate, viewMode }: CalendarGridProps) {
   return (
-    <div className="booking-fc space-y-4 rounded-3xl border border-slate-200 bg-white p-3 shadow-sm">
+    <div className="booking-fc space-y-4 rounded-3xl border p-3 shadow-sm">
       <div className="overflow-x-auto">
         <div
           className={cn(

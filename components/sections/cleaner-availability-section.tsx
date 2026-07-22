@@ -32,9 +32,9 @@ export function CleanerAvailabilitySection() {
   }, [availability.data?.items]);
 
   return (
-    <Card className="rounded-2xl border-slate-200 bg-white">
+    <Card className="rounded-2xl">
       <CardHeader className="pb-3">
-          <CardTitle className="text-2xl font-bold text-slate-900">My Availability</CardTitle>
+        <CardTitle className="text-2xl font-bold ">My Availability</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {(cleaners.data ?? []).map((cleaner) => {
@@ -43,7 +43,7 @@ export function CleanerAvailabilitySection() {
             <div key={cleaner.id} className="rounded-xl border border-slate-200 px-4 py-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-base font-semibold text-slate-900">
+                  <p className="text-base font-semibold ">
                     {cleaner.firstName} {cleaner.lastName}
                   </p>
                   <p className="text-sm text-slate-500">{cleaner.serviceArea || "No service area"}</p>
