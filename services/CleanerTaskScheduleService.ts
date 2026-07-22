@@ -236,8 +236,9 @@ export class CleanerTaskScheduleService {
     const from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const to = new Date(now.getFullYear(), now.getMonth() + 2, 0, 23, 59, 59, 999);
 
-    const schedules = await cleanerTaskScheduleRepository.findActiveForCleaner(cleanerProfile.id);
-    const assignedClientIds = Array.from(new Set(schedules.map((s) => s.clientId)));
+    // All assignments for this cleaner (any status/dates) so the cleaner can
+    // see cleaning days for every client they are assigned to.
+    const schedules = await cleanerTaskScheduleRepository.findAllForCleaner(cleanerProfile.id);
 
     // Best (most advanced) cleaning status per assigned client.
     const statusByClient = new Map<string, CleaningStatus>();
@@ -247,12 +248,18 @@ export class CleanerTaskScheduleService {
       if (!prev || STATUS_RANK[next] > STATUS_RANK[prev]) statusByClient.set(s.clientId, next);
     }
 
-    const [bookings, availability] = await Promise.all([
-      guestBookingInfoRepository.listForCleanerClientsCalendar({
-        clientIds: assignedClientIds,
-        from,
-        to,
-      }),
+    // Fetch every assigned client's bookings in the visible calendar window.
+    // We scope by fetch time (matching the client calendar) so bookings whose
+    // own startDate/endDate are null are not dropped — they still render on
+    // their own dates, which is the cleaning day the cleaner needs to see.
+    const assignedClientIds = Array.from(new Set(schedules.map((s) => s.clientId)));
+    const bookings = await guestBookingInfoRepository.listForCleanerClientsCalendar({
+      clientIds: assignedClientIds,
+      from,
+      to,
+    });
+
+    const [availability] = await Promise.all([
       cleanerAvailabilityRepository.list({
         page: 1,
         pageSize: 200,

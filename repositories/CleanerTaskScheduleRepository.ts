@@ -95,6 +95,22 @@ export class CleanerTaskScheduleRepository {
     });
   }
 
+  /**
+   * Every non-deleted assignment for a cleaner (no "active now" restriction),
+   * used by the cleaner calendar so a cleaner sees cleaning days for any client
+   * they are assigned to, scoped to that assignment's own date range.
+   */
+  findAllForCleaner(cleanerId: string) {
+    return prisma.cleanerTaskSchedule.findMany({
+      where: {
+        cleanerId,
+        deletedAt: null,
+      },
+      include: taskScheduleInclude,
+      orderBy: { startDate: "desc" },
+    });
+  }
+
   create(data: Prisma.CleanerTaskScheduleCreateInput) {
     return prisma.cleanerTaskSchedule.create({
       data,

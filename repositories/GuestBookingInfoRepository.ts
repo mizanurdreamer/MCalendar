@@ -101,11 +101,11 @@ export class GuestBookingInfoRepository {
     return prisma.guestBookingInfo.findMany({
       where: {
         clientId: { in: params.clientIds },
-        OR: [
-          { startDate: { gte: params.from, lte: params.to } },
-          { endDate: { gte: params.from, lte: params.to } },
-          { startDate: { lte: params.from }, endDate: { gte: params.to } },
-        ],
+        // Scope by fetch time (like the client calendar) so bookings with null
+        // startDate/endDate are not dropped — they simply render on their own dates.
+        fetchData: {
+          fetchedAt: { gte: params.from, lte: params.to },
+        },
       },
       include: {
         endpoint: { select: { id: true, name: true } },
