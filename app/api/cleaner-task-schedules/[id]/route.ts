@@ -5,7 +5,6 @@ import { requireActor } from "@/lib/auth";
 import { z } from "zod";
 
 const updateTaskScheduleSchema = z.object({
-  endDate: z.string().datetime().optional(),
   isActive: z.boolean().optional(),
   status: z.enum(["ASSIGNED", "CONFIRMED", "IN_PROGRESS", "DONE", "CANCELLED"]).optional(),
 });
@@ -23,7 +22,6 @@ export async function PATCH(
     const result = await cleanerTaskScheduleService.update(
       id,
       {
-        endDate: dto.endDate ? new Date(dto.endDate) : undefined,
         isActive: dto.isActive,
         status: dto.status,
       },

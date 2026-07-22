@@ -58,8 +58,8 @@ export class ClientCalendarService {
     const cleaningEvents: CalendarEventView[] = schedules.map((s) => ({
       id: `cleaning:${s.id}`,
       title: `Cleaning · ${s.cleaner.firstName} ${s.cleaner.lastName}`,
-      start: s.startDate.toISOString(),
-      end: s.endDate?.toISOString() ?? undefined,
+      start: s.assignedDate.toISOString(),
+      end: undefined,
       allDay: true,
       classNames: ["evt-cleaning"],
       extendedProps: {

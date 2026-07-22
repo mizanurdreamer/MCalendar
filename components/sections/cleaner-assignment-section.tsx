@@ -51,10 +51,9 @@ const STATUS_VARIANT: Record<CleaningStatus, string> = {
   CANCELLED: "bg-red-500/20 text-red-700",
 };
 
-function fmtRange(from: string, to: string | null) {
+function fmtDate(dateStr: string) {
   const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", year: "numeric" };
-  const start = new Date(from).toLocaleDateString(undefined, opts);
-  return to ? `${start} – ${new Date(to).toLocaleDateString(undefined, opts)}` : `${start} (open-ended)`;
+  return new Date(dateStr).toLocaleDateString(undefined, opts);
 }
 
 export function CleanerAssignmentSection() {
@@ -67,16 +66,14 @@ export function CleanerAssignmentSection() {
   const [open, setOpen] = React.useState(false);
   const [toDelete, setToDelete] = React.useState<{ id: string; name: string } | null>(null);
   const [cleanerId, setCleanerId] = React.useState("");
-  const [startDate, setStartDate] = React.useState("");
-  const [endDate, setEndDate] = React.useState("");
+  const [assignedDate, setAssignedDate] = React.useState("");
 
   const today = new Date().toISOString().slice(0, 10);
   const assignments = data?.items ?? [];
 
   const openNew = () => {
     setCleanerId(cleaners.data?.[0]?.id ?? "");
-    setStartDate(today);
-    setEndDate("");
+    setAssignedDate(today);
     setOpen(true);
   };
 
@@ -86,16 +83,15 @@ export function CleanerAssignmentSection() {
       toast({ title: "Select a cleaner", variant: "destructive" });
       return;
     }
-    if (!startDate) {
-      toast({ title: "Start date is required", variant: "destructive" });
+    if (!assignedDate) {
+      toast({ title: "Assigned date is required", variant: "destructive" });
       return;
     }
     try {
       await create.mutateAsync({
         clientId: me.id,
         cleanerId,
-        startDate: `${startDate}T00:00:00.000Z`,
-        endDate: endDate ? `${endDate}T00:00:00.000Z` : null,
+        assignedDate: `${assignedDate}T00:00:00.000Z`,
       });
       toast({ title: "Cleaner assigned" });
       setOpen(false);
@@ -135,7 +131,7 @@ export function CleanerAssignmentSection() {
           <TableHeader className="bg-slate-50/70">
             <TableRow className="hover:bg-slate-50/70">
               <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Cleaner</TableHead>
-              <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Assignment period</TableHead>
+              <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Assigned date</TableHead>
               <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Status</TableHead>
               <TableHead className="w-[120px] text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Actions</TableHead>
             </TableRow>
@@ -157,7 +153,7 @@ export function CleanerAssignmentSection() {
                     <p className="text-[17px] font-semibold text-slate-900">{a.cleanerName}</p>
                     <p className="text-sm text-slate-400">{a.cleanerEmail}</p>
                   </TableCell>
-                  <TableCell className="text-[17px] text-slate-600">{fmtRange(a.startDate, a.endDate)}</TableCell>
+                  <TableCell className="text-[17px] text-slate-600">{fmtDate(a.assignedDate)}</TableCell>
                   <TableCell>
                     <Badge className={`rounded-full border-transparent ${STATUS_VARIANT[a.status]}`}>
                       {STATUS_LABEL[a.status]}
@@ -203,11 +199,8 @@ export function CleanerAssignmentSection() {
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Start date">
-              <Input type="date" value={startDate} min={today} onChange={(e) => setStartDate(e.target.value)} />
-            </Field>
-            <Field label="End date (optional)">
-              <Input type="date" value={endDate} min={startDate || today} onChange={(e) => setEndDate(e.target.value)} />
+            <Field label="Assigned date">
+              <Input type="date" value={assignedDate} min={today} onChange={(e) => setAssignedDate(e.target.value)} />
             </Field>
           </div>
           <DialogFooter>

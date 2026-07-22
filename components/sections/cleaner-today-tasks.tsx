@@ -24,10 +24,9 @@ const STATUS_VARIANT: Record<CleaningStatus, string> = {
   CANCELLED: "bg-red-500/20 text-red-700",
 };
 
-function fmtRange(from: string, to: string | null) {
+function fmtDate(dateStr: string) {
   const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", year: "numeric" };
-  const start = new Date(from).toLocaleDateString(undefined, opts);
-  return to ? `${start} – ${new Date(to).toLocaleDateString(undefined, opts)}` : `${start} (open-ended)`;
+  return new Date(dateStr).toLocaleDateString(undefined, opts);
 }
 
 export function CleanerTodayTasks() {
@@ -73,7 +72,7 @@ export function CleanerTodayTasks() {
             >
               <div>
                 <p className="text-[17px] font-semibold text-slate-900">{a.clientName}</p>
-                <p className="text-sm text-slate-500">{fmtRange(a.startDate, a.endDate)}</p>
+                <p className="text-sm text-slate-500">{fmtDate(a.assignedDate)}</p>
               </div>
               <div className="flex items-center gap-3">
                 <Badge className={`rounded-full border-transparent ${STATUS_VARIANT[a.status]}`}>

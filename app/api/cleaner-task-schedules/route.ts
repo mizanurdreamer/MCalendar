@@ -8,8 +8,7 @@ import { z } from "zod";
 const createTaskScheduleSchema = z.object({
   clientId: z.string().uuid(),
   cleanerId: z.string().uuid(),
-  startDate: z.string().datetime(),
-  endDate: z.string().datetime().optional(),
+  assignedDate: z.string().datetime(),
 });
 
 export async function GET(req: NextRequest) {
@@ -40,8 +39,7 @@ export async function POST(req: NextRequest) {
       {
         clientId: dto.clientId,
         cleanerId: dto.cleanerId,
-        startDate: new Date(dto.startDate),
-        endDate: dto.endDate ? new Date(dto.endDate) : undefined,
+        assignedDate: new Date(dto.assignedDate),
       },
       actor,
     );

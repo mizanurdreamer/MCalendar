@@ -51,8 +51,7 @@ export type CleanerTaskScheduleView = {
   cleanerId: string;
   cleanerName: string;
   cleanerEmail: string;
-  startDate: string;
-  endDate: string | null;
+  assignedDate: string;
   status: CleaningStatus;
   isActive: boolean;
   createdAt: string;
@@ -120,8 +119,7 @@ export type CleanerCalendarAssignmentView = {
   id: string;
   clientId: string;
   clientName: string;
-  startDate: string;
-  endDate: string | null;
+  assignedDate: string;
   status: CleaningStatus;
 };
 

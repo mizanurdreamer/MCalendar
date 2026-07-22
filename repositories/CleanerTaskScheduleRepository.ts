@@ -54,7 +54,7 @@ export class CleanerTaskScheduleRepository {
     const [items, total] = await Promise.all([
       prisma.cleanerTaskSchedule.findMany({
         where,
-        orderBy: { startDate: "desc" },
+        orderBy: { assignedDate: "desc" },
         skip: (page - 1) * pageSize,
         take: pageSize,
         include: taskScheduleInclude,
@@ -72,11 +72,10 @@ export class CleanerTaskScheduleRepository {
         clientId,
         isActive: true,
         deletedAt: null,
-        startDate: { lte: now },
-        OR: [{ endDate: null }, { endDate: { gte: now } }],
+        assignedDate: { lte: now },
       },
       include: taskScheduleInclude,
-      orderBy: { startDate: "desc" },
+      orderBy: { assignedDate: "desc" },
     });
   }
 
@@ -87,11 +86,10 @@ export class CleanerTaskScheduleRepository {
         cleanerId,
         isActive: true,
         deletedAt: null,
-        startDate: { lte: now },
-        OR: [{ endDate: null }, { endDate: { gte: now } }],
+        assignedDate: { lte: now },
       },
       include: taskScheduleInclude,
-      orderBy: { startDate: "desc" },
+      orderBy: { assignedDate: "desc" },
     });
   }
 
@@ -107,7 +105,7 @@ export class CleanerTaskScheduleRepository {
         deletedAt: null,
       },
       include: taskScheduleInclude,
-      orderBy: { startDate: "desc" },
+      orderBy: { assignedDate: "desc" },
     });
   }
 

@@ -36,8 +36,7 @@ export type CleanerTaskScheduleView = {
   cleanerId: string;
   cleanerName: string;
   cleanerEmail: string;
-  startDate: string;
-  endDate: string | null;
+  assignedDate: string;
   status: CleaningStatus;
   isActive: boolean;
   createdAt: string;
@@ -54,8 +53,7 @@ export function toTaskScheduleView(
     cleanerId: item.cleaner.userId,
     cleanerName: `${item.cleaner.firstName} ${item.cleaner.lastName}`,
     cleanerEmail: item.cleaner.Email,
-    startDate: item.startDate.toISOString(),
-    endDate: item.endDate?.toISOString() ?? null,
+    assignedDate: item.assignedDate.toISOString(),
     status: (item.status as CleaningStatus) ?? "ASSIGNED",
     isActive: item.isActive,
     createdAt: item.createdAt.toISOString(),
@@ -131,13 +129,12 @@ export class CleanerTaskScheduleService {
       cleanerName: `${a.cleaner.firstName} ${a.cleaner.lastName}`,
       cleanerEmail: a.cleaner.Email,
       cleanerPhone: a.cleaner.phoneNo || null,
-      startDate: a.startDate.toISOString(),
-      endDate: a.endDate?.toISOString() ?? null,
+      assignedDate: a.assignedDate.toISOString(),
     }));
   }
 
   async create(
-    params: { clientId: string; cleanerId: string; startDate: Date; endDate?: Date; status?: CleaningStatus },
+    params: { clientId: string; cleanerId: string; assignedDate: Date; status?: CleaningStatus },
     actor: ActorContext,
   ) {
     // Verify both users exist with correct roles
@@ -156,19 +153,13 @@ export class CleanerTaskScheduleService {
       throw new ForbiddenError();
     }
 
-    // Validate date range
-    if (params.endDate && params.endDate <= params.startDate) {
-      throw new ConflictError("End date must be after start date");
-    }
-
     const clientProfile = await this.resolveClientProfileId(params.clientId);
     const cleanerProfile = await this.resolveCleanerProfileId(params.cleanerId);
 
     const taskSchedule = await cleanerTaskScheduleRepository.create({
       client: { connect: { id: clientProfile.id } },
       cleaner: { connect: { id: cleanerProfile.id } },
-      startDate: params.startDate,
-      endDate: params.endDate ?? null,
+      assignedDate: params.assignedDate,
       status: params.status ?? "ASSIGNED",
       createdBy: actor.userId,
       updatedBy: actor.userId,
@@ -179,7 +170,7 @@ export class CleanerTaskScheduleService {
 
   async update(
     id: string,
-    params: { endDate?: Date; isActive?: boolean; status?: CleaningStatus },
+    params: { isActive?: boolean; status?: CleaningStatus },
     actor: ActorContext,
   ) {
     const existing = await cleanerTaskScheduleRepository.findById(id);
@@ -188,10 +179,7 @@ export class CleanerTaskScheduleService {
     // Clients own the schedule; cleaners may only advance the cleaning status.
     if (actor.role === "CLEANER") {
       if (actor.userId !== existing.cleaner.userId) throw new ForbiddenError();
-      if (params.status === undefined && params.isActive === undefined && params.endDate === undefined) {
-        throw new ForbiddenError("Cleaners may only update cleaning status");
-      }
-      if (params.status === undefined && (params.isActive !== undefined || params.endDate !== undefined)) {
+      if (params.status === undefined) {
         throw new ForbiddenError("Cleaners may only update cleaning status");
       }
     } else if (actor.role !== "SUPER_ADMIN" && actor.userId !== existing.client.userId) {
@@ -199,7 +187,6 @@ export class CleanerTaskScheduleService {
     }
 
     const taskSchedule = await cleanerTaskScheduleRepository.update(id, {
-      endDate: params.endDate,
       isActive: params.isActive,
       status: params.status,
       updatedBy: actor.userId,
@@ -309,8 +296,7 @@ export class CleanerTaskScheduleService {
         id: s.id,
         clientId: s.client.userId,
         clientName: `${s.client.firstName} ${s.client.lastName}`,
-        startDate: s.startDate.toISOString(),
-        endDate: (s.endDate?.toISOString() ?? null) as string | null,
+        assignedDate: s.assignedDate.toISOString(),
         status: (s.status as CleaningStatus) ?? "ASSIGNED",
       })),
     };

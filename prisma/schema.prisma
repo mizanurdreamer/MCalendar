@@ -177,8 +177,7 @@ model CleanerTaskSchedule {
   client    ClientProfile     @relation( fields: [clientId], references: [id], onDelete: Cascade)
   cleaner   CleanerProfile     @relation(fields: [cleanerId], references: [id], onDelete: Cascade)
 
-  startDate DateTime
-  endDate   DateTime?
+  assignedDate DateTime
   status    String   @default("ASSIGNED")
   isActive  Boolean  @default(true)
   isDeleted    Boolean @default(false)
@@ -188,11 +187,11 @@ model CleanerTaskSchedule {
   updatedBy String?   @db.Uuid
   deletedAt DateTime?
 
-  @@unique([clientId, cleanerId, startDate], map: "cleanerTaskSchedule_clientId_cleanerId_startDate_key")
+  @@unique([clientId, cleanerId, assignedDate], map: "cleanerTaskSchedule_clientId_cleanerId_assignedDate_key")
   @@index([clientId], map: "cleanerTaskSchedule_clientId_idx")
   @@index([cleanerId], map: "cleanerTaskSchedule_cleanerId_idx")
   @@index([status], map: "cleanerTaskSchedule_status_idx")
-  @@index([startDate, endDate], map: "cleanerTaskSchedules_startDate_endDate_idx")
+  @@index([assignedDate], map: "cleanerTaskSchedule_assignedDate_idx")
   @@index([deletedAt], map: "cleanerTaskSchedule_deletedAt_idx")
   @@map("cleanerTaskSchedule")
 }

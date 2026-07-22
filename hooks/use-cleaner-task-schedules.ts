@@ -22,8 +22,7 @@ export function useCleanerTaskSchedules(params: { page?: number; activeOnly?: bo
 export type CreateTaskScheduleDTO = {
   clientId: string;
   cleanerId: string;
-  startDate: string;
-  endDate?: string | null;
+  assignedDate: string;
 };
 
 export function useCreateTaskSchedule() {
