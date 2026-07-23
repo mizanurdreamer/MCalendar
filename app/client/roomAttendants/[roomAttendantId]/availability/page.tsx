@@ -16,7 +16,7 @@ export default async function ClientRoomAttendantAvailabilityScreen({
       <Link
         href="/client/roomAttendants"
         aria-label="Back to roomAttendants"
-        className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
+        className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
       >
         <ArrowLeft className="h-5 w-5" />
       </Link>

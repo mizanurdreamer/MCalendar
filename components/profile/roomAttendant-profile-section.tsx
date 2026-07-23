@@ -47,7 +47,7 @@ export function RoomAttendantProfileSection() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-3xl font-extrabold tracking-tight ">RoomAttendant Profile</h1>
-          <Badge className="rounded-full border-transparent bg-emerald-500/15 px-3 py-1 text-emerald-700">
+          <Badge className="rounded-full border-transparent bg-emerald-500/15 px-3 py-1 text-emerald-700 dark:text-emerald-400">
             ROOMATTENDATNT
           </Badge>
         </div>

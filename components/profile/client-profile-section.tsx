@@ -47,7 +47,7 @@ export function ClientProfileSection() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-3xl font-extrabold tracking-tight ">Client Profile</h1>
-          <Badge className="rounded-full border-transparent bg-blue-500/15 px-3 py-1 text-blue-700">CLIENT</Badge>
+          <Badge className="rounded-full border-transparent bg-blue-500/15 px-3 py-1 text-blue-700 dark:text-blue-400">CLIENT</Badge>
         </div>
         {!editing ? (
           <Button className="rounded-xl" onClick={() => setEditing(true)}>

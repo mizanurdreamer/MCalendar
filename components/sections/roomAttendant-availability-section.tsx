@@ -40,13 +40,13 @@ export function RoomAttendantAvailabilitySection() {
         {(roomAttendants.data ?? []).map((roomAttendant) => {
           const slots = byRoomAttendant.get(roomAttendant.id) ?? [];
           return (
-            <div key={roomAttendant.id} className="rounded-xl border border-slate-200 px-4 py-3">
+            <div key={roomAttendant.id} className="rounded-xl border border-border px-4 py-3">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-base font-semibold ">
                     {roomAttendant.firstName} {roomAttendant.lastName}
                   </p>
-                  <p className="text-sm text-slate-500">{roomAttendant.serviceArea || "No service area"}</p>
+                  <p className="text-sm text-muted-foreground">{roomAttendant.serviceArea || "No service area"}</p>
                 </div>
                 <Badge className="rounded-full border-transparent bg-emerald-500/20 text-emerald-700">
                   {slots.length > 0 ? `${slots.length} slot${slots.length > 1 ? "s" : ""}` : "No availability"}
@@ -71,7 +71,7 @@ export function RoomAttendantAvailabilitySection() {
           );
         })}
         {!roomAttendants.isLoading && (roomAttendants.data?.length ?? 0) === 0 && (
-          <p className="text-sm text-slate-500">No roomAttendants found.</p>
+          <p className="text-sm text-muted-foreground">No roomAttendants found.</p>
         )}
       </CardContent>
     </Card>

@@ -165,7 +165,7 @@ export function SmsGatewaysSection() {
                           type="button"
                           title="Delete"
                           aria-label="Delete"
-                          className="rounded-lg p-2 text-red-500 hover:bg-red-50 hover:text-red-700"
+                          className="rounded-lg p-2 text-red-500 hover:bg-destructive/10 hover:text-destructive"
                           onClick={() => setToDelete(item)}
                         >
                           <Trash2 className="h-5 w-5" />

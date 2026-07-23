@@ -18,11 +18,11 @@ const NEXT_STATUS: Partial<Record<CleaningStatus, CleaningStatus>> = {
 };
 
 const STATUS_VARIANT: Record<CleaningStatus, string> = {
-  [RoomAttendantTaskStatus.ASSIGNED]: "bg-indigo-500/20 text-indigo-700",
-  [RoomAttendantTaskStatus.CONFIRMED]: "bg-sky-500/20 text-sky-700",
-  [RoomAttendantTaskStatus.IN_PROGRESS]: "bg-amber-500/20 text-amber-700",
-  [RoomAttendantTaskStatus.DONE]: "bg-emerald-500/20 text-emerald-700",
-  [RoomAttendantTaskStatus.CANCELLED]: "bg-red-500/20 text-red-700",
+  [RoomAttendantTaskStatus.ASSIGNED]: "bg-indigo-500/20 text-indigo-700 dark:text-indigo-400",
+  [RoomAttendantTaskStatus.CONFIRMED]: "bg-sky-500/20 text-sky-700 dark:text-sky-400",
+  [RoomAttendantTaskStatus.IN_PROGRESS]: "bg-amber-500/20 text-amber-700 dark:text-amber-400",
+  [RoomAttendantTaskStatus.DONE]: "bg-emerald-500/20 text-emerald-700 dark:text-emerald-400",
+  [RoomAttendantTaskStatus.CANCELLED]: "bg-red-500/20 text-red-700 dark:text-red-400",
 };
 
 function fmtDate(dateStr: string) {

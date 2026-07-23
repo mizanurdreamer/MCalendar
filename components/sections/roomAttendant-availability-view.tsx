@@ -36,7 +36,7 @@ export function RoomAttendantAvailabilityView({ roomAttendantId }: { roomAttenda
         <h1 className="text-[38px] font-extrabold tracking-tight ">
           Availability
           {roomAttendant && (
-            <span className="ml-2 text-base font-normal text-slate-500">
+            <span className="ml-2 text-base font-normal text-muted-foreground">
               {roomAttendant.firstName} {roomAttendant.lastName}
               {roomAttendant.serviceArea ? ` · ${roomAttendant.serviceArea}` : ""}
             </span>

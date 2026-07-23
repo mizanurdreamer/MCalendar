@@ -211,7 +211,7 @@ export function UsersSection({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <h1 className="text-[30px] font-extrabold tracking-tight ">{copy.plural}</h1>
-          <span className="rounded-full px-3 py-1 text-sm font-semibold text-muted-foreground dark:text-slate-300 bg-slate-200 dark:bg-slate-800 ">
+          <span className="rounded-full px-3 py-1 text-sm font-semibold bg-muted text-muted-foreground">
             {(data?.total ?? 0).toLocaleString()} total
           </span>
         </div>
@@ -283,7 +283,7 @@ export function UsersSection({
             <TableHeader className="">
               <TableRow className="">
                 <TableHead className="w-12 px-4" />
-                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">{role === "CLIENT" ? "Client" : "RoomAttendant"}</TableHead>
+                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">{role === "CLIENT" ? "Client" : "RoomAttendant"}</TableHead>
                 {role === "CLIENT" ? (
                   <>
                     <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">Primary contact</TableHead>
@@ -387,7 +387,7 @@ export function UsersSection({
                               type="button"
                               title="Delete"
                               aria-label="Delete"
-                              className="rounded-lg p-2 text-red-500 hover:bg-red-50 hover:text-red-700"
+                              className="rounded-lg p-2 text-red-500 hover:bg-destructive/10 hover:text-destructive"
                               onClick={() => setToDelete(u)}
                             >
                               <Trash2 className="h-5 w-5" />

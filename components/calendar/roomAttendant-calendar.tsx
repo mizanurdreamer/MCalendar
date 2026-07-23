@@ -158,12 +158,12 @@ export function RoomAttendantCalendar() {
         )}
 
         <div className="flex flex-wrap items-center gap-4 px-1 pb-1 text-sm text-muted-foreground">
-          <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-[#6366f1]" />Assigned</span>
-          <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-[#0ea5e9]" />Confirmed</span>
-          <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-[#f59e0b]" />In progress</span>
-          <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-[#22c55e]" />Done</span>
-          <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-[#ef4444]" />Cancelled</span>
-          <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-[#b8c1d0]" />Availability</span>
+          <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-[#6366f1] dark:bg-[#818cf8]" />Assigned</span>
+          <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-[#0ea5e9] dark:bg-[#38bdf8]" />Confirmed</span>
+          <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-[#f59e0b] dark:bg-[#fbbf24]" />In progress</span>
+          <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-[#22c55e] dark:bg-[#4ade80]" />Done</span>
+          <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-[#ef4444] dark:bg-[#f87171]" />Cancelled</span>
+          <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-[#b8c1d0] dark:bg-[#64748b]" />Availability</span>
         </div>
       </section>
 

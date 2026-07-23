@@ -3,9 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { UpcomingCleaningView } from "@/models/view";
 
 const STATUS_DOT: Record<string, string> = {
-  pending: "#f59e0b",
-  cancelled: "#ef4444",
-  canceled: "#ef4444",
+  pending: "bg-amber-500 dark:bg-amber-400",
+  cancelled: "bg-red-500 dark:bg-red-400",
+  canceled: "bg-red-500 dark:bg-red-400",
 };
 
 export function UpcomingCleanings({ items }: { items: UpcomingCleaningView[] }) {
@@ -31,8 +31,7 @@ export function UpcomingCleanings({ items }: { items: UpcomingCleaningView[] }) 
                     <p className="text-sm text-muted-foreground">{item.note}</p>
                   </div>
                   <span
-                    className="mt-2 inline-flex h-2.5 w-2.5 shrink-0 rounded-full"
-                    style={{ backgroundColor: STATUS_DOT[item.status ?? ""] ?? "#7c3aed" }}
+                    className={`mt-2 inline-flex h-2.5 w-2.5 shrink-0 rounded-full ${STATUS_DOT[item.status ?? ""] ?? "bg-purple-500 dark:bg-purple-400"}`}
                   />
                 </div>
               </div>

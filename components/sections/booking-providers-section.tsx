@@ -176,7 +176,7 @@ export function BookingProvidersSection() {
                     className="h-5 w-5 rounded-md text-primary focus:ring-primary"
                   />
                 </TableHead>
-                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">
                   Provider
                 </TableHead>
                 <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">
@@ -227,7 +227,7 @@ export function BookingProvidersSection() {
                           type="button"
                           title="View"
                           aria-label="View"
-                          className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                          className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                           onClick={() => setViewProvider(e)}
                         >
                           <Eye className="h-5 w-5" />
@@ -245,7 +245,7 @@ export function BookingProvidersSection() {
                           type="button"
                           title="Delete"
                           aria-label="Delete"
-                          className="rounded-lg p-2 text-red-500 hover:bg-red-50 hover:text-red-700"
+                          className="rounded-lg p-2 text-red-500 hover:bg-destructive/10 hover:text-destructive"
                           onClick={() => setToDelete(e)}
                         >
                           <Trash2 className="h-5 w-5" />
