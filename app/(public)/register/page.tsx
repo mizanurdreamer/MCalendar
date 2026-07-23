@@ -87,6 +87,9 @@ export default function RegisterPage() {
           <div className="space-y-2">
             <Label htmlFor="phone">Phone</Label>
             <Input id="phone" {...register("phone")} />
+            {errors.phone && (
+              <p className="text-xs text-destructive">{errors.phone.message}</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>

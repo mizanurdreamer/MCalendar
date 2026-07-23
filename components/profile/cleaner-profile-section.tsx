@@ -18,7 +18,7 @@ export function CleanerProfileSection() {
   const { data, isLoading } = useCleanerProfile();
   const update = useUpdateCleanerProfile();
 
-  const { register, handleSubmit, reset } = useForm<UpdateCleanerProfileDTO>({
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<UpdateCleanerProfileDTO>({
     resolver: zodResolver(updateCleanerProfileSchema),
     values: {
       firstName: data?.firstName ?? "",
@@ -82,10 +82,10 @@ export function CleanerProfileSection() {
           <CardTitle className="text-lg ">Account</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
-          <ProfileInput label="First name" disabled={!editing} {...register("firstName")} />
-          <ProfileInput label="Last name" disabled={!editing} {...register("lastName")} />
+          <ProfileInput label="First name" disabled={!editing} error={errors.firstName?.message} {...register("firstName")} />
+          <ProfileInput label="Last name" disabled={!editing} error={errors.lastName?.message} {...register("lastName")} />
           <ProfileInput label="Email" value={data.email} disabled />
-          <ProfileInput label="Phone" disabled={!editing} {...register("phone")} />
+          <ProfileInput label="Phone" disabled={!editing} error={errors.phone?.message} {...register("phone")} />
         </CardContent>
       </Card>
 
@@ -121,13 +121,15 @@ export function CleanerProfileSection() {
 function ProfileInput(
   props: React.ComponentProps<typeof Input> & {
     label: string;
+    error?: string;
   },
 ) {
-  const { label, ...inputProps } = props;
+  const { label, error, ...inputProps } = props;
   return (
     <div className="rounded-xl border p-3">
       <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">{label}</p>
       <Input className="mt-2 h-10" {...inputProps} />
+      {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
     </div>
   );
 }

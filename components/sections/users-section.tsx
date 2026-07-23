@@ -474,7 +474,6 @@ function UserFormDialog({
           role: editing.role,
           isActive: editing.isActive,
           companyName: editing.companyName ?? "",
-          primaryContact: editing.primaryContact ?? "",
           portfolioSize: editing.portfolioSize ?? undefined,
           timezone: editing.timezone ?? "",
           serviceArea: editing.serviceArea ?? "",
@@ -489,7 +488,6 @@ function UserFormDialog({
           password: "",
           confirmPassword: "",
           companyName: "",
-          primaryContact: "",
           portfolioSize: undefined,
           timezone: "",
           serviceArea: "",
@@ -514,7 +512,6 @@ function UserFormDialog({
           role: values.role,
           isActive: values.isActive,
           companyName: values.companyName,
-          primaryContact: values.primaryContact,
           portfolioSize: values.portfolioSize,
           timezone: values.timezone,
           serviceArea: values.serviceArea,
@@ -591,7 +588,7 @@ function UserFormDialog({
               </SelectContent>
             </Select>
           </Field>
-          <Field label="Phone">
+          <Field label="Phone" error={errors.phone?.message}>
             <Input {...register("phone")} />
           </Field>
 
@@ -599,9 +596,6 @@ function UserFormDialog({
             <div className="grid grid-cols-2 gap-3">
               <Field label="Company / Brand">
                 <Input {...register("companyName")} />
-              </Field>
-              <Field label="Primary contact">
-                <Input {...register("primaryContact")} />
               </Field>
               <Field label="Portfolio size">
                 <Input

@@ -1,14 +1,14 @@
 import { z } from "zod";
 
 export const createBookingEndpointSchema = z.object({
-  name: z.string().trim().min(1).max(120),
-  url: z.string().trim().url().max(2000),
+  name: z.string().trim().min(1, "Name is required").max(120, "Name is too long"),
+  url: z.string().trim().min(1, "URL is required").url("Enter a valid URL").max(2000, "URL is too long"),
   isActive: z.boolean().default(true),
 });
 
 export const updateBookingEndpointSchema = z.object({
-  name: z.string().trim().min(1).max(120).optional(),
-  url: z.string().trim().url().max(2000).optional(),
+  name: z.string().trim().min(1, "Name cannot be empty").max(120, "Name is too long").optional(),
+  url: z.string().trim().min(1, "URL cannot be empty").url("Enter a valid URL").max(2000, "URL is too long").optional(),
   isActive: z.boolean().optional(),
 });
 

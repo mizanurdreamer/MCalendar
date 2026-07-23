@@ -125,7 +125,6 @@ export class AuthService {
         dto.role === "CLIENT"
           ? {
               companyName: null,
-              primaryContact: null,
               portfolioSize: null,
               timezone: null,
             }

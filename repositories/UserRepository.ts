@@ -57,7 +57,6 @@ type CreateUserInput = {
   updatedBy?: string;
   clientProfile?: {
     companyName?: string | null;
-    primaryContact?: string | null;
     portfolioSize?: number | null;
     timezone?: string | null;
   };
@@ -79,7 +78,6 @@ type UpdateUserInput = {
   updatedBy?: string;
   clientProfile?: {
     companyName?: string | null;
-    primaryContact?: string | null;
     portfolioSize?: number | null;
     timezone?: string | null;
   };

@@ -54,7 +54,6 @@ export class UserService {
       isActive: dto.isActive,
       clientProfile: {
         companyName: dto.companyName || null,
-        primaryContact: dto.primaryContact || null,
         portfolioSize: dto.portfolioSize ?? null,
         timezone: dto.timezone || null,
       },
@@ -90,8 +89,6 @@ export class UserService {
       isActive: dto.isActive,
       clientProfile: {
         companyName: dto.companyName === undefined ? undefined : dto.companyName || null,
-        primaryContact:
-          dto.primaryContact === undefined ? undefined : dto.primaryContact || null,
         portfolioSize: dto.portfolioSize,
         timezone: dto.timezone === undefined ? undefined : dto.timezone || null,
       },
