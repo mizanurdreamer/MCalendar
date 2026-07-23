@@ -60,7 +60,7 @@ export function CalendarToolbar({
               variant={viewMode === "month" ? "default" : "ghost"}
               className={cn(
                 "h-10 rounded-xl px-5 text-[17px] font-semibold",
-                viewMode !== "month" && "text-slate-600",
+                viewMode !== "month" && "text-muted-foreground",
               )}
               onClick={() => onViewModeChange("month")}
             >
@@ -71,7 +71,7 @@ export function CalendarToolbar({
               variant={viewMode === "week" ? "default" : "ghost"}
               className={cn(
                 "h-10 rounded-xl px-5 text-[17px] font-semibold",
-                viewMode !== "week" && "text-slate-600",
+                viewMode !== "week" && "text-muted-foreground",
               )}
               onClick={() => onViewModeChange("week")}
             >
@@ -82,7 +82,7 @@ export function CalendarToolbar({
               variant={viewMode === "day" ? "default" : "ghost"}
               className={cn(
                 "h-10 rounded-xl px-5 text-[17px] font-semibold",
-                viewMode !== "day" && "text-slate-600",
+                viewMode !== "day" && "text-muted-foreground",
               )}
               onClick={() => onViewModeChange("day")}
             >
@@ -106,7 +106,7 @@ export function CalendarToolbar({
                 "cursor-pointer whitespace-nowrap rounded-2xl border px-5 py-2.5 text-[17px] font-semibold",
                 activeProperty === property
                   ? "border-primary bg-primary text-primary-foreground"
-                  : "text-slate-600",
+                  : "text-muted-foreground",
               )}
               onClick={() => onChangeProperty(property)}
             >

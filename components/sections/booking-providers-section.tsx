@@ -176,16 +176,21 @@ export function BookingProvidersSection() {
                     className="h-5 w-5 rounded-md text-primary focus:ring-primary"
                   />
                 </TableHead>
+<<<<<<< HEAD:components/sections/booking-providers-section.tsx
                 <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
                   Provider
+=======
+                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">
+                  Endpoint
+>>>>>>> 70775190310bdfd1f11d587cb2bb8bca6d7e9956:components/sections/booking-endpoints-section.tsx
                 </TableHead>
-                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">
                   URL
                 </TableHead>
-                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">
                   Status
                 </TableHead>
-                <TableHead className="text-right text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+                <TableHead className="text-right text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">
                   Actions
                 </TableHead>
               </TableRow>
@@ -195,7 +200,7 @@ export function BookingProvidersSection() {
                 <EmptyRow colSpan={5}>Loading…</EmptyRow>
               ) : data && data.items.length > 0 ? (
                 data.items.map((e) => (
-                  <TableRow key={e.id} className="hover:bg-slate-50/40">
+                  <TableRow key={e.id} className="hover:bg-accent/50">
                     <TableCell className="px-4">
                       <input
                         type="checkbox"
@@ -207,15 +212,15 @@ export function BookingProvidersSection() {
                     <TableCell className="text-[17px] font-medium ">
                       {e.name}
                     </TableCell>
-                    <TableCell className="max-w-md truncate text-[17px] text-slate-600">
+                    <TableCell className="max-w-md truncate text-[17px] text-muted-foreground">
                       {e.url}
                     </TableCell>
                     <TableCell>
                       <Badge
                         className={
                           e.isActive
-                            ? "rounded-full border-transparent bg-emerald-500/20 px-3 py-1 text-[13px] font-semibold text-emerald-700"
-                            : "rounded-full border-transparent bg-slate-200 px-3 py-1 text-[13px] font-semibold text-slate-600"
+                            ? "rounded-full border-transparent bg-emerald-500/20 px-3 py-1 text-[13px] font-semibold text-emerald-700 dark:text-emerald-400"
+                            : "rounded-full border-transparent bg-muted px-3 py-1 text-[13px] font-semibold text-muted-foreground"
                         }
                       >
                         {e.isActive ? "Active" : "Inactive"}
@@ -227,8 +232,13 @@ export function BookingProvidersSection() {
                           type="button"
                           title="View"
                           aria-label="View"
+<<<<<<< HEAD:components/sections/booking-providers-section.tsx
                           className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
                           onClick={() => setViewProvider(e)}
+=======
+                          className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
+                          onClick={() => setViewEndpoint(e)}
+>>>>>>> 70775190310bdfd1f11d587cb2bb8bca6d7e9956:components/sections/booking-endpoints-section.tsx
                         >
                           <Eye className="h-5 w-5" />
                         </button>
@@ -236,7 +246,7 @@ export function BookingProvidersSection() {
                           type="button"
                           title="Edit"
                           aria-label="Edit"
-                          className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                          className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
                           onClick={() => setDialog({ open: true, editing: e })}
                         >
                           <Pencil className="h-5 w-5" />

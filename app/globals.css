@@ -148,6 +148,10 @@
   background: #b8c1d0;
 }
 
+.dark .booking-fc .evt-neutral {
+  background: #64748b;
+}
+
 .booking-fc .evt-green {
   background: #22c55e;
 }
@@ -164,8 +168,16 @@
   color: #6d28d9;
 }
 
+.dark .booking-fc .evt-cleaning {
+  color: #a78bfa;
+}
+
 .booking-fc .evt-availability {
   color: #475569;
+}
+
+.dark .booking-fc .evt-availability {
+  color: #94a3b8;
 }
 
 .booking-fc .evt-assigned {
@@ -187,3 +199,17 @@
 .booking-fc .evt-cancelled {
   background: #ef4444;
 }
+
+.legend-dot-blue { background: #2563eb; }
+.legend-dot-green { background: #22c55e; }
+.legend-dot-amber { background: #f59e0b; }
+.legend-dot-neutral { background: #b8c1d0; }
+.legend-dot-red { background: #ef4444; }
+.legend-dot-purple { background: #7c3aed; }
+
+.dark .legend-dot-blue { background: #60a5fa; }
+.dark .legend-dot-green { background: #4ade80; }
+.dark .legend-dot-amber { background: #fbbf24; }
+.dark .legend-dot-neutral { background: #64748b; }
+.dark .legend-dot-red { background: #f87171; }
+.dark .legend-dot-purple { background: #a78bfa; }

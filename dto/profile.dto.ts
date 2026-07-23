@@ -3,7 +3,7 @@ import { z } from "zod";
 export const updateClientProfileSchema = z.object({
   firstName: z.string().trim().min(1).max(80).optional(),
   lastName: z.string().trim().min(1).max(80).optional(),
-  phone: z.string().trim().max(30).optional().or(z.literal("")),
+  phone: z.string().trim().min(1).max(30).optional(),
   companyName: z.string().trim().max(160).optional().or(z.literal("")),
   primaryContact: z.string().trim().max(160).optional().or(z.literal("")),
   portfolioSize: z.coerce.number().int().min(0).max(100000).optional(),
@@ -13,7 +13,7 @@ export const updateClientProfileSchema = z.object({
 export const updateRoomAttendantProfileSchema = z.object({
   firstName: z.string().trim().min(1).max(80).optional(),
   lastName: z.string().trim().min(1).max(80).optional(),
-  phone: z.string().trim().max(30).optional().or(z.literal("")),
+  phone: z.string().trim().min(1).max(30).optional(),
   serviceArea: z.string().trim().max(160).optional().or(z.literal("")),
   hourlyRate: z.coerce.number().int().min(0).max(10000).optional(),
   rating: z.coerce.number().min(0).max(5).optional(),

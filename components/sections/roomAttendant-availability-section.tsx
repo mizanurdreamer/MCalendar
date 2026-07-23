@@ -40,13 +40,21 @@ export function RoomAttendantAvailabilitySection() {
         {(roomAttendants.data ?? []).map((roomAttendant) => {
           const slots = byRoomAttendant.get(roomAttendant.id) ?? [];
           return (
+<<<<<<< HEAD:components/sections/roomAttendant-availability-section.tsx
             <div key={roomAttendant.id} className="rounded-xl border border-slate-200 px-4 py-3">
+=======
+            <div key={cleaner.id} className="rounded-xl border border-border px-4 py-3">
+>>>>>>> 70775190310bdfd1f11d587cb2bb8bca6d7e9956:components/sections/cleaner-availability-section.tsx
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-base font-semibold ">
                     {roomAttendant.firstName} {roomAttendant.lastName}
                   </p>
+<<<<<<< HEAD:components/sections/roomAttendant-availability-section.tsx
                   <p className="text-sm text-slate-500">{roomAttendant.serviceArea || "No service area"}</p>
+=======
+                  <p className="text-sm text-muted-foreground">{cleaner.serviceArea || "No service area"}</p>
+>>>>>>> 70775190310bdfd1f11d587cb2bb8bca6d7e9956:components/sections/cleaner-availability-section.tsx
                 </div>
                 <Badge className="rounded-full border-transparent bg-emerald-500/20 text-emerald-700">
                   {slots.length > 0 ? `${slots.length} slot${slots.length > 1 ? "s" : ""}` : "No availability"}
@@ -57,12 +65,12 @@ export function RoomAttendantAvailabilitySection() {
                   {slots.map((s) => (
                      <li
                        key={s.id}
-                       className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm"
+                       className="flex items-center justify-between rounded-lg bg-muted px-3 py-2 text-sm"
                      >
-                       <span className="font-medium text-slate-700">
+                       <span className="font-medium text-foreground">
                          {formatRange(s.fromDate, s.toDate)}
                        </span>
-                       {s.note && <span className="text-slate-500">{s.note}</span>}
+                       {s.note && <span className="text-muted-foreground">{s.note}</span>}
                      </li>
                   ))}
                 </ul>
@@ -70,8 +78,13 @@ export function RoomAttendantAvailabilitySection() {
             </div>
           );
         })}
+<<<<<<< HEAD:components/sections/roomAttendant-availability-section.tsx
         {!roomAttendants.isLoading && (roomAttendants.data?.length ?? 0) === 0 && (
           <p className="text-sm text-slate-500">No roomAttendants found.</p>
+=======
+        {!cleaners.isLoading && (cleaners.data?.length ?? 0) === 0 && (
+          <p className="text-sm text-muted-foreground">No cleaners found.</p>
+>>>>>>> 70775190310bdfd1f11d587cb2bb8bca6d7e9956:components/sections/cleaner-availability-section.tsx
         )}
       </CardContent>
     </Card>

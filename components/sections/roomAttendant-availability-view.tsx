@@ -35,14 +35,21 @@ export function RoomAttendantAvailabilityView({ roomAttendantId }: { roomAttenda
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-[38px] font-extrabold tracking-tight ">
           Availability
+<<<<<<< HEAD:components/sections/roomAttendant-availability-view.tsx
           {roomAttendant && (
             <span className="ml-2 text-base font-normal text-slate-500">
               {roomAttendant.firstName} {roomAttendant.lastName}
               {roomAttendant.serviceArea ? ` · ${roomAttendant.serviceArea}` : ""}
+=======
+          {cleaner && (
+            <span className="ml-2 text-base font-normal text-muted-foreground">
+              {cleaner.firstName} {cleaner.lastName}
+              {cleaner.serviceArea ? ` · ${cleaner.serviceArea}` : ""}
+>>>>>>> 70775190310bdfd1f11d587cb2bb8bca6d7e9956:components/sections/cleaner-availability-view.tsx
             </span>
           )}
         </h1>
-        <span className="rounded-full px-3 py-1 text-sm font-semibold text-slate-500">
+        <span className="rounded-full px-3 py-1 text-sm font-semibold text-muted-foreground">
           {slots.length.toLocaleString()} total
         </span>
       </div>
@@ -50,15 +57,15 @@ export function RoomAttendantAvailabilityView({ roomAttendantId }: { roomAttenda
       <Card className="overflow-hidden rounded-2xl">
         <CardContent className="p-0">
           <Table>
-            <TableHeader className="bg-slate-50/70">
-              <TableRow className="hover:bg-slate-50/70">
-                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+            <TableHeader className="bg-muted/50">
+              <TableRow className="hover:bg-muted/50">
+                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">
                   Date range
                 </TableHead>
-                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">
                   Note
                 </TableHead>
-                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">
                   Status
                 </TableHead>
               </TableRow>
@@ -71,13 +78,13 @@ export function RoomAttendantAvailabilityView({ roomAttendantId }: { roomAttenda
                 <EmptyRow colSpan={3}>No availability set.</EmptyRow>
               ) : (
                 slots.map((slot) => (
-                  <TableRow key={slot.id} className="h-[74px] border-slate-200 hover:bg-slate-50/40">
+                  <TableRow key={slot.id} className="h-[74px] border-border hover:bg-accent/50">
                     <TableCell>
                       <p className="text-[17px] font-semibold ">
                         {formatRange(slot.fromDate, slot.toDate)}
                       </p>
                     </TableCell>
-                    <TableCell className="text-[17px] text-slate-600">{slot.note ?? "-"}</TableCell>
+                    <TableCell className="text-[17px] text-muted-foreground">{slot.note ?? "-"}</TableCell>
                     <TableCell>
                       <Badge className="rounded-full border-transparent bg-emerald-500/20 text-emerald-700">
                         Available

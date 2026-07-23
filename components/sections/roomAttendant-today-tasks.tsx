@@ -64,7 +64,7 @@ export function RoomAttendantTodayTasks() {
       </CardHeader>
       <CardContent className="space-y-3">
         {assignments.length === 0 ? (
-          <p className="text-sm text-slate-500">No clients have assigned you yet.</p>
+          <p className="text-sm text-muted-foreground">No clients have assigned you yet.</p>
         ) : (
           assignments.map((a) => (
             <div
@@ -73,7 +73,7 @@ export function RoomAttendantTodayTasks() {
             >
               <div>
                 <p className="text-[17px] font-semibold">{a.clientName}</p>
-                <p className="text-sm text-slate-500">{fmtDate(a.assignedDate)}</p>
+                <p className="text-sm text-muted-foreground">{fmtDate(a.assignedDate)}</p>
               </div>
               <div className="flex items-center gap-3">
                 <Badge className={`rounded-full border-transparent ${STATUS_VARIANT[a.status]}`}>

@@ -85,7 +85,7 @@ export default function RegisterPage() {
             )}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="phone">Phone (optional)</Label>
+            <Label htmlFor="phone">Phone</Label>
             <Input id="phone" {...register("phone")} />
           </div>
           <div className="space-y-2">

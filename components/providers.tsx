@@ -4,6 +4,7 @@ import * as React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { PreloaderProvider } from "@/components/preloader-provider";
+import { ThemeProvider } from "@/lib/theme-context";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = React.useState(
@@ -21,7 +22,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <PreloaderProvider>{children}</PreloaderProvider>
+      <ThemeProvider>
+        <PreloaderProvider>{children}</PreloaderProvider>
+      </ThemeProvider>
       <Toaster />
     </QueryClientProvider>
   );

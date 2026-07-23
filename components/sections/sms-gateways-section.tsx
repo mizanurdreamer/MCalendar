@@ -115,16 +115,16 @@ export function SmsGatewaysSection() {
           <Table>
             <TableHeader className="">
               <TableRow className="">
-                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">
                   Name
                 </TableHead>
-                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">
                   Domain
                 </TableHead>
-                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">
                   Status
                 </TableHead>
-                <TableHead className="text-right text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+                <TableHead className="text-right text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">
                   Actions
                 </TableHead>
               </TableRow>
@@ -138,13 +138,13 @@ export function SmsGatewaysSection() {
                     <TableCell className="text-[17px] font-medium ">
                       {item.name}
                     </TableCell>
-                    <TableCell className="text-[17px] text-slate-600">{item.domain}</TableCell>
+                    <TableCell className="text-[17px] text-muted-foreground">{item.domain}</TableCell>
                     <TableCell>
                       <Badge
                         className={
                           item.isActive
-                            ? "rounded-full border-transparent bg-emerald-500/20 px-3 py-1 text-[13px] font-semibold text-emerald-700"
-                            : "rounded-full border-transparent bg-slate-200 px-3 py-1 text-[13px] font-semibold text-slate-600"
+                            ? "rounded-full border-transparent bg-emerald-500/20 px-3 py-1 text-[13px] font-semibold text-emerald-700 dark:text-emerald-400"
+                            : "rounded-full border-transparent bg-muted px-3 py-1 text-[13px] font-semibold text-muted-foreground"
                         }
                       >
                         {item.isActive ? "Active" : "Inactive"}
@@ -156,7 +156,7 @@ export function SmsGatewaysSection() {
                           type="button"
                           title="Edit"
                           aria-label="Edit"
-                          className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                          className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
                           onClick={() => setDialog({ open: true, editing: item })}
                         >
                           <Pencil className="h-5 w-5" />

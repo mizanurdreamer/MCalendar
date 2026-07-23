@@ -4,6 +4,8 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogOut, Menu, X, Moon, PanelLeftClose, PanelLeftOpen, Sun, UserCircle2 } from "lucide-react";
+import { useTheme } from "@/lib/theme-context";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { cn, initials } from "@/lib/utils";
 import { NAV_BY_ROLE, type NavItem } from "@/components/dashboard/nav";
 import { Button } from "@/components/ui/button";
@@ -25,35 +27,6 @@ type SessionUser = {
   email: string;
   role: Role;
 };
-
-type Theme = "light" | "dark";
-
-const THEME_STORAGE_KEY = "bookingcalendar-theme";
-
-function getStoredTheme(): Theme {
-  if (typeof window === "undefined") {
-    return "light";
-  }
-
-  const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
-  if (storedTheme === "light" || storedTheme === "dark") {
-    return storedTheme;
-  }
-
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-}
-
-function applyTheme(theme: Theme) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  const root = window.document.documentElement;
-  root.classList.remove("light", "dark");
-  root.classList.add(theme);
-  root.style.colorScheme = theme;
-  window.localStorage.setItem(THEME_STORAGE_KEY, theme);
-}
 
 function NavLinks({
   items,
@@ -107,13 +80,7 @@ export function DashboardShell({
 }) {
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [collapsed, setCollapsed] = React.useState(false);
-  const [theme, setTheme] = React.useState<Theme>(() => {
-    if (typeof document === "undefined") {
-      return "light";
-    }
-
-    return document.documentElement.classList.contains("dark") ? "dark" : "light";
-  });
+  const { theme, toggleTheme } = useTheme();
   const logout = useLogout();
   const items = NAV_BY_ROLE[user.role];
   const profileHrefByRole: Partial<Record<Role, string>> = {
@@ -121,18 +88,6 @@ export function DashboardShell({
     ROOMATTENDATNT: "/roomAttendant/profile",
   };
   const profileHref = profileHrefByRole[user.role];
-
-  React.useEffect(() => {
-    const initialTheme = getStoredTheme();
-    setTheme(initialTheme);
-    applyTheme(initialTheme);
-  }, []);
-
-  const toggleTheme = () => {
-    const nextTheme = theme === "dark" ? "light" : "dark";
-    setTheme(nextTheme);
-    applyTheme(nextTheme);
-  };
 
   return (
     <div className="flex min-h-screen bg-muted/30">
@@ -264,6 +219,7 @@ export function DashboardShell({
             </Button>
           </div>
           <div className="flex-1" />
+          <ThemeToggle />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-2 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring">

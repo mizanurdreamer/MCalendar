@@ -145,7 +145,7 @@ export function RoomAttendantCalendar() {
 
         {isLoading ? (
           <div className="flex min-h-[560px] items-center justify-center rounded-3xl border">
-            <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : (
           <CalendarGrid
@@ -157,7 +157,7 @@ export function RoomAttendantCalendar() {
           />
         )}
 
-        <div className="flex flex-wrap items-center gap-4 px-1 pb-1 text-sm text-slate-500">
+        <div className="flex flex-wrap items-center gap-4 px-1 pb-1 text-sm text-muted-foreground">
           <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-[#6366f1]" />Assigned</span>
           <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-[#0ea5e9]" />Confirmed</span>
           <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-[#f59e0b]" />In progress</span>

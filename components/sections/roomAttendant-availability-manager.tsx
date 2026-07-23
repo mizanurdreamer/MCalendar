@@ -154,7 +154,7 @@ export function RoomAttendantAvailabilityManager({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <h1 className="text-[38px] font-extrabold tracking-tight ">My Availability</h1>
-          <span className="rounded-full px-3 py-1 text-sm font-semibold text-slate-500">
+          <span className="rounded-full px-3 py-1 text-sm font-semibold text-muted-foreground">
             {slots.length} total
           </span>
         </div>
@@ -172,16 +172,16 @@ export function RoomAttendantAvailabilityManager({
         <Table>
           <TableHeader>
             <TableRow className="border-b">
-              <TableHead className="h-12 px-6 text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+              <TableHead className="h-12 px-6 text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">
                 Date range
               </TableHead>
-              <TableHead className="h-12 text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+              <TableHead className="h-12 text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">
                 Note
               </TableHead>
-              <TableHead className="h-12 text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+              <TableHead className="h-12 text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">
                 Status
               </TableHead>
-              <TableHead className="h-12 w-[120px] text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+              <TableHead className="h-12 w-[120px] text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">
                 Actions
               </TableHead>
             </TableRow>
@@ -206,8 +206,8 @@ export function RoomAttendantAvailabilityManager({
                   <TableCell className="px-6 text-[17px] font-medium ">
                     {formatRange(slot.fromDate, slot.toDate)}
                   </TableCell>
-                  <TableCell className="text-[17px] text-slate-500">
-                    {slot.note || <span className="text-slate-300">—</span>}
+                  <TableCell className="text-[17px] text-muted-foreground">
+                    {slot.note || <span className="text-muted-foreground">—</span>}
                   </TableCell>
                   <TableCell>
                     <Badge className="rounded-full border-transparent bg-emerald-500/20 text-emerald-700">
@@ -220,7 +220,7 @@ export function RoomAttendantAvailabilityManager({
                         type="button"
                         title="Edit"
                         aria-label="Edit"
-                        className="rounded-lg p-2 text-slate-500 hover:bg-slate-400 hover:text-slate-900"
+                        className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
                         onClick={() => openEdit(slot)}
                       >
                         <Pencil className="h-5 w-5" />
@@ -302,7 +302,7 @@ function ConfirmDelete({
         <DialogHeader>
           <DialogTitle>Delete availability?</DialogTitle>
         </DialogHeader>
-        <p className="text-sm text-slate-600">This availability slot will be removed.</p>
+        <p className="text-sm text-muted-foreground">This availability slot will be removed.</p>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={onClose} disabled={pending}>
             Cancel
