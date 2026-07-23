@@ -283,11 +283,7 @@ export function UsersSection({
             <TableHeader className="">
               <TableRow className="">
                 <TableHead className="w-12 px-4" />
-<<<<<<< HEAD
                 <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">{role === "CLIENT" ? "Client" : "RoomAttendant"}</TableHead>
-=======
-                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">{role === "CLIENT" ? "Client" : "Cleaner"}</TableHead>
->>>>>>> 70775190310bdfd1f11d587cb2bb8bca6d7e9956
                 {role === "CLIENT" ? (
                   <>
                     <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">Primary contact</TableHead>

@@ -35,17 +35,10 @@ export function RoomAttendantAvailabilityView({ roomAttendantId }: { roomAttenda
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-[38px] font-extrabold tracking-tight ">
           Availability
-<<<<<<< HEAD:components/sections/roomAttendant-availability-view.tsx
           {roomAttendant && (
             <span className="ml-2 text-base font-normal text-slate-500">
               {roomAttendant.firstName} {roomAttendant.lastName}
               {roomAttendant.serviceArea ? ` · ${roomAttendant.serviceArea}` : ""}
-=======
-          {cleaner && (
-            <span className="ml-2 text-base font-normal text-muted-foreground">
-              {cleaner.firstName} {cleaner.lastName}
-              {cleaner.serviceArea ? ` · ${cleaner.serviceArea}` : ""}
->>>>>>> 70775190310bdfd1f11d587cb2bb8bca6d7e9956:components/sections/cleaner-availability-view.tsx
             </span>
           )}
         </h1>
