@@ -21,7 +21,7 @@ function BookingEvent({ event }: EventContentArg) {
   if (event.classNames.includes("evt-availability")) {
     return (
       <span className="inline-flex items-center gap-1 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-medium">
-        <span className="h-1.5 w-1.5 rounded-full bg-slate-500" />
+        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />
         {event.title}
       </span>
     );
@@ -78,13 +78,13 @@ export function CalendarGrid({ calendarRef, events, onDateTitleChange, initialDa
           />
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-4 px-1 pb-1 text-sm text-slate-500">
-        <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-[#2563eb]" />Confirmed</span>
-        <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-[#22c55e]" />Checked in</span>
-        <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-[#f59e0b]" />Pending</span>
-        <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-[#b8c1d0]" />Checked out</span>
-        <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-[#ef4444]" />Cancelled</span>
-        <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-[#7c3aed]" />* Cleaning (checkout day)</span>
+      <div className="flex flex-wrap items-center gap-4 px-1 pb-1 text-sm text-muted-foreground">
+        <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full legend-dot-blue" />Confirmed</span>
+        <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full legend-dot-green" />Checked in</span>
+        <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full legend-dot-amber" />Pending</span>
+        <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full legend-dot-neutral" />Checked out</span>
+        <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full legend-dot-red" />Cancelled</span>
+        <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full legend-dot-purple" />* Cleaning (checkout day)</span>
       </div>
     </div>
   );

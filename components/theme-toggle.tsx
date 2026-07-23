@@ -1,62 +1,41 @@
 "use client";
 
 import * as React from "react";
-
-type Theme = "light" | "dark";
-
-const STORAGE_KEY = "bookingcalendar-theme";
-
-function getPreferredTheme(): Theme {
-  if (typeof window === "undefined") {
-    return "light";
-  }
-
-  const storedTheme = window.localStorage.getItem(STORAGE_KEY);
-  if (storedTheme === "light" || storedTheme === "dark") {
-    return storedTheme;
-  }
-
-  return window.matchMedia("(prefers-color-scheme: dark)").matches
-    ? "dark"
-    : "light";
-}
-
-function applyTheme(theme: Theme) {
-  const root = window.document.documentElement;
-  root.classList.remove("light", "dark");
-  root.classList.add(theme);
-  root.style.colorScheme = theme;
-  window.localStorage.setItem(STORAGE_KEY, theme);
-}
+import { Moon, Sun } from "lucide-react";
+import { useTheme } from "@/lib/theme-context";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export function ThemeToggle() {
-  const [theme, setTheme] = React.useState<Theme>("light");
-
-  React.useEffect(() => {
-    const initialTheme = getPreferredTheme();
-    setTheme(initialTheme);
-    applyTheme(initialTheme);
-  }, []);
-
-  const handleChange = (nextTheme: Theme) => {
-    setTheme(nextTheme);
-    applyTheme(nextTheme);
-  };
+  const { theme, setTheme } = useTheme();
 
   return (
-    <div className="fixed right-4 top-4 z-50">
-      <label className="flex items-center gap-2 rounded-full border border-border bg-background/90 px-3 py-2 text-sm shadow-sm backdrop-blur">
-        <span className="font-medium text-foreground">Theme</span>
-        <select
-          aria-label="Select theme"
-          value={theme}
-          onChange={(event) => handleChange(event.target.value as Theme)}
-          className="rounded-full border-none bg-transparent text-sm font-medium text-foreground outline-none"
-        >
-          <option value="light">Light</option>
-          <option value="dark">Dark</option>
-        </select>
-      </label>
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
+          {theme === "dark" ? (
+            <Moon className="h-4 w-4" />
+          ) : (
+            <Sun className="h-4 w-4" />
+          )}
+          <span className="sr-only">Toggle theme</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => setTheme("light")}>
+          <Sun className="mr-2 h-4 w-4" />
+          Light
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("dark")}>
+          <Moon className="mr-2 h-4 w-4" />
+          Dark
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

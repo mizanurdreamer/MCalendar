@@ -40,13 +40,13 @@ export function CleanerAvailabilitySection() {
         {(cleaners.data ?? []).map((cleaner) => {
           const slots = byCleaner.get(cleaner.id) ?? [];
           return (
-            <div key={cleaner.id} className="rounded-xl border border-slate-200 px-4 py-3">
+            <div key={cleaner.id} className="rounded-xl border border-border px-4 py-3">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-base font-semibold ">
                     {cleaner.firstName} {cleaner.lastName}
                   </p>
-                  <p className="text-sm text-slate-500">{cleaner.serviceArea || "No service area"}</p>
+                  <p className="text-sm text-muted-foreground">{cleaner.serviceArea || "No service area"}</p>
                 </div>
                 <Badge className="rounded-full border-transparent bg-emerald-500/20 text-emerald-700">
                   {slots.length > 0 ? `${slots.length} slot${slots.length > 1 ? "s" : ""}` : "No availability"}
@@ -57,12 +57,12 @@ export function CleanerAvailabilitySection() {
                   {slots.map((s) => (
                      <li
                        key={s.id}
-                       className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm"
+                       className="flex items-center justify-between rounded-lg bg-muted px-3 py-2 text-sm"
                      >
-                       <span className="font-medium text-slate-700">
+                       <span className="font-medium text-foreground">
                          {formatRange(s.fromDate, s.toDate)}
                        </span>
-                       {s.note && <span className="text-slate-500">{s.note}</span>}
+                       {s.note && <span className="text-muted-foreground">{s.note}</span>}
                      </li>
                   ))}
                 </ul>
@@ -71,7 +71,7 @@ export function CleanerAvailabilitySection() {
           );
         })}
         {!cleaners.isLoading && (cleaners.data?.length ?? 0) === 0 && (
-          <p className="text-sm text-slate-500">No cleaners found.</p>
+          <p className="text-sm text-muted-foreground">No cleaners found.</p>
         )}
       </CardContent>
     </Card>

@@ -41,7 +41,7 @@ export function ClientProfileSection() {
     }
   };
 
-  if (isLoading || !data) return <div className="text-sm text-slate-500">Loading profile...</div>;
+  if (isLoading || !data) return <div className="text-sm text-muted-foreground">Loading profile...</div>;
 
   return (
     <div className="space-y-5">
@@ -118,7 +118,7 @@ function ProfileInput(
   const { label, ...inputProps } = props;
   return (
     <div className="rounded-xl border p-3">
-      <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">{label}</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">{label}</p>
       <Input className="mt-2 h-10" {...inputProps} />
     </div>
   );

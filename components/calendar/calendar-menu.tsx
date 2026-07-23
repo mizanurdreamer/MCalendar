@@ -5,13 +5,13 @@ import {
   Clock3,
   Home,
   MessageSquare,
-  Moon,
   Settings2,
   SlidersHorizontal,
-  Sun,
   Shield,
   Sparkles,
 } from "lucide-react";
+import { useTheme } from "@/lib/theme-context";
+import { Moon, Sun } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,8 +32,8 @@ const ROLE_ITEMS = [
 ];
 
 export function CalendarMenu() {
-  return (
-    <aside className="hidden rounded-3xl border bg-background p-4 xl:flex xl:min-h-[calc(100vh-9.5rem)] xl:w-[270px] xl:flex-col">
+  const { theme, toggleTheme } = useTheme();
+  return <aside className="hidden rounded-3xl border bg-background p-4 xl:flex xl:min-h-[calc(100vh-9.5rem)] xl:w-[270px] xl:flex-col">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-sm font-bold text-primary-foreground">
@@ -92,11 +92,11 @@ export function CalendarMenu() {
       </div>
 
       <div className="mt-auto space-y-3 pt-6">
-        <Button variant="ghost" className="h-11 w-full justify-start rounded-xl px-3 text-muted-foreground">
+        <Button variant="ghost" onClick={toggleTheme} className="h-11 w-full justify-start rounded-xl px-3 text-muted-foreground">
           <span className="mr-3 inline-flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
-            <Moon className="h-4 w-4" />
+            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </span>
-          Dark mode
+          {theme === "dark" ? "Light mode" : "Dark mode"}
         </Button>
         <Button variant="ghost" className="h-11 w-full justify-start rounded-xl px-3 text-muted-foreground">
           <span className="mr-3 inline-flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
@@ -115,5 +115,4 @@ export function CalendarMenu() {
         </div>
       </div>
     </aside>
-  );
 }

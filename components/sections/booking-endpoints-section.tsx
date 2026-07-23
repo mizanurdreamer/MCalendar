@@ -176,16 +176,16 @@ export function BookingEndpointsSection() {
                     className="h-5 w-5 rounded-md text-primary focus:ring-primary"
                   />
                 </TableHead>
-                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">
                   Endpoint
                 </TableHead>
-                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">
                   URL
                 </TableHead>
-                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">
                   Status
                 </TableHead>
-                <TableHead className="text-right text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+                <TableHead className="text-right text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">
                   Actions
                 </TableHead>
               </TableRow>
@@ -195,7 +195,7 @@ export function BookingEndpointsSection() {
                 <EmptyRow colSpan={5}>Loading…</EmptyRow>
               ) : data && data.items.length > 0 ? (
                 data.items.map((e) => (
-                  <TableRow key={e.id} className="hover:bg-slate-50/40">
+                  <TableRow key={e.id} className="hover:bg-accent/50">
                     <TableCell className="px-4">
                       <input
                         type="checkbox"
@@ -207,15 +207,15 @@ export function BookingEndpointsSection() {
                     <TableCell className="text-[17px] font-medium ">
                       {e.name}
                     </TableCell>
-                    <TableCell className="max-w-md truncate text-[17px] text-slate-600">
+                    <TableCell className="max-w-md truncate text-[17px] text-muted-foreground">
                       {e.url}
                     </TableCell>
                     <TableCell>
                       <Badge
                         className={
                           e.isActive
-                            ? "rounded-full border-transparent bg-emerald-500/20 px-3 py-1 text-[13px] font-semibold text-emerald-700"
-                            : "rounded-full border-transparent bg-slate-200 px-3 py-1 text-[13px] font-semibold text-slate-600"
+                            ? "rounded-full border-transparent bg-emerald-500/20 px-3 py-1 text-[13px] font-semibold text-emerald-700 dark:text-emerald-400"
+                            : "rounded-full border-transparent bg-muted px-3 py-1 text-[13px] font-semibold text-muted-foreground"
                         }
                       >
                         {e.isActive ? "Active" : "Inactive"}
@@ -227,7 +227,7 @@ export function BookingEndpointsSection() {
                           type="button"
                           title="View"
                           aria-label="View"
-                          className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                          className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
                           onClick={() => setViewEndpoint(e)}
                         >
                           <Eye className="h-5 w-5" />
@@ -236,7 +236,7 @@ export function BookingEndpointsSection() {
                           type="button"
                           title="Edit"
                           aria-label="Edit"
-                          className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                          className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
                           onClick={() => setDialog({ open: true, editing: e })}
                         >
                           <Pencil className="h-5 w-5" />

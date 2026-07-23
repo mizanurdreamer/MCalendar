@@ -16,7 +16,7 @@ export default async function CleanerAvailabilityScreen({
       <Link
         href="/admin/cleaners"
         aria-label="Back to cleaners"
-        className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
+        className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
       >
         <ArrowLeft className="h-5 w-5" />
       </Link>

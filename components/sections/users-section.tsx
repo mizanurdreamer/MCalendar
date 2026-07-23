@@ -147,9 +147,9 @@ function getRowMeta(user: UserView, role: ManagedRole): UserRowMeta {
 
 function statusBadge(status: UiStatus) {
   if (status === "active") {
-    return <Badge className="rounded-full border-transparent bg-emerald-500/20 px-3 py-1 text-[13px] font-semibold text-emerald-700">Active</Badge>;
+    return <Badge className="rounded-full border-transparent bg-emerald-500/20 px-3 py-1 text-[13px] font-semibold text-emerald-700 dark:text-emerald-400">Active</Badge>;
   }
-  return <Badge className="rounded-full border-transparent bg-red-500/20 px-3 py-1 text-[13px] font-semibold text-red-700">Inactive</Badge>;
+  return <Badge className="rounded-full border-transparent bg-red-500/20 px-3 py-1 text-[13px] font-semibold text-red-700 dark:text-red-400">Inactive</Badge>;
 }
 
 export function UsersSection({
@@ -211,13 +211,13 @@ export function UsersSection({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <h1 className="text-[30px] font-extrabold tracking-tight ">{copy.plural}</h1>
-          <span className="rounded-full px-3 py-1 text-sm font-semibold text-slate-500 dark:text-slate-300 bg-slate-200 dark:bg-slate-800 ">
+          <span className="rounded-full px-3 py-1 text-sm font-semibold text-muted-foreground dark:text-slate-300 bg-slate-200 dark:bg-slate-800 ">
             {(data?.total ?? 0).toLocaleString()} total
           </span>
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="h-10 rounded-xl border-slate-300 px-4 text-[17px] font-semibold text-slate-600">
+          <Button variant="outline" size="sm" className="h-10 rounded-xl border-border px-4 text-[17px] font-semibold text-muted-foreground">
             <Download className="mr-1 h-4 w-4" />
             Export
           </Button>
@@ -283,24 +283,24 @@ export function UsersSection({
             <TableHeader className="">
               <TableRow className="">
                 <TableHead className="w-12 px-4" />
-                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">{role === "CLIENT" ? "Client" : "Cleaner"}</TableHead>
+                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">{role === "CLIENT" ? "Client" : "Cleaner"}</TableHead>
                 {role === "CLIENT" ? (
                   <>
-                    <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Primary contact</TableHead>
-                    <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">SMS gateway</TableHead>
-                    <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Phone</TableHead>
-                    <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Portfolio</TableHead>
+                    <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">Primary contact</TableHead>
+                    <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">SMS gateway</TableHead>
+                    <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">Phone</TableHead>
+                    <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">Portfolio</TableHead>
                   </>
                 ) : (
                   <>
-                    <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Service area</TableHead>
-                    <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">SMS gateway</TableHead>
-                    <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Phone</TableHead>
-                    <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Rate</TableHead>
+                    <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">Service area</TableHead>
+                    <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">SMS gateway</TableHead>
+                    <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">Phone</TableHead>
+                    <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">Rate</TableHead>
                   </>
                 )}
-                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Status</TableHead>
-                <TableHead className="text-right text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Actions</TableHead>
+                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">Status</TableHead>
+                <TableHead className="text-right text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">Actions</TableHead>
               </TableRow>
             </TableHeader>
 
@@ -311,13 +311,13 @@ export function UsersSection({
                 filteredItems.map((u) => {
                   const meta = getRowMeta(u, role);
                   return (
-                    <TableRow key={u.id} className="h-[74px] border-slate-200 hover:bg-slate-50/40">
+                    <TableRow key={u.id} className="h-[74px] border-border hover:bg-accent/50">
                       <TableCell className="px-4">
                         <input
                           type="checkbox"
                           checked={selected.has(u.id)}
                           onChange={() => toggleSelect(u.id)}
-                          className="h-5 w-5 rounded-md border-slate-300 text-primary focus:ring-primary"
+                          className="h-5 w-5 rounded-md border-border text-primary focus:ring-primary"
                         />
                       </TableCell>
 
@@ -328,24 +328,24 @@ export function UsersSection({
                             <p className="text-[23px] font-bold leading-[1.1] ">
                               {u.firstName} {u.lastName}
                             </p>
-                            <p className="text-[17px] text-slate-400">{meta.subtitle}</p>
+                            <p className="text-[17px] text-muted-foreground">{meta.subtitle}</p>
                           </div>
                         </div>
                       </TableCell>
 
                       {role === "CLIENT" ? (
                         <>
-                          <TableCell className="text-[17px] text-slate-600">{meta.primaryContact}</TableCell>
-                          <TableCell className="text-[17px] text-slate-600">{u.smsGatewayName ?? "-"}</TableCell>
-                          <TableCell className="text-[17px] text-slate-600">{u.phone ?? "-"}</TableCell>
-                          <TableCell className="text-[17px] text-slate-600">{meta.portfolio}</TableCell>
+                          <TableCell className="text-[17px] text-muted-foreground">{meta.primaryContact}</TableCell>
+                          <TableCell className="text-[17px] text-muted-foreground">{u.smsGatewayName ?? "-"}</TableCell>
+                          <TableCell className="text-[17px] text-muted-foreground">{u.phone ?? "-"}</TableCell>
+                          <TableCell className="text-[17px] text-muted-foreground">{meta.portfolio}</TableCell>
                         </>
                       ) : (
                         <>
-                          <TableCell className="text-[17px] text-slate-600">{meta.serviceArea}</TableCell>
-                          <TableCell className="text-[17px] text-slate-600">{u.smsGatewayName ?? "-"}</TableCell>
-                          <TableCell className="text-[17px] text-slate-600">{u.phone ?? "-"}</TableCell>
-                          <TableCell className="text-[17px] text-slate-600">{meta.rate}</TableCell>
+                          <TableCell className="text-[17px] text-muted-foreground">{meta.serviceArea}</TableCell>
+                          <TableCell className="text-[17px] text-muted-foreground">{u.smsGatewayName ?? "-"}</TableCell>
+                          <TableCell className="text-[17px] text-muted-foreground">{u.phone ?? "-"}</TableCell>
+                          <TableCell className="text-[17px] text-muted-foreground">{meta.rate}</TableCell>
                         </>
                       )}
 
@@ -358,7 +358,7 @@ export function UsersSection({
                               type="button"
                               title="View availability"
                               aria-label="View availability"
-                              className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                              className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
                               onClick={() => router.push(`${availabilityBasePath}/${u.id}/availability`)}
                             >
                               <CalendarClock className="h-5 w-5" />
@@ -368,7 +368,7 @@ export function UsersSection({
                             type="button"
                             title="View"
                             aria-label="View"
-                            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                            className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
                             onClick={() => setViewUser(u)}
                           >
                             <Eye className="h-5 w-5" />
@@ -377,7 +377,7 @@ export function UsersSection({
                             type="button"
                             title="Edit"
                             aria-label="Edit"
-                            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                            className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
                             onClick={() => setDialog({ open: true, editing: u })}
                           >
                             <Pencil className="h-5 w-5" />

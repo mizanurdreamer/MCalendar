@@ -79,13 +79,13 @@ export function Pagination({
   }
 
   return (
-    <div className="mt-4 flex items-center justify-between px-2 text-sm text-slate-500">
+    <div className="mt-4 flex items-center justify-between px-2 text-sm text-muted-foreground">
       <span>
         Showing {start}-{end} of {data.total.toLocaleString()} {itemLabel}
       </span>
       <div className="flex items-center gap-1">
         <button
-          className="px-2 py-1 text-sm font-semibold text-slate-400 hover:text-slate-700 disabled:pointer-events-none disabled:opacity-50"
+          className="px-2 py-1 text-sm font-semibold text-muted-foreground hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
           disabled={page <= 1}
           onClick={() => onPage(page - 1)}
         >
@@ -93,7 +93,7 @@ export function Pagination({
         </button>
         {pages.map((p, i) =>
           p === "..." ? (
-            <span key={`dots-${i}`} className="px-2 py-1 text-sm text-slate-400">
+            <span key={`dots-${i}`} className="px-2 py-1 text-sm text-muted-foreground">
               ...
             </span>
           ) : (
@@ -103,7 +103,7 @@ export function Pagination({
               className={
                 p === page
                   ? "flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-sm font-semibold text-primary-foreground"
-                  : "flex h-8 w-8 items-center justify-center rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100"
+                  : "flex h-8 w-8 items-center justify-center rounded-xl text-sm font-semibold text-muted-foreground hover:bg-accent"
               }
             >
               {p}
@@ -111,7 +111,7 @@ export function Pagination({
           ),
         )}
         <button
-          className="px-2 py-1 text-sm font-semibold text-slate-600 hover:text-slate-800 disabled:pointer-events-none disabled:opacity-50"
+          className="px-2 py-1 text-sm font-semibold text-muted-foreground hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
           disabled={page >= data.totalPages}
           onClick={() => onPage(page + 1)}
         >

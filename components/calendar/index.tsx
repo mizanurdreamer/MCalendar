@@ -104,7 +104,7 @@ export function BookingCalendar() {
 
         {isLoading ? (
           <div className="flex min-h-[560px] items-center justify-center rounded-3xl border">
-            <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : (
           <CalendarGrid
