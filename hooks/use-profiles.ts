@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
-import type { UpdateClientProfileDTO, UpdateCleanerProfileDTO } from "@/dto/profile.dto";
+import type { UpdateClientProfileDTO, UpdateRoomAttendantProfileDTO } from "@/dto/profile.dto";
 
 export type ClientProfileView = {
   userId: string;
@@ -16,7 +16,7 @@ export type ClientProfileView = {
   timezone: string | null;
 };
 
-export type CleanerProfileView = {
+export type RoomAttendantProfileView = {
   userId: string;
   firstName: string;
   lastName: string;
@@ -45,19 +45,19 @@ export function useUpdateClientProfile() {
   });
 }
 
-export function useCleanerProfile() {
+export function useRoomAttendantProfile() {
   return useQuery({
-    queryKey: ["cleaner-profile"],
-    queryFn: () => api.get<CleanerProfileView>("/api/cleaner-profile"),
+    queryKey: ["roomAttendant-profile"],
+    queryFn: () => api.get<RoomAttendantProfileView>("/api/roomAttendant-profile"),
   });
 }
 
-export function useUpdateCleanerProfile() {
+export function useUpdateRoomAttendantProfile() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (dto: UpdateCleanerProfileDTO) => api.patch<CleanerProfileView>("/api/cleaner-profile", dto),
+    mutationFn: (dto: UpdateRoomAttendantProfileDTO) => api.patch<RoomAttendantProfileView>("/api/roomAttendant-profile", dto),
     onSuccess: (data) => {
-      qc.setQueryData(["cleaner-profile"], data);
+      qc.setQueryData(["roomAttendant-profile"], data);
       qc.invalidateQueries({ queryKey: ["me"] });
     },
   });

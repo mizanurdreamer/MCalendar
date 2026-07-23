@@ -58,7 +58,7 @@ export class UserService {
         portfolioSize: dto.portfolioSize ?? null,
         timezone: dto.timezone || null,
       },
-      cleanerProfile: {
+      roomAttendantProfile: {
         serviceArea: dto.serviceArea || null,
         hourlyRate: dto.hourlyRate ?? null,
         rating: dto.rating ?? null,
@@ -75,9 +75,9 @@ export class UserService {
     const existing = await userRepository.findById(id);
     if (!existing) throw new NotFoundError("User not found");
 
-    // Non-admins (clients) may only manage cleaner accounts and cannot change roles.
+    // Non-admins (clients) may only manage roomAttendant accounts and cannot change roles.
     const isAdmin = actor.role === "SUPER_ADMIN";
-    if (!isAdmin && !(actor.role === "CLIENT" && existing.role === "CLEANER")) {
+    if (!isAdmin && !(actor.role === "CLIENT" && existing.role === "ROOMATTENDATNT")) {
       throw new ForbiddenError();
     }
 
@@ -95,7 +95,7 @@ export class UserService {
         portfolioSize: dto.portfolioSize,
         timezone: dto.timezone === undefined ? undefined : dto.timezone || null,
       },
-      cleanerProfile: {
+      roomAttendantProfile: {
         serviceArea: dto.serviceArea === undefined ? undefined : dto.serviceArea || null,
         hourlyRate: dto.hourlyRate,
         rating: dto.rating,
@@ -111,10 +111,10 @@ export class UserService {
     const existing = await userRepository.findById(id);
     if (!existing) throw new NotFoundError("User not found");
 
-    // Non-admins (clients) may only delete cleaner accounts.
+    // Non-admins (clients) may only delete roomAttendant accounts.
     if (
       actor.role !== "SUPER_ADMIN" &&
-      !(actor.role === "CLIENT" && existing.role === "CLEANER")
+      !(actor.role === "CLIENT" && existing.role === "ROOMATTENDATNT")
     ) {
       throw new ForbiddenError();
     }
@@ -122,9 +122,9 @@ export class UserService {
     await userRepository.softDelete(id, actor.userId);
   }
 
-  /** Active cleaners, for assignment dropdowns. Optionally filter by clientId. */
-  listCleaners(clientId?: string) {
-    return userRepository.listByRole("CLEANER", clientId).then((users) => users.map(toPublicUser));
+  /** Active roomAttendants, for assignment dropdowns. Optionally filter by clientId. */
+  listRoomAttendants(clientId?: string) {
+    return userRepository.listByRole("ROOMATTENDATNT", clientId).then((users) => users.map(toPublicUser));
   }
 
   listClients() {

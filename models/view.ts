@@ -5,7 +5,7 @@
 import type { Paginated } from "@/models";
 import type { Role } from "@/models/role";
 export type { Role } from "@/models/role";
-import { CleanerTaskStatus } from "@/lib/enums/CleanerTaskStatus";
+import { RoomAttendantTaskStatus } from "@/lib/enums/RoomAttendantTaskStatus";
 export type UserView = {
   id: string;
   email: string;
@@ -45,14 +45,14 @@ export type SmsGatewayView = {
   createdAt: string;
 };
 
-export type CleanerTaskScheduleView = {
+export type RoomAttendantTaskScheduleView = {
   id: string;
   clientId: string;
   clientName: string;
   clientEmail: string;
-  cleanerId: string;
-  cleanerName: string;
-  cleanerEmail: string;
+  roomAttendantId: string;
+  roomAttendantName: string;
+  roomAttendantEmail: string;
   assignedDate: string;
   status: CleaningStatus;
   isSentSms: boolean;
@@ -61,13 +61,13 @@ export type CleanerTaskScheduleView = {
   createdAt: string;
 };
 
-export type CleanerAvailabilityView = {
+export type RoomAttendantAvailabilityView = {
   id: string;
   clientId: string;
   clientName: string;
-  cleanerId: string;
-  cleanerName: string;
-  cleanerEmail: string;
+  roomAttendantId: string;
+  roomAttendantName: string;
+  roomAttendantEmail: string;
   fromDate: string;
   toDate: string | null;
   note: string | null;
@@ -102,9 +102,9 @@ export type CalendarDataView = {
   upcomingCleanings: UpcomingCleaningView[];
 };
 
-export type CleaningStatus = CleanerTaskStatus;
+export type CleaningStatus = RoomAttendantTaskStatus;
 
-export type CleanerCalendarEventView = {
+export type RoomAttendantCalendarEventView = {
   id: string;
   kind: "booking" | "availability";
   title: string;
@@ -116,7 +116,7 @@ export type CleanerCalendarEventView = {
   cleaningStatus: CleaningStatus | null;
 };
 
-export type CleanerCalendarAssignmentView = {
+export type RoomAttendantCalendarAssignmentView = {
   id: string;
   clientId: string;
   clientName: string;
@@ -124,9 +124,9 @@ export type CleanerCalendarAssignmentView = {
   status: CleaningStatus;
 };
 
-export type CleanerCalendarDataView = {
-  events: CleanerCalendarEventView[];
-  assignments: CleanerCalendarAssignmentView[];
+export type RoomAttendantCalendarDataView = {
+  events: RoomAttendantCalendarEventView[];
+  assignments: RoomAttendantCalendarAssignmentView[];
 };
 
 export type { Paginated };

@@ -46,7 +46,7 @@ export type AuthResult = {
 
 function toPublicUser(user: User): PublicUser {
   const clientProfile = user.clientProfile;
-  const cleanerProfile = user.cleanerProfile;
+  const roomAttendantProfile = user.roomAttendantProfile;
 
   return {
     id: user.id,
@@ -62,10 +62,10 @@ function toPublicUser(user: User): PublicUser {
     primaryContact: clientProfile?.primaryContact ?? null,
     portfolioSize: clientProfile?.portfolioSize ?? null,
     timezone: clientProfile?.timezone ?? null,
-    serviceArea: cleanerProfile?.serviceArea ?? null,
-    hourlyRate: cleanerProfile?.hourlyRate ?? null,
-    rating: cleanerProfile?.rating ? Number(cleanerProfile.rating) : null,
-    clientId: cleanerProfile?.clientId ?? null,
+    serviceArea: roomAttendantProfile?.serviceArea ?? null,
+    hourlyRate: roomAttendantProfile?.hourlyRate ?? null,
+    rating: roomAttendantProfile?.rating ? Number(roomAttendantProfile.rating) : null,
+    clientId: roomAttendantProfile?.clientId ?? null,
     clientProfileId: clientProfile?.id ?? null,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
@@ -130,8 +130,8 @@ export class AuthService {
               timezone: null,
             }
           : undefined,
-      cleanerProfile:
-        dto.role === "CLEANER"
+      roomAttendantProfile:
+        dto.role === "ROOMATTENDATNT"
           ? {
               serviceArea: null,
               hourlyRate: null,

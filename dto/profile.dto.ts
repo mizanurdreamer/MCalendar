@@ -10,7 +10,7 @@ export const updateClientProfileSchema = z.object({
   timezone: z.string().trim().max(80).optional().or(z.literal("")),
 });
 
-export const updateCleanerProfileSchema = z.object({
+export const updateRoomAttendantProfileSchema = z.object({
   firstName: z.string().trim().min(1).max(80).optional(),
   lastName: z.string().trim().min(1).max(80).optional(),
   phone: z.string().trim().max(30).optional().or(z.literal("")),
@@ -20,4 +20,4 @@ export const updateCleanerProfileSchema = z.object({
 });
 
 export type UpdateClientProfileDTO = z.infer<typeof updateClientProfileSchema>;
-export type UpdateCleanerProfileDTO = z.infer<typeof updateCleanerProfileSchema>;
+export type UpdateRoomAttendantProfileDTO = z.infer<typeof updateRoomAttendantProfileSchema>;

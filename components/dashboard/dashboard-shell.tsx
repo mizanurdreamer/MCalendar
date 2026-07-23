@@ -118,7 +118,7 @@ export function DashboardShell({
   const items = NAV_BY_ROLE[user.role];
   const profileHrefByRole: Partial<Record<Role, string>> = {
     CLIENT: "/client/profile",
-    CLEANER: "/cleaner/profile",
+    ROOMATTENDATNT: "/roomAttendant/profile",
   };
   const profileHref = profileHrefByRole[user.role];
 

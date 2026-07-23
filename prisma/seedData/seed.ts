@@ -22,9 +22,9 @@ async function main() {
     create: { name: "CLIENT" },
   });
   await prisma.role.upsert({
-    where: { name: "CLEANER" },
+    where: { name: "ROOMATTENDATNT" },
     update: {},
-    create: { name: "CLEANER" },
+    create: { name: "ROOMATTENDATNT" },
   });
 
  const existingUser = await prisma.user.findFirst({

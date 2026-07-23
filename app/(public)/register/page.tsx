@@ -52,7 +52,7 @@ export default function RegisterPage() {
     <Card>
       <CardHeader>
         <CardTitle className="text-2xl">Create your account</CardTitle>
-        <CardDescription>Join bookingCalendar as a client or cleaner</CardDescription>
+        <CardDescription>Join bookingCalendar as a client or roomAttendant</CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit(onSubmit)}>
         <CardContent className="space-y-4">
@@ -113,7 +113,7 @@ export default function RegisterPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="CLIENT">Client</SelectItem>
-                <SelectItem value="CLEANER">Cleaner</SelectItem>
+                <SelectItem value="ROOMATTENDATNT">RoomAttendant</SelectItem>
               </SelectContent>
             </Select>
           </div>

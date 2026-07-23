@@ -1,7 +1,7 @@
 import type { ActorContext } from "@/models";
 import type { CalendarDataView, CalendarEventView } from "@/models/view";
 import { guestBookingInfoRepository } from "@/repositories/GuestBookingInfoRepository";
-import { cleanerTaskScheduleRepository } from "@/repositories/CleanerTaskScheduleRepository";
+import { roomAttendantTaskScheduleRepository } from "@/repositories/RoomAttendantTaskScheduleRepository";
 import { prisma } from "@/lib/prisma";
 import { NotFoundError } from "@/lib/errors";
 
@@ -53,11 +53,11 @@ export class ClientCalendarService {
       .map((row) => this.toCalendarEvent(row))
       .filter((item): item is CalendarEventView => item !== null);
 
-    // Cleaning assignments the client created for their cleaners.
-    const schedules = await cleanerTaskScheduleRepository.findActiveForClient(clientProfile.id);
+    // Cleaning assignments the client created for their roomAttendants.
+    const schedules = await roomAttendantTaskScheduleRepository.findActiveForClient(clientProfile.id);
     const cleaningEvents: CalendarEventView[] = schedules.map((s) => ({
       id: `cleaning:${s.id}`,
-      title: `Cleaning · ${s.cleaner.firstName} ${s.cleaner.lastName}`,
+      title: `Cleaning · ${s.roomAttendant.firstName} ${s.roomAttendant.lastName}`,
       start: s.assignedDate.toISOString(),
       end: undefined,
       allDay: true,

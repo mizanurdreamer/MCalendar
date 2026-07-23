@@ -6,7 +6,7 @@ type UserWithRelations = Prisma.UserGetPayload<{
   include: {
     role: true;
     clientProfile: { include: { smsGateway: true } };
-    cleanerProfile: { include: { smsGateway: true } };
+    roomAttendantProfile: { include: { smsGateway: true } };
   };
 }>;
 
@@ -41,7 +41,7 @@ export type User = {
   smsGatewayName: string | null;
   phone: string | null;
   clientProfile: MappedProfile | null;
-  cleanerProfile: MappedProfile | null;
+  roomAttendantProfile: MappedProfile | null;
 };
 
 type CreateUserInput = {
@@ -61,7 +61,7 @@ type CreateUserInput = {
     portfolioSize?: number | null;
     timezone?: string | null;
   };
-  cleanerProfile?: {
+  roomAttendantProfile?: {
     serviceArea?: string | null;
     hourlyRate?: number | null;
     rating?: number | null;
@@ -83,7 +83,7 @@ type UpdateUserInput = {
     portfolioSize?: number | null;
     timezone?: string | null;
   };
-  cleanerProfile?: {
+  roomAttendantProfile?: {
     serviceArea?: string | null;
     hourlyRate?: number | null;
     rating?: number | null;
@@ -99,7 +99,7 @@ export class UserRepository {
   private withRole = {
     role: true,
     clientProfile: { include: { smsGateway: true } },
-    cleanerProfile: { include: { smsGateway: true } },
+    roomAttendantProfile: { include: { smsGateway: true } },
   } satisfies Prisma.UserInclude;
 
   private emptyToNull(value?: string | null) {
@@ -128,16 +128,16 @@ export class UserRepository {
           firstName: user.clientProfile.firstName,
           lastName: user.clientProfile.lastName,
         }
-      : user.cleanerProfile
+      : user.roomAttendantProfile
         ? {
-            firstName: user.cleanerProfile.firstName,
-            lastName: user.cleanerProfile.lastName,
+            firstName: user.roomAttendantProfile.firstName,
+            lastName: user.roomAttendantProfile.lastName,
           }
         : this.splitDisplayName(user.displayName);
 
     const phoneFromProfile =
       this.emptyToNull(user.clientProfile?.phoneNo) ??
-      this.emptyToNull(user.cleanerProfile?.phoneNo) ??
+      this.emptyToNull(user.roomAttendantProfile?.phoneNo) ??
       null;
 
     return {
@@ -155,9 +155,9 @@ export class UserRepository {
       deletedAt: user.deletedAt,
       firstName,
       lastName,
-      smsGatewayId: user.clientProfile?.smsGatewayId ?? user.cleanerProfile?.smsGatewayId ?? null,
+      smsGatewayId: user.clientProfile?.smsGatewayId ?? user.roomAttendantProfile?.smsGatewayId ?? null,
       smsGatewayName:
-        user.clientProfile?.smsGateway?.name ?? user.cleanerProfile?.smsGateway?.name ?? null,
+        user.clientProfile?.smsGateway?.name ?? user.roomAttendantProfile?.smsGateway?.name ?? null,
       phone: phoneFromProfile,
       clientProfile: user.clientProfile
         ? {
@@ -175,17 +175,17 @@ export class UserRepository {
             clientId: null,
           }
         : null,
-      cleanerProfile: user.cleanerProfile
+      roomAttendantProfile: user.roomAttendantProfile
         ? {
-            id: user.cleanerProfile.id,
+            id: user.roomAttendantProfile.id,
             companyName: null,
             primaryContact: null,
             portfolioSize: null,
             timezone: null,
-            serviceArea: user.cleanerProfile.serviceArea,
-            hourlyRate: user.cleanerProfile.hourlyRate,
-            rating: user.cleanerProfile.rating,
-            clientId: user.cleanerProfile.clientId,
+            serviceArea: user.roomAttendantProfile.serviceArea,
+            hourlyRate: user.roomAttendantProfile.hourlyRate,
+            rating: user.roomAttendantProfile.rating,
+            clientId: user.roomAttendantProfile.clientId,
           }
         : null,
     };
@@ -223,7 +223,7 @@ export class UserRepository {
       ...(role ? { role: { name: role } } : {}),
       ...(status === "active" ? { isActive: true } : {}),
       ...(status === "inactive" ? { isActive: false } : {}),
-      ...(clientId ? { cleanerProfile: { clientId } } : {}),
+      ...(clientId ? { roomAttendantProfile: { clientId } } : {}),
       ...(search
         ? {
             OR: [
@@ -231,8 +231,8 @@ export class UserRepository {
               { email: { contains: search, mode: "insensitive" } },
               { clientProfile: { is: { firstName: { contains: search, mode: "insensitive" } } } },
               { clientProfile: { is: { lastName: { contains: search, mode: "insensitive" } } } },
-              { cleanerProfile: { is: { firstName: { contains: search, mode: "insensitive" } } } },
-              { cleanerProfile: { is: { lastName: { contains: search, mode: "insensitive" } } } },
+              { roomAttendantProfile: { is: { firstName: { contains: search, mode: "insensitive" } } } },
+              { roomAttendantProfile: { is: { lastName: { contains: search, mode: "insensitive" } } } },
             ],
           }
         : {}),
@@ -257,7 +257,7 @@ export class UserRepository {
       role: { name: role },
       isActive: true,
       ...this.notDeleted,
-      ...(clientId ? { cleanerProfile: { clientId } } : {}),
+      ...(clientId ? { roomAttendantProfile: { clientId } } : {}),
     };
 
     const users = await prisma.user.findMany({
@@ -298,19 +298,19 @@ export class UserRepository {
                 },
               }
             : {}),
-          ...(data.role === "CLEANER"
+          ...(data.role === "ROOMATTENDATNT"
             ? {
-                cleanerProfile: {
+                roomAttendantProfile: {
                   create: {
                     Email: data.email.toLowerCase(),
                     firstName: data.firstName,
                     lastName: data.lastName,
                     smsGatewayId: data.smsGatewayId ?? null,
                     phoneNo: this.emptyToNull(data.phone) ?? "",
-                    serviceArea: this.emptyToNull(data.cleanerProfile?.serviceArea) ?? null,
-                    hourlyRate: data.cleanerProfile?.hourlyRate ?? null,
-                    rating: data.cleanerProfile?.rating ?? null,
-                    clientId: data.cleanerProfile?.clientId ?? null,
+                    serviceArea: this.emptyToNull(data.roomAttendantProfile?.serviceArea) ?? null,
+                    hourlyRate: data.roomAttendantProfile?.hourlyRate ?? null,
+                    rating: data.roomAttendantProfile?.rating ?? null,
+                    clientId: data.roomAttendantProfile?.clientId ?? null,
                     createdBy: data.createdBy,
                     updatedBy: data.updatedBy,
                   },
@@ -385,12 +385,12 @@ export class UserRepository {
           },
         });
         if (data.role === "CLIENT") {
-          await tx.cleanerProfile.deleteMany({ where: { userId: id } });
+          await tx.roomAttendantProfile.deleteMany({ where: { userId: id } });
         }
       }
 
-      if (data.role === "CLEANER" || data.cleanerProfile) {
-        await tx.cleanerProfile.upsert({
+      if (data.role === "ROOMATTENDATNT" || data.roomAttendantProfile) {
+        await tx.roomAttendantProfile.upsert({
           where: { userId: id },
           update: {
             firstName: data.firstName,
@@ -399,10 +399,10 @@ export class UserRepository {
             ...(data.phone !== undefined
               ? { phoneNo: this.emptyToNull(data.phone) ?? "" }
               : {}),
-            serviceArea: this.emptyToNull(data.cleanerProfile?.serviceArea),
-            hourlyRate: data.cleanerProfile?.hourlyRate,
-            rating: data.cleanerProfile?.rating,
-            clientId: data.cleanerProfile?.clientId ?? undefined,
+            serviceArea: this.emptyToNull(data.roomAttendantProfile?.serviceArea),
+            hourlyRate: data.roomAttendantProfile?.hourlyRate,
+            rating: data.roomAttendantProfile?.rating,
+            clientId: data.roomAttendantProfile?.clientId ?? undefined,
             deletedAt: null,
             updatedBy: data.updatedBy,
           },
@@ -413,22 +413,22 @@ export class UserRepository {
             lastName: data.lastName ?? mappedCurrent.lastName,
             smsGatewayId: data.smsGatewayId ?? null,
             phoneNo: this.emptyToNull(data.phone) ?? "",
-            serviceArea: this.emptyToNull(data.cleanerProfile?.serviceArea) ?? null,
-            hourlyRate: data.cleanerProfile?.hourlyRate ?? null,
-            rating: data.cleanerProfile?.rating ?? null,
-            clientId: data.cleanerProfile?.clientId ?? null,
+            serviceArea: this.emptyToNull(data.roomAttendantProfile?.serviceArea) ?? null,
+            hourlyRate: data.roomAttendantProfile?.hourlyRate ?? null,
+            rating: data.roomAttendantProfile?.rating ?? null,
+            clientId: data.roomAttendantProfile?.clientId ?? null,
             createdBy: data.updatedBy,
             updatedBy: data.updatedBy,
           },
         });
-        if (data.role === "CLEANER") {
+        if (data.role === "ROOMATTENDATNT") {
           await tx.clientProfile.deleteMany({ where: { userId: id } });
         }
       }
 
       if (data.role === "SUPER_ADMIN") {
         await tx.clientProfile.deleteMany({ where: { userId: id } });
-        await tx.cleanerProfile.deleteMany({ where: { userId: id } });
+        await tx.roomAttendantProfile.deleteMany({ where: { userId: id } });
       }
 
       const updated = await tx.user.findUnique({

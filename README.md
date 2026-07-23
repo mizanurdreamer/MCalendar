@@ -102,7 +102,7 @@ docker compose up --build
 | --- | --- | --- |
 | Super Admin | admin@bookingcalendar.com | Password123! |
 | Client | client@bookingcalendar.com | Password123! |
-| Cleaner | cleaner@bookingcalendar.com | Password123! |
+| RoomAttendant | roomAttendant@bookingcalendar.com | Password123! |
 
 ## Project Structure
 
@@ -112,20 +112,20 @@ bookingCalendar/
 │   ├── (public)/                 # Login / Register
 │   ├── admin/                    # Super Admin dashboard
 │   │   ├── clients/              # Manage clients
-│   │   ├── cleaners/             # Manage cleaners
+│   │   ├── roomAttendants/             # Manage roomAttendants
 │   │   └── dashboard/            # Admin overview
 │   ├── client/                   # Client dashboard
 │   │   ├── today/                # Today's view
 │   │   ├── calendar/             # Calendar view
 │   │   ├── booking-endpoints/    # Manage iCal endpoints
-│   │   └── cleaners/             # View assigned cleaners
-│   ├── cleaner/                  # Cleaner dashboard
+│   │   └── roomAttendants/             # View assigned roomAttendants
+│   ├── roomAttendant/                  # RoomAttendant dashboard
 │   │   └── today/                # Today's schedule
 │   └── api/                      # REST API endpoints
 │       ├── auth/                 # Login, register, refresh, logout
 │       ├── users/                # User CRUD
 │       ├── booking-endpoints/    # Booking endpoint CRUD
-│       ├── cleaner-task-schedules/  # Client ↔ Cleaner Task Schedules
+│       ├── roomAttendant-task-schedules/  # Client ↔ RoomAttendant Task Schedules
 │       └── cron/                 # Cron job triggers
 ├── components/                   # React components
 │   ├── ui/                       # shadcn/ui primitives
@@ -139,7 +139,7 @@ bookingCalendar/
 │   ├── UserService.ts            # User CRUD
 │   ├── ClientBookingEndpointService.ts # Endpoint CRUD
 │   ├── GuestBookingInfoService.ts # Read fetched booking data
-│   └── CleanerTaskScheduleService.ts # Client ↔ Cleaner Task Schedules
+│   └── RoomAttendantTaskScheduleService.ts # Client ↔ RoomAttendant Task Schedules
 ├── repositories/                 # Database access layer (Prisma only)
 ├── dto/                          # Zod validation schemas
 ├── models/                       # Domain types
@@ -180,7 +180,7 @@ bookingCalendar/
 | GET | `/api/users/[id]` | Get user by ID |
 | PATCH | `/api/users/[id]` | Update user |
 | DELETE | `/api/users/[id]` | Delete user |
-| GET | `/api/users/cleaners` | List all cleaners |
+| GET | `/api/users/roomAttendants` | List all roomAttendants |
 | GET | `/api/users/clients` | List all clients |
 
 ### Booking Endpoints
@@ -192,14 +192,14 @@ bookingCalendar/
 | PATCH | `/api/booking-endpoints/[id]` | Update endpoint |
 | DELETE | `/api/booking-endpoints/[id]` | Delete endpoint |
 
-### Cleaner Task Schedules
+### RoomAttendant Task Schedules
 
 | Method | Endpoint | Description |
 | --- | --- | --- |
-| GET | `/api/cleaner-task-schedules` | List task schedules (supports `?clientId=`, `?cleanerId=`, `?activeOnly=`) |
-| POST | `/api/cleaner-task-schedules` | Create assignment |
-| PATCH | `/api/cleaner-task-schedules/[id]` | Update assignment |
-| DELETE | `/api/cleaner-task-schedules/[id]` | Delete assignment |
+| GET | `/api/roomAttendant-task-schedules` | List task schedules (supports `?clientId=`, `?roomAttendantId=`, `?activeOnly=`) |
+| POST | `/api/roomAttendant-task-schedules` | Create assignment |
+| PATCH | `/api/roomAttendant-task-schedules/[id]` | Update assignment |
+| DELETE | `/api/roomAttendant-task-schedules/[id]` | Delete assignment |
 
 ### Cron Jobs
 
@@ -212,21 +212,21 @@ The booking data fetch job starts automatically on server boot (see
 `CRON_BOOKING_DATA_FETCH_SCHEDULE_IN_MINUTES` (default `10`, i.e.
 `*/10 * * * *`) and is logged at startup.
 
-## Cleaner Task Schedules
+## RoomAttendant Task Schedules
 
-Clients can assign cleaners for specific date ranges. The system supports:
+Clients can assign roomAttendants for specific date ranges. The system supports:
 
-- **Many-to-many**: One client can have multiple cleaners, one cleaner can serve multiple clients
+- **Many-to-many**: One client can have multiple roomAttendants, one roomAttendant can serve multiple clients
 - **Date range**: Each assignment has a `startDate` and optional `endDate`
 - **Active/inactive**: Soft-disable task schedules without deleting
 
-**Example: Assign a cleaner for summer**
+**Example: Assign a roomAttendant for summer**
 
 ```json
-POST /api/cleaner-task-schedules
+POST /api/roomAttendant-task-schedules
 {
   "clientId": "uuid-of-client",
-  "cleanerId": "uuid-of-cleaner",
+  "roomAttendantId": "uuid-of-roomAttendant",
   "startDate": "2025-06-01T00:00:00Z",
   "endDate": "2025-08-31T23:59:59Z"
 }
@@ -252,8 +252,8 @@ DTO (validation) → Repository (Prisma) → Service (business logic) → API Ro
 | Role | Access |
 | --- | --- |
 | SUPER_ADMIN | Full access to all users, endpoints, task schedules |
-| CLIENT | Manage own endpoints, view assigned cleaners |
-| CLEANER | View own schedule and task schedules |
+| CLIENT | Manage own endpoints, view assigned roomAttendants |
+| ROOMATTENDATNT | View own schedule and task schedules |
 
 ## Building for Production
 

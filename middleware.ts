@@ -11,13 +11,13 @@ import type { Role } from "@/models/role";
 const ROLE_HOME: Record<Role, string> = {
   SUPER_ADMIN: "/admin/dashboard",
   CLIENT: "/client/today",
-  CLEANER: "/cleaner/today",
+  ROOMATTENDATNT: "/roomAttendant/today",
 };
 
 const ROLE_PREFIX: Record<Role, string> = {
   SUPER_ADMIN: "/admin",
   CLIENT: "/client",
-  CLEANER: "/cleaner",
+  ROOMATTENDATNT: "/roomAttendant",
 };
 
 const AUTH_PAGES = ["/login", "/register"];

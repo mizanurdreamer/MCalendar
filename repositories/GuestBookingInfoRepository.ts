@@ -92,7 +92,7 @@ export class GuestBookingInfoRepository {
     });
   }
 
-  listForCleanerClientsCalendar(params: {
+  listForRoomAttendantClientsCalendar(params: {
     clientIds: string[];
     from: Date;
     to: Date;

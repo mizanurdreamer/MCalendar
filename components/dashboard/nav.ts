@@ -22,7 +22,7 @@ export type NavItem = {
 const SUPER_ADMIN_NAV: NavItem[] = [
   { label: "Overview", href: "/admin/dashboard", icon: LayoutDashboard, exact: true },
   { label: "Clients", href: "/admin/clients", icon: Users },
-  { label: "Cleaners", href: "/admin/cleaners", icon: Sparkles },
+  { label: "RoomAttendants", href: "/admin/roomAttendants", icon: Sparkles },
   { label: "SMS Gateways", href: "/admin/sms-gateways", icon: MessageSquareText },
   { label: "SMS Demo", href: "/admin/sms-demo", icon: SendHorizontal },
 ];
@@ -35,23 +35,23 @@ const CLIENT_NAV: NavItem[] = [
     href: "/client/booking-endpoints",
     icon: Link2,
   },
-  { label: "Cleaners", href: "/client/cleaners", icon: Sparkles },
+  { label: "RoomAttendants", href: "/client/roomAttendants", icon: Sparkles },
 ];
 
-const CLEANER_NAV: NavItem[] = [
-  { label: "Today", href: "/cleaner/today", icon: Sun, exact: true },
-  { label: "Calendar", href: "/cleaner/calendar", icon: CalendarDays },
-  { label: "Availability", href: "/cleaner/availability", icon: CalendarClock }
+const ROOMATTENDATNT_NAV: NavItem[] = [
+  { label: "Today", href: "/roomAttendant/today", icon: Sun, exact: true },
+  { label: "Calendar", href: "/roomAttendant/calendar", icon: CalendarDays },
+  { label: "Availability", href: "/roomAttendant/availability", icon: CalendarClock }
 ];
 
 export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
   SUPER_ADMIN: SUPER_ADMIN_NAV,
   CLIENT: CLIENT_NAV,
-  CLEANER: CLEANER_NAV,
+  ROOMATTENDATNT: ROOMATTENDATNT_NAV,
 };
 
 export const ROLE_LABEL: Record<Role, string> = {
   SUPER_ADMIN: "Super Admin",
   CLIENT: "Client",
-  CLEANER: "Cleaner",
+  ROOMATTENDATNT: "RoomAttendant",
 };

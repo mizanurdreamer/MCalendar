@@ -4,12 +4,12 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
 import type { UserView } from "@/models/view";
 
-/** Active cleaners for assignment dropdowns. Optionally filter by clientId. */
-export function useCleaners(enabled = true, clientId?: string) {
+/** Active roomAttendants for assignment dropdowns. Optionally filter by clientId. */
+export function useRoomAttendants(enabled = true, clientId?: string) {
   const query = clientId ? `?clientId=${clientId}` : "";
   return useQuery({
-    queryKey: ["lookup", "cleaners", clientId],
-    queryFn: () => api.get<UserView[]>(`/api/users/cleaners${query}`),
+    queryKey: ["lookup", "roomAttendants", clientId],
+    queryFn: () => api.get<UserView[]>(`/api/users/roomAttendants${query}`),
     enabled,
   });
 }

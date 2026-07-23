@@ -47,7 +47,7 @@ CREATE TABLE "clientProfile" (
 );
 
 -- CreateTable
-CREATE TABLE "cleanerProfile" (
+CREATE TABLE "roomAttendantProfile" (
     "id" UUID NOT NULL,
     "userId" UUID NOT NULL,
     "Email" TEXT NOT NULL,
@@ -64,7 +64,7 @@ CREATE TABLE "cleanerProfile" (
     "updatedBy" UUID,
     "deletedAt" TIMESTAMP(3),
 
-    CONSTRAINT "cleanerProfile_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "roomAttendantProfile_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -126,10 +126,10 @@ CREATE TABLE "guestBookingInfo" (
 );
 
 -- CreateTable
-CREATE TABLE "cleanerTaskSchedule" (
+CREATE TABLE "roomAttendantTaskSchedule" (
     "id" UUID NOT NULL,
     "clientId" UUID NOT NULL,
-    "cleanerId" UUID NOT NULL,
+    "roomAttendantId" UUID NOT NULL,
     "startDate" TIMESTAMP(3) NOT NULL,
     "endDate" TIMESTAMP(3),
     "isActive" BOOLEAN NOT NULL DEFAULT true,
@@ -140,7 +140,7 @@ CREATE TABLE "cleanerTaskSchedule" (
     "updatedBy" UUID,
     "deletedAt" TIMESTAMP(3),
 
-    CONSTRAINT "cleanerTaskSchedule_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "roomAttendantTaskSchedule_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -159,10 +159,10 @@ CREATE UNIQUE INDEX "clientProfile_userId_key" ON "clientProfile"("userId");
 CREATE INDEX "clientProfile_deletedAt_idx" ON "clientProfile"("deletedAt");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "cleanerProfile_userId_key" ON "cleanerProfile"("userId");
+CREATE UNIQUE INDEX "roomAttendantProfile_userId_key" ON "roomAttendantProfile"("userId");
 
 -- CreateIndex
-CREATE INDEX "cleanerProfile_deletedAt_idx" ON "cleanerProfile"("deletedAt");
+CREATE INDEX "roomAttendantProfile_deletedAt_idx" ON "roomAttendantProfile"("deletedAt");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "refreshToken_tokenHash_key" ON "refreshToken"("tokenHash");
@@ -201,19 +201,19 @@ CREATE INDEX "guestBookingInfo_clientId_idx" ON "guestBookingInfo"("clientId");
 CREATE INDEX "guestBookingInfo_fetchDataId_idx" ON "guestBookingInfo"("fetchDataId");
 
 -- CreateIndex
-CREATE INDEX "cleanerTaskSchedule_clientId_idx" ON "cleanerTaskSchedule"("clientId");
+CREATE INDEX "roomAttendantTaskSchedule_clientId_idx" ON "roomAttendantTaskSchedule"("clientId");
 
 -- CreateIndex
-CREATE INDEX "cleanerTaskSchedule_cleanerId_idx" ON "cleanerTaskSchedule"("cleanerId");
+CREATE INDEX "roomAttendantTaskSchedule_roomAttendantId_idx" ON "roomAttendantTaskSchedule"("roomAttendantId");
 
 -- CreateIndex
-CREATE INDEX "cleanerTaskSchedules_startDate_endDate_idx" ON "cleanerTaskSchedule"("startDate", "endDate");
+CREATE INDEX "roomAttendantTaskSchedules_startDate_endDate_idx" ON "roomAttendantTaskSchedule"("startDate", "endDate");
 
 -- CreateIndex
-CREATE INDEX "cleanerTaskSchedule_deletedAt_idx" ON "cleanerTaskSchedule"("deletedAt");
+CREATE INDEX "roomAttendantTaskSchedule_deletedAt_idx" ON "roomAttendantTaskSchedule"("deletedAt");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "cleanerTaskSchedule_clientId_cleanerId_startDate_key" ON "cleanerTaskSchedule"("clientId", "cleanerId", "startDate");
+CREATE UNIQUE INDEX "roomAttendantTaskSchedule_clientId_roomAttendantId_startDate_key" ON "roomAttendantTaskSchedule"("clientId", "roomAttendantId", "startDate");
 
 -- AddForeignKey
 ALTER TABLE "user" ADD CONSTRAINT "user_roleId_fkey" FOREIGN KEY ("roleId") REFERENCES "role"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -222,7 +222,7 @@ ALTER TABLE "user" ADD CONSTRAINT "user_roleId_fkey" FOREIGN KEY ("roleId") REFE
 ALTER TABLE "clientProfile" ADD CONSTRAINT "clientProfile_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "cleanerProfile" ADD CONSTRAINT "cleanerProfile_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "roomAttendantProfile" ADD CONSTRAINT "roomAttendantProfile_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "refreshToken" ADD CONSTRAINT "refreshToken_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -246,7 +246,7 @@ ALTER TABLE "guestBookingInfo" ADD CONSTRAINT "guestBookingInfo_clientId_fkey" F
 ALTER TABLE "guestBookingInfo" ADD CONSTRAINT "guestBookingInfo_fetchDataId_fkey" FOREIGN KEY ("fetchDataId") REFERENCES "bookingFetchData"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "cleanerTaskSchedule" ADD CONSTRAINT "cleanerTaskSchedule_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "clientProfile"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "roomAttendantTaskSchedule" ADD CONSTRAINT "roomAttendantTaskSchedule_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "clientProfile"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "cleanerTaskSchedule" ADD CONSTRAINT "cleanerTaskSchedule_cleanerId_fkey" FOREIGN KEY ("cleanerId") REFERENCES "cleanerProfile"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "roomAttendantTaskSchedule" ADD CONSTRAINT "roomAttendantTaskSchedule_roomAttendantId_fkey" FOREIGN KEY ("roomAttendantId") REFERENCES "roomAttendantProfile"("id") ON DELETE CASCADE ON UPDATE CASCADE;

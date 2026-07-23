@@ -13,8 +13,8 @@ export async function GET(req: NextRequest) {
     const rawRole = req.nextUrl.searchParams.get("role");
     const roleParam: Role | null = rawRole && isRole(rawRole) ? rawRole : null;
 
-    // Clients may only browse cleaners; super admins may browse anyone.
-    if (actor.role !== "SUPER_ADMIN" && roleParam !== "CLEANER") {
+    // Clients may only browse roomAttendants; super admins may browse anyone.
+    if (actor.role !== "SUPER_ADMIN" && roleParam !== "ROOMATTENDATNT") {
       throw new ForbiddenError();
     }
 
@@ -37,8 +37,8 @@ export async function POST(req: NextRequest) {
     const actor = await requireActor("SUPER_ADMIN", "CLIENT");
     const dto = createUserSchema.parse(await req.json());
 
-    // Clients may only create cleaner accounts.
-    if (actor.role !== "SUPER_ADMIN" && dto.role !== "CLEANER") {
+    // Clients may only create roomAttendant accounts.
+    if (actor.role !== "SUPER_ADMIN" && dto.role !== "ROOMATTENDATNT") {
       throw new ForbiddenError();
     }
 

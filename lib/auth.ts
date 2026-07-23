@@ -88,8 +88,8 @@ export function dashboardPathForRole(role: Role): string {
   switch (role) {
     case "SUPER_ADMIN":
       return "/admin/dashboard";
-    case "CLEANER":
-      return "/cleaner/today";
+    case "ROOMATTENDATNT":
+      return "/roomAttendant/today";
     case "CLIENT":
     default:
       return "/client/today";
