@@ -12,7 +12,7 @@ export const registerSchema = z
     firstName: z.string().trim().min(1, "First name is required").max(80),
     lastName: z.string().trim().min(1, "Last name is required").max(80),
     email: z.string().email("Enter a valid email"),
-    phone: z.string().trim().max(30).optional().or(z.literal("")),
+    phone: z.string().trim().min(1).max(15),
     password: z
       .string()
       .min(8, "Password must be at least 8 characters")
