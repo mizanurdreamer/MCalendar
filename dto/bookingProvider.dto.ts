@@ -1,16 +1,16 @@
 import { z } from "zod";
 
-export const createBookingEndpointSchema = z.object({
+export const createBookingProviderSchema = z.object({
   name: z.string().trim().min(1).max(120),
   url: z.string().trim().url().max(2000),
   isActive: z.boolean().default(true),
 });
 
-export const updateBookingEndpointSchema = z.object({
+export const updateBookingProviderSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
   url: z.string().trim().url().max(2000).optional(),
   isActive: z.boolean().optional(),
 });
 
-export type CreateBookingEndpointDTO = z.infer<typeof createBookingEndpointSchema>;
-export type UpdateBookingEndpointDTO = z.infer<typeof updateBookingEndpointSchema>;
+export type CreateBookingProviderDTO = z.infer<typeof createBookingProviderSchema>;
+export type UpdateBookingProviderDTO = z.infer<typeof updateBookingProviderSchema>;

@@ -117,27 +117,27 @@ bookingCalendar/
 │   ├── client/                   # Client dashboard
 │   │   ├── today/                # Today's view
 │   │   ├── calendar/             # Calendar view
-│   │   ├── booking-endpoints/    # Manage iCal endpoints
+│   │   ├── booking-providers/    # Manage iCal providers
 │   │   └── roomAttendants/             # View assigned roomAttendants
 │   ├── roomAttendant/                  # RoomAttendant dashboard
 │   │   └── today/                # Today's schedule
-│   └── api/                      # REST API endpoints
+│   └── api/                      # REST API providers
 │       ├── auth/                 # Login, register, refresh, logout
 │       ├── users/                # User CRUD
-│       ├── booking-endpoints/    # Booking endpoint CRUD
+│       ├── booking-providers/    # Booking provider CRUD
 │       ├── roomAttendant-task-schedules/  # Client ↔ RoomAttendant Task Schedules
 │       └── cron/                 # Cron job triggers
 ├── components/                   # React components
 │   ├── ui/                       # shadcn/ui primitives
 │   ├── dashboard/                # Dashboard layout + nav
-│   └── sections/                 # Feature sections (users, endpoints)
+│   └── sections/                 # Feature sections (users, providers)
 ├── services/                     # Business logic layer
 │   ├── cron/                     # Cron job services (separated)
 │   │   ├── CronJobScheduler.ts   # Job registration + execution
 │   │   └── BookingDataFetchJob.ts # iCal/JSON fetch logic
 │   ├── AuthService.ts            # Auth + token management
 │   ├── UserService.ts            # User CRUD
-│   ├── ClientBookingEndpointService.ts # Endpoint CRUD
+│   ├── ClientBookingProviderService.ts # Provider CRUD
 │   ├── GuestBookingInfoService.ts # Read fetched booking data
 │   └── RoomAttendantTaskScheduleService.ts # Client ↔ RoomAttendant Task Schedules
 ├── repositories/                 # Database access layer (Prisma only)
@@ -159,11 +159,11 @@ bookingCalendar/
 └── docker-entrypoint.sh          # Runs migrations on startup
 ```
 
-## API Endpoints
+## API Providers
 
 ### Auth
 
-| Method | Endpoint | Description |
+| Method | Provider | Description |
 | --- | --- | --- |
 | POST | `/api/auth/register` | Create account |
 | POST | `/api/auth/login` | Sign in |
@@ -173,7 +173,7 @@ bookingCalendar/
 
 ### Users
 
-| Method | Endpoint | Description |
+| Method | Provider | Description |
 | --- | --- | --- |
 | GET | `/api/users` | List users (supports `?role=`, `?status=`, `?search=`) |
 | POST | `/api/users` | Create user |
@@ -183,18 +183,18 @@ bookingCalendar/
 | GET | `/api/users/roomAttendants` | List all roomAttendants |
 | GET | `/api/users/clients` | List all clients |
 
-### Booking Endpoints
+### Booking Providers
 
-| Method | Endpoint | Description |
+| Method | Provider | Description |
 | --- | --- | --- |
-| GET | `/api/booking-endpoints` | List endpoints (supports `?status=`) |
-| POST | `/api/booking-endpoints` | Create endpoint |
-| PATCH | `/api/booking-endpoints/[id]` | Update endpoint |
-| DELETE | `/api/booking-endpoints/[id]` | Delete endpoint |
+| GET | `/api/booking-providers` | List providers (supports `?status=`) |
+| POST | `/api/booking-providers` | Create provider |
+| PATCH | `/api/booking-providers/[id]` | Update provider |
+| DELETE | `/api/booking-providers/[id]` | Delete provider |
 
 ### RoomAttendant Task Schedules
 
-| Method | Endpoint | Description |
+| Method | Provider | Description |
 | --- | --- | --- |
 | GET | `/api/roomAttendant-task-schedules` | List task schedules (supports `?clientId=`, `?roomAttendantId=`, `?activeOnly=`) |
 | POST | `/api/roomAttendant-task-schedules` | Create assignment |
@@ -203,7 +203,7 @@ bookingCalendar/
 
 ### Cron Jobs
 
-| Method | Endpoint | Description |
+| Method | Provider | Description |
 | --- | --- | --- |
 | GET | `/api/cron/status` | Get job status (monitoring only) |
 
@@ -251,8 +251,8 @@ DTO (validation) → Repository (Prisma) → Service (business logic) → API Ro
 
 | Role | Access |
 | --- | --- |
-| SUPER_ADMIN | Full access to all users, endpoints, task schedules |
-| CLIENT | Manage own endpoints, view assigned roomAttendants |
+| SUPER_ADMIN | Full access to all users, providers, task schedules |
+| CLIENT | Manage own providers, view assigned roomAttendants |
 | ROOMATTENDATNT | View own schedule and task schedules |
 
 ## Building for Production

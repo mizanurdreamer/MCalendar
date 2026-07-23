@@ -28,7 +28,7 @@ export type UserView = {
   createdAt: string;
 };
 
-export type BookingEndpointView = {
+export type BookingProviderView = {
   id: string;
   clientId: string;
   name: string;

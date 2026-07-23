@@ -265,7 +265,7 @@ export class RoomAttendantTaskScheduleService {
     for (const row of bookings) {
       if (!row.startDate && !row.endDate) continue;
       const clientId = row.clientId;
-      const property = row.endpoint?.name ?? "Property";
+      const property = row.provider?.name ?? "Property";
       const title = row.summary?.trim() || property;
       const cleaningStatus = statusByClient.get(clientId) ?? RoomAttendantTaskStatus.ASSIGNED;
       events.push({

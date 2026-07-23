@@ -46,7 +46,7 @@ export class ClientCalendarService {
 
     const latestRows = this.keepLatestRows(rows);
     const properties = Array.from(
-      new Set(latestRows.map((row) => row.endpoint?.name?.trim()).filter(Boolean)),
+      new Set(latestRows.map((row) => row.provider?.name?.trim()).filter(Boolean)),
     ) as string[];
 
     const bookingEvents = latestRows
@@ -88,7 +88,7 @@ export class ClientCalendarService {
 
     for (const row of rows) {
       const key = [
-        row.endpointId,
+        row.providerId,
         row.summary ?? "",
         row.startDate?.toISOString() ?? "",
         row.endDate?.toISOString() ?? "",
@@ -103,7 +103,7 @@ export class ClientCalendarService {
 
   private toCalendarEvent(row: CalendarRow): CalendarEventView | null {
     if (!row.startDate && !row.endDate) return null;
-    const property = row.endpoint?.name ?? "Property";
+    const property = row.provider?.name ?? "Property";
     const title = row.summary?.trim() || property;
     const status = this.normalizeStatus(row.status);
 
@@ -123,7 +123,7 @@ export class ClientCalendarService {
 
   private toUpcomingCleaning(row: CalendarRow) {
     const checkout = row.endDate as Date;
-    const property = row.endpoint?.name ?? "Property";
+    const property = row.provider?.name ?? "Property";
     const title = row.summary?.trim() || "Guest";
     const status = this.normalizeStatus(row.status);
 

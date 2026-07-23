@@ -31,8 +31,8 @@ const CLIENT_NAV: NavItem[] = [
   { label: "Today", href: "/client/today", icon: Sun, exact: true },
   { label: "Calendar", href: "/client/calendar", icon: CalendarDays },
   {
-    label: "Booking Endpoints",
-    href: "/client/booking-endpoints",
+    label: "Booking Providers",
+    href: "/client/booking-providers",
     icon: Link2,
   },
   { label: "RoomAttendants", href: "/client/roomAttendants", icon: Sparkles },

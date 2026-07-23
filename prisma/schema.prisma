@@ -58,7 +58,7 @@ model ClientProfile {
   createdBy String?  @db.Uuid
   updatedBy String?  @db.Uuid
   deletedAt DateTime?
-  bookingEndpoints ClientBookingEndpoint[]
+  bookingProviders ClientBookingProvider[]
   bookingFetchDatas BookingFetchData[]
   guestBookingInfos GuestBookingInfo[]
   roomAttendantTaskSchedules RoomAttendantTaskSchedule[]
@@ -111,7 +111,7 @@ model RefreshToken {
   @@map("refreshToken")
 }
 
-model ClientBookingEndpoint {
+model ClientBookingProvider {
   id       String  @id @default(uuid()) @db.Uuid
   clientId String  @db.Uuid
   client   ClientProfile    @relation(fields: [clientId], references: [id], onDelete: Cascade)
@@ -128,15 +128,15 @@ model ClientBookingEndpoint {
   updatedBy String?   @db.Uuid
   deletedAt DateTime?
 
-  @@index([clientId], map: "clientBookingEndpoint_clientId_idx")
-  @@index([deletedAt], map: "clientBookingEndpoint_deletedAt_idx")
-  @@map("clientBookingEndpoint")
+  @@index([clientId], map: "clientBookingProvider_clientId_idx")
+  @@index([deletedAt], map: "clientBookingProvider_deletedAt_idx")
+  @@map("clientBookingProvider")
 }
 
 model BookingFetchData {
   id         String                @id @default(uuid()) @db.Uuid
-  endpointId String                @db.Uuid
-  endpoint   ClientBookingEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  providerId String                @db.Uuid
+  provider   ClientBookingProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
   clientId   String                @db.Uuid
   client     ClientProfile        @relation(fields: [clientId], references: [id], onDelete: Cascade)
   payloadHash String
@@ -145,8 +145,8 @@ model BookingFetchData {
 
   items GuestBookingInfo[]
 
-  @@unique([endpointId, payloadHash], map: "bookingFetchData_endpointId_payloadHash_key")
-  @@index([endpointId], map: "bookingFetchData_endpointId_idx")
+  @@unique([providerId, payloadHash], map: "bookingFetchData_providerId_payloadHash_key")
+  @@index([providerId], map: "bookingFetchData_providerId_idx")
   @@index([clientId], map: "bookingFetchData_clientId_idx")
   @@index([fetchedAt], map: "bookingFetchData_fetchedAt_idx")
   @@map("bookingFetchData")
@@ -154,8 +154,8 @@ model BookingFetchData {
 
 model GuestBookingInfo {
   id         String                @id @default(uuid()) @db.Uuid
-  endpointId String                @db.Uuid
-  endpoint   ClientBookingEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  providerId String                @db.Uuid
+  provider   ClientBookingProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
   clientId   String                @db.Uuid
   client     ClientProfile         @relation( fields: [clientId], references: [id], onDelete: Cascade)
   fetchDataId String               @db.Uuid
@@ -169,7 +169,7 @@ model GuestBookingInfo {
   isDeleted    Boolean @default(false)
   createdAt DateTime @default(now())
 
-  @@index([endpointId], map: "guestBookingInfo_endpointId_idx")
+  @@index([providerId], map: "guestBookingInfo_providerId_idx")
   @@index([clientId], map: "guestBookingInfo_clientId_idx")
   @@index([fetchDataId], map: "guestBookingInfo_fetchDataId_idx")
   @@map("guestBookingInfo")

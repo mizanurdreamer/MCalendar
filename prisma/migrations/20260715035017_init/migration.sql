@@ -80,7 +80,7 @@ CREATE TABLE "refreshToken" (
 );
 
 -- CreateTable
-CREATE TABLE "clientBookingEndpoint" (
+CREATE TABLE "clientBookingProvider" (
     "id" UUID NOT NULL,
     "clientId" UUID NOT NULL,
     "name" TEXT NOT NULL,
@@ -93,13 +93,13 @@ CREATE TABLE "clientBookingEndpoint" (
     "updatedBy" UUID,
     "deletedAt" TIMESTAMP(3),
 
-    CONSTRAINT "clientBookingEndpoint_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "clientBookingProvider_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "bookingFetchData" (
     "id" UUID NOT NULL,
-    "endpointId" UUID NOT NULL,
+    "providerId" UUID NOT NULL,
     "clientId" UUID NOT NULL,
     "payloadHash" TEXT NOT NULL,
     "rawData" JSONB NOT NULL,
@@ -111,7 +111,7 @@ CREATE TABLE "bookingFetchData" (
 -- CreateTable
 CREATE TABLE "guestBookingInfo" (
     "id" UUID NOT NULL,
-    "endpointId" UUID NOT NULL,
+    "providerId" UUID NOT NULL,
     "clientId" UUID NOT NULL,
     "fetchDataId" UUID NOT NULL,
     "dedupeKey" TEXT NOT NULL,
@@ -171,13 +171,13 @@ CREATE UNIQUE INDEX "refreshToken_tokenHash_key" ON "refreshToken"("tokenHash");
 CREATE INDEX "refreshToken_userId_idx" ON "refreshToken"("userId");
 
 -- CreateIndex
-CREATE INDEX "clientBookingEndpoint_clientId_idx" ON "clientBookingEndpoint"("clientId");
+CREATE INDEX "clientBookingProvider_clientId_idx" ON "clientBookingProvider"("clientId");
 
 -- CreateIndex
-CREATE INDEX "clientBookingEndpoint_deletedAt_idx" ON "clientBookingEndpoint"("deletedAt");
+CREATE INDEX "clientBookingProvider_deletedAt_idx" ON "clientBookingProvider"("deletedAt");
 
 -- CreateIndex
-CREATE INDEX "bookingFetchData_endpointId_idx" ON "bookingFetchData"("endpointId");
+CREATE INDEX "bookingFetchData_providerId_idx" ON "bookingFetchData"("providerId");
 
 -- CreateIndex
 CREATE INDEX "bookingFetchData_clientId_idx" ON "bookingFetchData"("clientId");
@@ -186,13 +186,13 @@ CREATE INDEX "bookingFetchData_clientId_idx" ON "bookingFetchData"("clientId");
 CREATE INDEX "bookingFetchData_fetchedAt_idx" ON "bookingFetchData"("fetchedAt");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "bookingFetchData_endpointId_payloadHash_key" ON "bookingFetchData"("endpointId", "payloadHash");
+CREATE UNIQUE INDEX "bookingFetchData_providerId_payloadHash_key" ON "bookingFetchData"("providerId", "payloadHash");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "guestBookingInfo_dedupeKey_key" ON "guestBookingInfo"("dedupeKey");
 
 -- CreateIndex
-CREATE INDEX "guestBookingInfo_endpointId_idx" ON "guestBookingInfo"("endpointId");
+CREATE INDEX "guestBookingInfo_providerId_idx" ON "guestBookingInfo"("providerId");
 
 -- CreateIndex
 CREATE INDEX "guestBookingInfo_clientId_idx" ON "guestBookingInfo"("clientId");
@@ -228,16 +228,16 @@ ALTER TABLE "roomAttendantProfile" ADD CONSTRAINT "roomAttendantProfile_userId_f
 ALTER TABLE "refreshToken" ADD CONSTRAINT "refreshToken_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "clientBookingEndpoint" ADD CONSTRAINT "clientBookingEndpoint_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "clientProfile"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "clientBookingProvider" ADD CONSTRAINT "clientBookingProvider_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "clientProfile"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "bookingFetchData" ADD CONSTRAINT "bookingFetchData_endpointId_fkey" FOREIGN KEY ("endpointId") REFERENCES "clientBookingEndpoint"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "bookingFetchData" ADD CONSTRAINT "bookingFetchData_providerId_fkey" FOREIGN KEY ("providerId") REFERENCES "clientBookingProvider"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "bookingFetchData" ADD CONSTRAINT "bookingFetchData_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "clientProfile"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "guestBookingInfo" ADD CONSTRAINT "guestBookingInfo_endpointId_fkey" FOREIGN KEY ("endpointId") REFERENCES "clientBookingEndpoint"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "guestBookingInfo" ADD CONSTRAINT "guestBookingInfo_providerId_fkey" FOREIGN KEY ("providerId") REFERENCES "clientBookingProvider"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "guestBookingInfo" ADD CONSTRAINT "guestBookingInfo_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "clientProfile"("id") ON DELETE CASCADE ON UPDATE CASCADE;
