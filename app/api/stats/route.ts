@@ -4,7 +4,7 @@ import { requireRole } from "@/lib/auth";
 
 export async function GET() {
   try {
-    const user = await requireRole("SUPER_ADMIN", "CLIENT", "CLEANER");
+    const user = await requireRole("SUPER_ADMIN", "CLIENT", "ROOMATTENDATNT");
     let stats;
     switch (user.role) {
       case "SUPER_ADMIN":
@@ -13,8 +13,8 @@ export async function GET() {
       case "CLIENT":
         stats = await statsService.client({ userId: user.sub, role: user.role });
         break;
-      case "CLEANER":
-        stats = await statsService.cleaner({ userId: user.sub, role: user.role });
+      case "ROOMATTENDATNT":
+        stats = await statsService.roomAttendant({ userId: user.sub, role: user.role });
         break;
     }
     return ok(stats);

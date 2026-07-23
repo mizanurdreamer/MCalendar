@@ -41,7 +41,7 @@ import { cn } from "@/lib/utils";
 import { Field, EmptyRow, Pagination, ConfirmDialog, msg } from "@/components/sections/shared-utils";
 import type { Role, UserView } from "@/models/view";
 
-type ManagedRole = Extract<Role, "CLIENT" | "CLEANER">;
+type ManagedRole = Extract<Role, "CLIENT" | "ROOMATTENDATNT">;
 
 type UiStatus = "active" | "inactive";
 
@@ -82,10 +82,10 @@ const COPY: Record<
       { label: "Sort: Name Z-A", value: "name_desc" },
     ],
   },
-  CLEANER: {
-    singular: "Cleaner",
-    plural: "Cleaners",
-    itemLabel: "cleaners",
+  ROOMATTENDATNT: {
+    singular: "RoomAttendant",
+    plural: "RoomAttendants",
+    itemLabel: "roomAttendants",
     statuses: [
       { label: "All", value: "all" },
       { label: "Active", value: "active" },
@@ -156,7 +156,7 @@ export function UsersSection({
   role,
   canCreate = true,
   canDelete = true,
-  availabilityBasePath = "/admin/cleaners",
+  availabilityBasePath = "/admin/roomAttendants",
   clientId,
 }: {
   role: ManagedRole;
@@ -283,7 +283,7 @@ export function UsersSection({
             <TableHeader className="">
               <TableRow className="">
                 <TableHead className="w-12 px-4" />
-                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">{role === "CLIENT" ? "Client" : "Cleaner"}</TableHead>
+                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">{role === "CLIENT" ? "Client" : "RoomAttendant"}</TableHead>
                 {role === "CLIENT" ? (
                   <>
                     <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">Primary contact</TableHead>
@@ -353,7 +353,7 @@ export function UsersSection({
 
                       <TableCell>
                         <div className="flex items-center justify-end gap-1">
-                          {role === "CLEANER" && (
+                          {role === "ROOMATTENDATNT" && (
                             <button
                               type="button"
                               title="View availability"
@@ -452,7 +452,7 @@ function UserFormDialog({
   const create = useCreateUser();
   const update = useUpdateUser(editing?.id ?? "");
   const { data: smsGatewayData } = useSmsGateways({ page: 1, pageSize: 100 });
-  const { data: clientData } = useClients(role === "CLEANER" && !clientId && !editing);
+  const { data: clientData } = useClients(role === "ROOMATTENDATNT" && !clientId && !editing);
 
   const {
     register,
@@ -550,7 +550,7 @@ function UserFormDialog({
           <Field label="Email" error={errors.email?.message}>
             <Input type="email" disabled={!!editing} {...register("email")} />
           </Field>
-          {role === "CLEANER" && !clientId && !editing && (
+          {role === "ROOMATTENDATNT" && !clientId && !editing && (
             <Field label="Client" error={errors.clientId?.message}>
               <Select
                 value={clientIdValue || "__none"}

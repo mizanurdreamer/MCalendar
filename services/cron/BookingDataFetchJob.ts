@@ -5,15 +5,15 @@ import { CRON_CONFIG } from "@/lib/cron/config";
 
 /**
  * Booking Data Fetch Job.
- * Fetches data from all active client booking endpoints and stores the responses.
+ * Fetches data from all active client booking providers and stores the responses.
  * This is a cron job service — separated from normal business services.
  */
 export class BookingDataFetchJob {
   /**
-   * Execute the job: fetch all active endpoints and save responses.
+   * Execute the job: fetch all active providers and save responses.
    */
   async execute(): Promise<{ fetched: number; failed: number; skipped: number }> {
-    const endpoints = await prisma.clientBookingEndpoint.findMany({
+    const providers = await prisma.clientBookingProvider.findMany({
       where: { isActive: true, deletedAt: null },
     });
 
@@ -22,7 +22,7 @@ export class BookingDataFetchJob {
     let skipped = 0;
 
     const results = await Promise.allSettled(
-      endpoints.map((endpoint) => this.fetchEndpoint(endpoint)),
+      providers.map((provider) => this.fetchProvider(provider)),
     );
 
     for (const result of results) {
@@ -43,22 +43,22 @@ export class BookingDataFetchJob {
   }
 
   /**
-   * Fetch a single endpoint and save the response.
+   * Fetch a single provider and save the response.
    */
-  private async fetchEndpoint(endpoint: {
+  private async fetchProvider(provider: {
     id: string;
     clientId: string;
     url: string;
     name: string;
   }): Promise<boolean> {
     try {
-      const response = await fetch(endpoint.url, {
+      const response = await fetch(provider.url, {
         headers: { "User-Agent": "BookingCalendar/1.0" },
       });
 
       if (!response.ok) {
         console.warn(
-          `[BookingDataFetch] Endpoint "${endpoint.name}" returned ${response.status}`,
+          `[BookingDataFetch] Provider "${provider.name}" returned ${response.status}`,
         );
         return false;
       }
@@ -78,13 +78,13 @@ export class BookingDataFetchJob {
 
       const fetchedAt = new Date();
       const payload = {
-        endpointName: endpoint.name,
+        providerName: provider.name,
         payload: rawData,
       } as Prisma.InputJsonValue;
       const payloadHash = await this.hashPayload(payload);
       const fetchData = await guestBookingInfoRepository.upsertFetchData({
-        endpointId: endpoint.id,
-        clientId: endpoint.clientId,
+        providerId: provider.id,
+        clientId: provider.clientId,
         payloadHash,
         rawData: payload,
         fetchedAt,
@@ -92,10 +92,10 @@ export class BookingDataFetchJob {
 
       await guestBookingInfoRepository.createMany(
         bookings.map((booking) => ({
-          endpointId: endpoint.id,
-          clientId: endpoint.clientId,
+          providerId: provider.id,
+          clientId: provider.clientId,
           fetchDataId: fetchData.id,
-          dedupeKey: this.buildDedupeKey(endpoint.id, booking),
+          dedupeKey: this.buildDedupeKey(provider.id, booking),
           summary: booking.summary,
           startDate: booking.startDate,
           endDate: booking.endDate,
@@ -217,7 +217,7 @@ export class BookingDataFetchJob {
   }
 
   private buildDedupeKey(
-    endpointId: string,
+    providerId: string,
     booking: {
       summary: string | null;
       startDate: Date | null;
@@ -226,7 +226,7 @@ export class BookingDataFetchJob {
     },
   ) {
     return [
-      endpointId,
+      providerId,
       booking.summary ?? "",
       booking.status ?? "",
       booking.startDate?.toISOString() ?? "",

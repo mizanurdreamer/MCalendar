@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { ActorContext } from "@/models";
-import type { UpdateClientProfileDTO, UpdateCleanerProfileDTO } from "@/dto/profile.dto";
+import type { UpdateClientProfileDTO, UpdateRoomAttendantProfileDTO } from "@/dto/profile.dto";
 
 type ClientProfileView = {
   userId: string;
@@ -14,7 +14,7 @@ type ClientProfileView = {
   timezone: string | null;
 };
 
-type CleanerProfileView = {
+type RoomAttendantProfileView = {
   userId: string;
   firstName: string;
   lastName: string;
@@ -55,18 +55,18 @@ export class ProfileService {
       });
 
       clientProfileId = clientProfile.id;
-    } else if (actor.role === "CLEANER") {
-      const cleanerProfile = await prisma.cleanerProfile.findUniqueOrThrow({
+    } else if (actor.role === "ROOMATTENDATNT") {
+      const roomAttendantProfile = await prisma.roomAttendantProfile.findUniqueOrThrow({
         where: {
           userId: actor.userId,
         },
       });
 
-      if (!cleanerProfile.clientId) {
-        throw new Error("Cleaner is not assigned to a client");
+      if (!roomAttendantProfile.clientId) {
+        throw new Error("RoomAttendant is not assigned to a client");
       }
 
-      clientProfileId = cleanerProfile.clientId;
+      clientProfileId = roomAttendantProfile.clientId;
     } else {
       throw new Error("Invalid actor role");
     }
@@ -147,10 +147,10 @@ export class ProfileService {
     };
   }
 
-  async getCleaner(actor: ActorContext): Promise<CleanerProfileView> {
+  async getRoomAttendant(actor: ActorContext): Promise<RoomAttendantProfileView> {
     const user = await prisma.user.findUniqueOrThrow({ where: { id: actor.userId } });
     const fallbackName = splitName(user.displayName);
-    const profile = await prisma.cleanerProfile.upsert({
+    const profile = await prisma.roomAttendantProfile.upsert({
       where: { userId: actor.userId },
       update: {},
       create: {
@@ -176,10 +176,10 @@ export class ProfileService {
     };
   }
 
-  async updateCleaner(
+  async updateRoomAttendant(
     actor: ActorContext,
-    dto: UpdateCleanerProfileDTO,
-  ): Promise<CleanerProfileView> {
+    dto: UpdateRoomAttendantProfileDTO,
+  ): Promise<RoomAttendantProfileView> {
     const currentUser = await prisma.user.findUniqueOrThrow({
       where: { id: actor.userId },
     });
@@ -193,7 +193,7 @@ export class ProfileService {
           updatedBy: actor.userId,
         },
       }),
-      prisma.cleanerProfile.upsert({
+      prisma.roomAttendantProfile.upsert({
         where: { userId: actor.userId },
         update: {
           ...(dto.firstName !== undefined ? { firstName: dto.firstName } : {}),

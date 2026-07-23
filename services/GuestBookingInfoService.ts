@@ -3,8 +3,8 @@ import type { ActorContext, Paginated } from "@/models";
 
 export type GuestBookingInfoView = {
   id: string;
-  endpointId: string;
-  endpointName: string;
+  providerId: string;
+  providerName: string;
   clientId: string;
   rawData: unknown;
   fetchedAt: string;
@@ -17,14 +17,14 @@ export type GuestBookingInfoView = {
 
 export function toGuestBookingInfoView(
   item: Awaited<ReturnType<typeof guestBookingInfoRepository.findById>> & {
-    endpoint?: { name: string };
+    provider?: { name: string };
     fetchData?: { rawData: unknown; fetchedAt: Date };
   },
 ): GuestBookingInfoView {
   return {
     id: item.id,
-    endpointId: item.endpointId,
-    endpointName: item.endpoint?.name ?? "",
+    providerId: item.providerId,
+    providerName: item.provider?.name ?? "",
     clientId: item.clientId,
     rawData: item.fetchData?.rawData ?? null,
     fetchedAt: item.fetchData?.fetchedAt.toISOString() ?? "",
@@ -41,7 +41,7 @@ export function toGuestBookingInfoView(
  */
 export class GuestBookingInfoService {
   async list(
-    params: { page: number; pageSize: number; clientId?: string; endpointId?: string },
+    params: { page: number; pageSize: number; clientId?: string; providerId?: string },
     _actor?: ActorContext,
   ): Promise<Paginated<GuestBookingInfoView>> {
     const { items, total } = await guestBookingInfoRepository.list(params);

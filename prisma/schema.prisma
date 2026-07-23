@@ -26,7 +26,7 @@ model User {
   isActive     Boolean @default(true)
   isDeleted    Boolean @default(false)
   clientProfile  ClientProfile?
-  cleanerProfile CleanerProfile?
+  roomAttendantProfile RoomAttendantProfile?
   refreshTokens      RefreshToken[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -58,18 +58,18 @@ model ClientProfile {
   createdBy String?  @db.Uuid
   updatedBy String?  @db.Uuid
   deletedAt DateTime?
-  bookingEndpoints ClientBookingEndpoint[]
+  bookingProviders ClientBookingProvider[]
   bookingFetchDatas BookingFetchData[]
   guestBookingInfos GuestBookingInfo[]
-  cleanerTaskSchedules CleanerTaskSchedule[]
-  cleanerAvailabilities CleanerAvailability[]
-  cleaners             CleanerProfile[]
+  roomAttendantTaskSchedules RoomAttendantTaskSchedule[]
+  roomAttendantAvailabilities RoomAttendantAvailability[]
+  roomAttendants             RoomAttendantProfile[]
   @@index([smsGatewayId], map: "clientProfile_smsGatewayId_idx")
   @@index([deletedAt], map: "clientProfile_deletedAt_idx")
   @@map("clientProfile")
 }
 
-model CleanerProfile {
+model RoomAttendantProfile {
   id        String   @id @default(uuid()) @db.Uuid
   userId    String   @unique @db.Uuid
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -79,7 +79,7 @@ model CleanerProfile {
   firstName String
   lastName String
   smsGatewayId String? @db.Uuid
-  smsGateway SmsGateway? @relation("CleanerSmsGateway", fields: [smsGatewayId], references: [id], onDelete: SetNull)
+  smsGateway SmsGateway? @relation("RoomAttendantSmsGateway", fields: [smsGatewayId], references: [id], onDelete: SetNull)
   phoneNo  String
   serviceArea String?
   hourlyRate Int?
@@ -90,12 +90,12 @@ model CleanerProfile {
   createdBy String?  @db.Uuid
   updatedBy String?  @db.Uuid
   deletedAt DateTime?
-  cleanerTaskSchedules CleanerTaskSchedule[]
-  availabilities       CleanerAvailability[]
-  @@index([clientId], map: "cleanerProfile_clientId_idx")
-  @@index([smsGatewayId], map: "cleanerProfile_smsGatewayId_idx")
-  @@index([deletedAt], map: "cleanerProfile_deletedAt_idx")
-  @@map("cleanerProfile")
+  roomAttendantTaskSchedules RoomAttendantTaskSchedule[]
+  availabilities       RoomAttendantAvailability[]
+  @@index([clientId], map: "roomAttendantProfile_clientId_idx")
+  @@index([smsGatewayId], map: "roomAttendantProfile_smsGatewayId_idx")
+  @@index([deletedAt], map: "roomAttendantProfile_deletedAt_idx")
+  @@map("roomAttendantProfile")
 }
 
 model RefreshToken {
@@ -111,7 +111,7 @@ model RefreshToken {
   @@map("refreshToken")
 }
 
-model ClientBookingEndpoint {
+model ClientBookingProvider {
   id       String  @id @default(uuid()) @db.Uuid
   clientId String  @db.Uuid
   client   ClientProfile    @relation(fields: [clientId], references: [id], onDelete: Cascade)
@@ -128,15 +128,15 @@ model ClientBookingEndpoint {
   updatedBy String?   @db.Uuid
   deletedAt DateTime?
 
-  @@index([clientId], map: "clientBookingEndpoint_clientId_idx")
-  @@index([deletedAt], map: "clientBookingEndpoint_deletedAt_idx")
-  @@map("clientBookingEndpoint")
+  @@index([clientId], map: "clientBookingProvider_clientId_idx")
+  @@index([deletedAt], map: "clientBookingProvider_deletedAt_idx")
+  @@map("clientBookingProvider")
 }
 
 model BookingFetchData {
   id         String                @id @default(uuid()) @db.Uuid
-  endpointId String                @db.Uuid
-  endpoint   ClientBookingEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  providerId String                @db.Uuid
+  provider   ClientBookingProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
   clientId   String                @db.Uuid
   client     ClientProfile        @relation(fields: [clientId], references: [id], onDelete: Cascade)
   payloadHash String
@@ -145,8 +145,8 @@ model BookingFetchData {
 
   items GuestBookingInfo[]
 
-  @@unique([endpointId, payloadHash], map: "bookingFetchData_endpointId_payloadHash_key")
-  @@index([endpointId], map: "bookingFetchData_endpointId_idx")
+  @@unique([providerId, payloadHash], map: "bookingFetchData_providerId_payloadHash_key")
+  @@index([providerId], map: "bookingFetchData_providerId_idx")
   @@index([clientId], map: "bookingFetchData_clientId_idx")
   @@index([fetchedAt], map: "bookingFetchData_fetchedAt_idx")
   @@map("bookingFetchData")
@@ -154,8 +154,8 @@ model BookingFetchData {
 
 model GuestBookingInfo {
   id         String                @id @default(uuid()) @db.Uuid
-  endpointId String                @db.Uuid
-  endpoint   ClientBookingEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  providerId String                @db.Uuid
+  provider   ClientBookingProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
   clientId   String                @db.Uuid
   client     ClientProfile         @relation( fields: [clientId], references: [id], onDelete: Cascade)
   fetchDataId String               @db.Uuid
@@ -169,18 +169,18 @@ model GuestBookingInfo {
   isDeleted    Boolean @default(false)
   createdAt DateTime @default(now())
 
-  @@index([endpointId], map: "guestBookingInfo_endpointId_idx")
+  @@index([providerId], map: "guestBookingInfo_providerId_idx")
   @@index([clientId], map: "guestBookingInfo_clientId_idx")
   @@index([fetchDataId], map: "guestBookingInfo_fetchDataId_idx")
   @@map("guestBookingInfo")
 }
 
-model CleanerTaskSchedule {
+model RoomAttendantTaskSchedule {
   id        String   @id @default(uuid()) @db.Uuid
   clientId  String   @db.Uuid
-  cleanerId String   @db.Uuid
+  roomAttendantId String   @db.Uuid
   client    ClientProfile     @relation( fields: [clientId], references: [id], onDelete: Cascade)
-  cleaner   CleanerProfile     @relation(fields: [cleanerId], references: [id], onDelete: Cascade)
+  roomAttendant   RoomAttendantProfile     @relation(fields: [roomAttendantId], references: [id], onDelete: Cascade)
 
   assignedDate DateTime
   status    Int @default(0)
@@ -194,22 +194,22 @@ model CleanerTaskSchedule {
   updatedBy String?   @db.Uuid
   deletedAt DateTime?
 
-  @@unique([clientId, cleanerId, assignedDate], map: "cleanerTaskSchedule_clientId_cleanerId_assignedDate_key")
-  @@index([clientId], map: "cleanerTaskSchedule_clientId_idx")
-  @@index([cleanerId], map: "cleanerTaskSchedule_cleanerId_idx")
-  @@index([status], map: "cleanerTaskSchedule_status_idx")
-  @@index([assignedDate], map: "cleanerTaskSchedule_assignedDate_idx")
-  @@index([isSentSms], map: "cleanerTaskSchedule_isSentSms_idx")
-  @@index([deletedAt], map: "cleanerTaskSchedule_deletedAt_idx")
-  @@map("cleanerTaskSchedule")
+  @@unique([clientId, roomAttendantId, assignedDate], map: "taskSchedule_clientId_roomAttendantId_assignedDate_key")
+  @@index([clientId], map: "roomAttendantTaskSchedule_clientId_idx")
+  @@index([roomAttendantId], map: "roomAttendantTaskSchedule_roomAttendantId_idx")
+  @@index([status], map: "roomAttendantTaskSchedule_status_idx")
+  @@index([assignedDate], map: "roomAttendantTaskSchedule_assignedDate_idx")
+  @@index([isSentSms], map: "roomAttendantTaskSchedule_isSentSms_idx")
+  @@index([deletedAt], map: "roomAttendantTaskSchedule_deletedAt_idx")
+  @@map("roomAttendantTaskSchedule")
 }
 
-model CleanerAvailability {
+model RoomAttendantAvailability {
   id        String   @id @default(uuid()) @db.Uuid
   clientId  String   @db.Uuid
   client    ClientProfile @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  cleanerId String   @db.Uuid
-  cleaner   CleanerProfile @relation(fields: [cleanerId], references: [id], onDelete: Cascade)
+  roomAttendantId String   @db.Uuid
+  roomAttendant   RoomAttendantProfile @relation(fields: [roomAttendantId], references: [id], onDelete: Cascade)
 
   fromDate  DateTime
   toDate    DateTime?
@@ -223,11 +223,11 @@ model CleanerAvailability {
   updatedBy String?  @db.Uuid
   deletedAt DateTime?
 
-  @@index([clientId], map: "cleanerAvailability_clientId_idx")
-  @@index([cleanerId], map: "cleanerAvailability_cleanerId_idx")
-  @@index([fromDate], map: "cleanerAvailability_fromDate_idx")
-  @@index([deletedAt], map: "cleanerAvailability_deletedAt_idx")
-  @@map("cleanerAvailability")
+  @@index([clientId], map: "roomAttendantAvailability_clientId_idx")
+  @@index([roomAttendantId], map: "roomAttendantAvailability_roomAttendantId_idx")
+  @@index([fromDate], map: "roomAttendantAvailability_fromDate_idx")
+  @@index([deletedAt], map: "roomAttendantAvailability_deletedAt_idx")
+  @@map("roomAttendantAvailability")
 }
 
 model SmsGateway {
@@ -235,7 +235,7 @@ model SmsGateway {
   name      String   @unique
   domain    String   @unique
   clientProfiles ClientProfile[] @relation("ClientSmsGateway")
-  cleanerProfiles CleanerProfile[] @relation("CleanerSmsGateway")
+  roomAttendantProfiles RoomAttendantProfile[] @relation("RoomAttendantSmsGateway")
   isActive  Boolean  @default(true)
   isDeleted Boolean  @default(false)
   createdAt DateTime @default(now())

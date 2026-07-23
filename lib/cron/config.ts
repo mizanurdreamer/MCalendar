@@ -14,9 +14,9 @@ const BOOKING_DATA_FETCH_SCHEDULE_IN_MINUTES = toInt(
   10,
 );
 
-/** How often (in minutes) the auto-assign cleaner cron should run. Default 60. */
-const AUTO_ASSIGN_CLEANER_SCHEDULE_IN_MINUTES = toInt(
-  process.env.CRON_AUTO_ASSIGN_CLEANER_SCHEDULE_IN_MINUTES,
+/** How often (in minutes) the auto-assign roomAttendant cron should run. Default 60. */
+const AUTO_ASSIGN_ROOMATTENDATNT_SCHEDULE_IN_MINUTES = toInt(
+  process.env.CRON_AUTO_ASSIGN_ROOMATTENDATNT_SCHEDULE_IN_MINUTES,
   60,
 );
 
@@ -34,11 +34,11 @@ export const CRON_CONFIG = {
   /** Enable/disable the booking data fetch job */
   BOOKING_DATA_FETCH_ENABLED: process.env.CRON_BOOKING_DATA_FETCH_ENABLED !== "false",
 
-  /** Interval between runs (ms) for the auto-assign cleaner job. */
-  AUTO_ASSIGN_CLEANER_INTERVAL_MS: AUTO_ASSIGN_CLEANER_SCHEDULE_IN_MINUTES * 60 * 1000,
+  /** Interval between runs (ms) for the auto-assign roomAttendant job. */
+  AUTO_ASSIGN_ROOMATTENDATNT_INTERVAL_MS: AUTO_ASSIGN_ROOMATTENDATNT_SCHEDULE_IN_MINUTES * 60 * 1000,
 
-  /** Enable/disable the auto-assign cleaner job */
-  AUTO_ASSIGN_CLEANER_ENABLED: process.env.CRON_AUTO_ASSIGN_CLEANER_ENABLED !== "false",
+  /** Enable/disable the auto-assign roomAttendant job */
+  AUTO_ASSIGN_ROOMATTENDATNT_ENABLED: process.env.CRON_AUTO_ASSIGN_ROOMATTENDATNT_ENABLED !== "false",
 
   /** API secret for cron trigger authentication */
   CRON_BOOKING_ENDPOINT_API_SECRET: process.env.CRON_BOOKING_ENDPOINT_API_SECRET ?? "",

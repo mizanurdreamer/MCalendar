@@ -28,7 +28,7 @@ const MAIN_ITEMS = [
 
 const ROLE_ITEMS = [
   { label: "Admin view", icon: Shield },
-  { label: "Cleaner view", icon: Sparkles },
+  { label: "RoomAttendant view", icon: Sparkles },
 ];
 
 export function CalendarMenu() {

@@ -19,7 +19,7 @@ export class StatsService {
     return [];
   }
 
-  async cleaner(_actor: ActorContext): Promise<DashboardStat[]> {
+  async roomAttendant(_actor: ActorContext): Promise<DashboardStat[]> {
     return [];
   }
 }

@@ -8,7 +8,7 @@ const features = [
   {
     icon: Users,
     title: "Role-based access",
-    body: "Tailored dashboards for super admins, clients, and cleaners.",
+    body: "Tailored dashboards for super admins, clients, and roomAttendants.",
   },
   {
     icon: Sparkles,

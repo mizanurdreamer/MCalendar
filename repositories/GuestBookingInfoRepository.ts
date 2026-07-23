@@ -10,7 +10,7 @@ export class GuestBookingInfoRepository {
     return prisma.guestBookingInfo.findUnique({
       where: { id },
       include: {
-        endpoint: { select: { name: true } },
+        provider: { select: { name: true } },
         fetchData: { select: { rawData: true, fetchedAt: true } },
       },
     });
@@ -20,14 +20,14 @@ export class GuestBookingInfoRepository {
     page: number;
     pageSize: number;
     clientId?: string;
-    endpointId?: string;
+    providerId?: string;
     from?: Date;
     to?: Date;
   }) {
-    const { page, pageSize, clientId, endpointId, from, to } = params;
+    const { page, pageSize, clientId, providerId, from, to } = params;
     const where: Prisma.GuestBookingInfoWhereInput = {
       ...(clientId ? { clientId } : {}),
-      ...(endpointId ? { endpointId } : {}),
+      ...(providerId ? { providerId } : {}),
       ...(from || to
         ? {
             fetchData: {
@@ -47,7 +47,7 @@ export class GuestBookingInfoRepository {
         skip: (page - 1) * pageSize,
         take: pageSize,
         include: {
-          endpoint: { select: { name: true } },
+          provider: { select: { name: true } },
           fetchData: { select: { rawData: true, fetchedAt: true } },
         },
       }),
@@ -66,7 +66,7 @@ export class GuestBookingInfoRepository {
   }
 
   upsertFetchData(params: {
-    endpointId: string;
+    providerId: string;
     clientId: string;
     payloadHash: string;
     rawData: Prisma.InputJsonValue;
@@ -74,8 +74,8 @@ export class GuestBookingInfoRepository {
   }): Promise<BookingFetchData> {
     return prisma.bookingFetchData.upsert({
       where: {
-        endpointId_payloadHash: {
-          endpointId: params.endpointId,
+        providerId_payloadHash: {
+          providerId: params.providerId,
           payloadHash: params.payloadHash,
         },
       },
@@ -83,7 +83,7 @@ export class GuestBookingInfoRepository {
         fetchedAt: params.fetchedAt,
       },
       create: {
-        endpointId: params.endpointId,
+        providerId: params.providerId,
         clientId: params.clientId,
         payloadHash: params.payloadHash,
         rawData: params.rawData,
@@ -92,7 +92,7 @@ export class GuestBookingInfoRepository {
     });
   }
 
-  listForCleanerClientsCalendar(params: {
+  listForRoomAttendantClientsCalendar(params: {
     clientIds: string[];
     from: Date;
     to: Date;
@@ -108,7 +108,7 @@ export class GuestBookingInfoRepository {
         },
       },
       include: {
-        endpoint: { select: { id: true, name: true } },
+        provider: { select: { id: true, name: true } },
         client: { select: { firstName: true, lastName: true } },
         fetchData: { select: { fetchedAt: true } },
       },
@@ -139,7 +139,7 @@ export class GuestBookingInfoRepository {
         ],
       },
       include: {
-        endpoint: {
+        provider: {
           select: { id: true, name: true },
         },
         fetchData: {
@@ -151,8 +151,8 @@ export class GuestBookingInfoRepository {
     });
   }
 
-  deleteByEndpointId(endpointId: string) {
-    return prisma.guestBookingInfo.deleteMany({ where: { endpointId } });
+  deleteByProviderId(providerId: string) {
+    return prisma.guestBookingInfo.deleteMany({ where: { providerId } });
   }
 }
 

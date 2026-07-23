@@ -1,7 +1,7 @@
 import type { ActorContext } from "@/models";
 import type { CalendarDataView, CalendarEventView } from "@/models/view";
 import { guestBookingInfoRepository } from "@/repositories/GuestBookingInfoRepository";
-import { cleanerTaskScheduleRepository } from "@/repositories/CleanerTaskScheduleRepository";
+import { roomAttendantTaskScheduleRepository } from "@/repositories/RoomAttendantTaskScheduleRepository";
 import { prisma } from "@/lib/prisma";
 import { NotFoundError } from "@/lib/errors";
 
@@ -46,18 +46,18 @@ export class ClientCalendarService {
 
     const latestRows = this.keepLatestRows(rows);
     const properties = Array.from(
-      new Set(latestRows.map((row) => row.endpoint?.name?.trim()).filter(Boolean)),
+      new Set(latestRows.map((row) => row.provider?.name?.trim()).filter(Boolean)),
     ) as string[];
 
     const bookingEvents = latestRows
       .map((row) => this.toCalendarEvent(row))
       .filter((item): item is CalendarEventView => item !== null);
 
-    // Cleaning assignments the client created for their cleaners.
-    const schedules = await cleanerTaskScheduleRepository.findActiveForClient(clientProfile.id);
+    // Cleaning assignments the client created for their roomAttendants.
+    const schedules = await roomAttendantTaskScheduleRepository.findActiveForClient(clientProfile.id);
     const cleaningEvents: CalendarEventView[] = schedules.map((s) => ({
       id: `cleaning:${s.id}`,
-      title: `Cleaning · ${s.cleaner.firstName} ${s.cleaner.lastName}`,
+      title: `Cleaning · ${s.roomAttendant.firstName} ${s.roomAttendant.lastName}`,
       start: s.assignedDate.toISOString(),
       end: undefined,
       allDay: true,
@@ -88,7 +88,7 @@ export class ClientCalendarService {
 
     for (const row of rows) {
       const key = [
-        row.endpointId,
+        row.providerId,
         row.summary ?? "",
         row.startDate?.toISOString() ?? "",
         row.endDate?.toISOString() ?? "",
@@ -103,7 +103,7 @@ export class ClientCalendarService {
 
   private toCalendarEvent(row: CalendarRow): CalendarEventView | null {
     if (!row.startDate && !row.endDate) return null;
-    const property = row.endpoint?.name ?? "Property";
+    const property = row.provider?.name ?? "Property";
     const title = row.summary?.trim() || property;
     const status = this.normalizeStatus(row.status);
 
@@ -123,7 +123,7 @@ export class ClientCalendarService {
 
   private toUpcomingCleaning(row: CalendarRow) {
     const checkout = row.endDate as Date;
-    const property = row.endpoint?.name ?? "Property";
+    const property = row.provider?.name ?? "Property";
     const title = row.summary?.trim() || "Guest";
     const status = this.normalizeStatus(row.status);
 
