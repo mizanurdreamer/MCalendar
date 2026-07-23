@@ -41,9 +41,9 @@ export function RoomAttendantTodayTasks() {
     if (!next) return;
     try {
       await update.mutateAsync({ id, status: next });
-      toast({ title: `Marked ${STATUS_LABEL[next].toLowerCase()}` });
+      toast({ title: `Marked ${STATUS_LABEL[next].toLowerCase()}`, variant: "success" });
     } catch {
-      toast({ title: "Update failed", variant: "destructive" });
+      toast({ title: "Update failed", variant: "error" });
     }
   };
 

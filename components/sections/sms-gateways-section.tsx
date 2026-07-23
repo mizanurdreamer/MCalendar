@@ -69,10 +69,10 @@ export function SmsGatewaysSection() {
     if (!toDelete) return;
     try {
       await del.mutateAsync(toDelete.id);
-      toast({ title: "SMS gateway deleted" });
+      toast({ title: "SMS gateway deleted", variant: "success" });
       setToDelete(null);
     } catch (err) {
-      toast({ title: "Delete failed", description: msg(err), variant: "destructive" });
+      toast({ title: "Delete failed", description: msg(err), variant: "error" });
     }
   };
 
@@ -240,14 +240,14 @@ function SmsGatewayFormDialog({
     try {
       if (editing) {
         await update.mutateAsync(values);
-        toast({ title: "SMS gateway updated" });
+        toast({ title: "SMS gateway updated", variant: "success" });
       } else {
         await create.mutateAsync(values);
-        toast({ title: "SMS gateway created" });
+        toast({ title: "SMS gateway created", variant: "success" });
       }
       onClose();
     } catch (e) {
-      toast({ title: "Save failed", description: msg(e), variant: "destructive" });
+      toast({ title: "Save failed", description: msg(e), variant: "error" });
     }
   };
 

@@ -33,10 +33,10 @@ export function RoomAttendantProfileSection() {
   const onSubmit = async (values: UpdateRoomAttendantProfileDTO) => {
     try {
       await update.mutateAsync(values);
-      toast({ title: "RoomAttendant profile updated" });
+      toast({ title: "RoomAttendant profile updated", variant: "success" });
       setEditing(false);
     } catch (error) {
-      toast({ title: "Update failed", description: msg(error), variant: "destructive" });
+      toast({ title: "Update failed", description: msg(error), variant: "error" });
     }
   };
 

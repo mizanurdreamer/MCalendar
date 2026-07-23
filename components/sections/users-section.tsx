@@ -199,10 +199,10 @@ export function UsersSection({
     if (!toDelete) return;
     try {
       await del.mutateAsync(toDelete.id);
-      toast({ title: `${copy.singular} deleted` });
+      toast({ title: `${copy.singular} deleted`, variant: "success" });
       setToDelete(null);
     } catch (e) {
-      toast({ title: "Delete failed", description: msg(e), variant: "destructive" });
+      toast({ title: "Delete failed", description: msg(e), variant: "error" });
     }
   };
 
@@ -519,14 +519,14 @@ function UserFormDialog({
           rating: values.rating,
           clientId: values.clientId || null,
         });
-        toast({ title: `${copy.singular} updated` });
+        toast({ title: `${copy.singular} updated`, variant: "success" });
       } else {
         await create.mutateAsync({ ...values, role });
-        toast({ title: `${copy.singular} created` });
+        toast({ title: `${copy.singular} created`, variant: "success" });
       }
       onClose();
     } catch (e) {
-      toast({ title: "Save failed", description: msg(e), variant: "destructive" });
+      toast({ title: "Save failed", description: msg(e), variant: "error" });
     }
   };
 

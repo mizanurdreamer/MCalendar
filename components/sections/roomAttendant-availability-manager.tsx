@@ -125,14 +125,14 @@ export function RoomAttendantAvailabilityManager({
           id: editing.id,
           body: payload,
         });
-        toast({ title: "Availability updated" });
+        toast({ title: "Availability updated", variant: "success" });
       } else {
         await create.mutateAsync(payload);
-        toast({ title: "Availability added" });
+        toast({ title: "Availability added", variant: "success" });
       }
       setOpen(false);
     } catch (e) {
-      toast({ title: "Save failed", description: msg(e), variant: "destructive" });
+      toast({ title: "Save failed", description: msg(e), variant: "error" });
     }
   };
 
@@ -140,10 +140,10 @@ export function RoomAttendantAvailabilityManager({
     if (!toDelete) return;
     try {
       await remove.mutateAsync(toDelete.id);
-      toast({ title: "Availability removed" });
+      toast({ title: "Availability removed", variant: "success" });
       setToDelete(null);
     } catch (e) {
-      toast({ title: "Delete failed", description: msg(e), variant: "destructive" });
+      toast({ title: "Delete failed", description: msg(e), variant: "error" });
     }
   };
 

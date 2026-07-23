@@ -107,10 +107,10 @@ export function BookingProvidersSection() {
     if (!toDelete) return;
     try {
       await del.mutateAsync(toDelete.id);
-      toast({ title: "Provider deleted" });
+      toast({ title: "Provider deleted", variant: "success" });
       setToDelete(null);
     } catch (err) {
-      toast({ title: "Delete failed", description: msg(err), variant: "destructive" });
+      toast({ title: "Delete failed", description: msg(err), variant: "error" });
     }
   };
 
@@ -324,14 +324,14 @@ function ProviderFormDialog({
     try {
       if (editing) {
         await update.mutateAsync(values);
-        toast({ title: "Provider updated" });
+        toast({ title: "Provider updated", variant: "success" });
       } else {
         await create.mutateAsync(values);
-        toast({ title: "Provider created" });
+        toast({ title: "Provider created", variant: "success" });
       }
       onClose();
     } catch (e) {
-      toast({ title: "Save failed", description: msg(e), variant: "destructive" });
+      toast({ title: "Save failed", description: msg(e), variant: "error" });
     }
   };
 

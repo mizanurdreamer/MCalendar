@@ -33,10 +33,10 @@ export function ClientProfileSection() {
   const onSubmit = async (values: UpdateClientProfileDTO) => {
     try {
       await update.mutateAsync(values);
-      toast({ title: "Client profile updated" });
+      toast({ title: "Client profile updated", variant: "success" });
       setEditing(false);
     } catch (error) {
-      toast({ title: "Update failed", description: msg(error), variant: "destructive" });
+      toast({ title: "Update failed", description: msg(error), variant: "error" });
     }
   };
 

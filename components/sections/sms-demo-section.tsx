@@ -44,7 +44,7 @@ export function SmsDemoSection() {
       toast({
         title: "Missing fields",
         description: "Gateway, phone number, and text are required.",
-        variant: "destructive",
+        variant: "warning",
       });
       return;
     }
@@ -58,12 +58,13 @@ export function SmsDemoSection() {
       toast({
         title: "SMS sent",
         description: `Delivered via ${result.to}`,
+        variant: "success",
       });
     } catch (e) {
       toast({
         title: "Send failed",
         description: msg(e),
-        variant: "destructive",
+        variant: "error",
       });
     }
   };
