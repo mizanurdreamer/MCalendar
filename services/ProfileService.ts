@@ -1,6 +1,7 @@
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/util/prisma";
 import type { ActorContext } from "@/models";
 import type { UpdateClientProfileDTO, UpdateRoomAttendantProfileDTO } from "@/dto/profile.dto";
+import { UserRole } from "@/util/enums/UserRole";
 
 type ClientProfileView = {
   userId: string;
@@ -47,7 +48,7 @@ export class ProfileService {
   async getClient(actor: ActorContext): Promise<ClientProfileView> {
     let clientProfileId: string;
 
-    if (actor.role === "CLIENT") {
+    if (actor.role === UserRole.CLIENT) {
       const clientProfile = await prisma.clientProfile.findUniqueOrThrow({
         where: {
           userId: actor.userId,
@@ -55,7 +56,7 @@ export class ProfileService {
       });
 
       clientProfileId = clientProfile.id;
-    } else if (actor.role === "ROOMATTENDATNT") {
+    } else if (actor.role === UserRole.ROOM_ATTENDANT) {
       const roomAttendantProfile = await prisma.roomAttendantProfile.findUniqueOrThrow({
         where: {
           userId: actor.userId,

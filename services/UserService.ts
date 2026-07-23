@@ -1,11 +1,12 @@
 import type { Role } from "@/models/role";
 import { userRepository } from "@/repositories/UserRepository";
-import { hashPassword } from "@/lib/password";
-import { ConflictError, ForbiddenError, NotFoundError } from "@/lib/errors";
+import { hashPassword } from "@/util/password";
+import { ConflictError, ForbiddenError, NotFoundError } from "@/util/errors";
 import { toPublicUser, type PublicUser } from "@/services/AuthService";
 import type { CreateUserDTO, UpdateUserDTO } from "@/dto/user.dto";
 import type { ActorContext, Paginated } from "@/models";
 import type { PaginationDTO } from "@/dto/common.dto";
+import { UserRole } from "@/util/enums/UserRole";
 
 /**
  * User management. All methods here assume the caller has already been
@@ -75,8 +76,8 @@ export class UserService {
     if (!existing) throw new NotFoundError("User not found");
 
     // Non-admins (clients) may only manage roomAttendant accounts and cannot change roles.
-    const isAdmin = actor.role === "SUPER_ADMIN";
-    if (!isAdmin && !(actor.role === "CLIENT" && existing.role === "ROOMATTENDATNT")) {
+    const isAdmin = actor.role === UserRole.SUPER_ADMIN;
+    if (!isAdmin && !(actor.role === UserRole.CLIENT && existing.role === UserRole.ROOM_ATTENDANT.toString())) {
       throw new ForbiddenError();
     }
 
@@ -110,8 +111,8 @@ export class UserService {
 
     // Non-admins (clients) may only delete roomAttendant accounts.
     if (
-      actor.role !== "SUPER_ADMIN" &&
-      !(actor.role === "CLIENT" && existing.role === "ROOMATTENDATNT")
+      actor.role !== UserRole.SUPER_ADMIN &&
+      !(actor.role === UserRole.CLIENT && existing.role === UserRole.ROOM_ATTENDANT.toString())
     ) {
       throw new ForbiddenError();
     }
@@ -119,13 +120,13 @@ export class UserService {
     await userRepository.softDelete(id, actor.userId);
   }
 
-  /** Active roomAttendants, for assignment dropdowns. Optionally filter by clientId. */
+  /** Active room-attendants, for assignment dropdowns. Optionally filter by clientId. */
   listRoomAttendants(clientId?: string) {
-    return userRepository.listByRole("ROOMATTENDATNT", clientId).then((users) => users.map(toPublicUser));
+    return userRepository.listByRole(UserRole.ROOM_ATTENDANT, clientId).then((users) => users.map(toPublicUser));
   }
 
   listClients() {
-    return userRepository.listByRole("CLIENT").then((users) => users.map(toPublicUser));
+    return userRepository.listByRole(UserRole.CLIENT).then((users) => users.map(toPublicUser));
   }
 }
 

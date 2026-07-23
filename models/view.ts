@@ -5,7 +5,7 @@
 import type { Paginated } from "@/models";
 import type { Role } from "@/models/role";
 export type { Role } from "@/models/role";
-import { RoomAttendantTaskStatus } from "@/lib/enums/RoomAttendantTaskStatus";
+import { RoomAttendantTaskStatus } from "@/util/enums/RoomAttendantTaskStatus";
 export type UserView = {
   id: string;
   email: string;

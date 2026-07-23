@@ -1,5 +1,5 @@
 import { Prisma, type RoomAttendantTaskSchedule } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/util/prisma";
 
 /**
  * Data-access for roomAttendant task schedules (client-roomAttendant with date range).

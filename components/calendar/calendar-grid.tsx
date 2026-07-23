@@ -3,7 +3,7 @@ import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import type { CalendarApi, EventContentArg, EventInput } from "@fullcalendar/core";
 import type { MutableRefObject } from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/util/utils";
 
 export type CalendarViewMode = "month" | "week" | "day";
 

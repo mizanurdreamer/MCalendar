@@ -1,9 +1,10 @@
 import { roomAttendantAvailabilityRepository } from "@/repositories/RoomAttendantAvailabilityRepository";
 import { userRepository } from "@/repositories/UserRepository";
-import { ConflictError, ForbiddenError, NotFoundError } from "@/lib/errors";
+import { UserRole } from "@/util/enums/UserRole";
+import { ConflictError, ForbiddenError, NotFoundError } from "@/util/errors";
 import type { ActorContext, Paginated } from "@/models";
 import type { PaginationDTO } from "@/dto/common.dto";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/util/prisma";
 
 export type RoomAttendantAvailabilityView = {
   id: string;
@@ -38,8 +39,8 @@ export function toAvailabilityView(
 }
 
 /**
- * RoomAttendant availability management. RoomAttendants manage their own slots; clients and
- * admins can view any roomAttendant's availability.
+ * RoomAttendant availability management. room-attendants manage their own slots; clients and
+ * admins can view any room-attendant's availability.
  */
 export class RoomAttendantAvailabilityService {
   private async resolveRoomAttendantProfileId(userId: string) {
@@ -57,7 +58,7 @@ export class RoomAttendantAvailabilityService {
   ): Promise<Paginated<RoomAttendantAvailabilityView>> {
     const clientId = params.clientId;
     const roomAttendantId =
-      actor.role === "ROOMATTENDATNT"
+      actor.role === UserRole.ROOM_ATTENDANT
         ? (await this.resolveRoomAttendantProfileId(actor.userId)).id
         : params.roomAttendantId
           ? (await this.resolveRoomAttendantProfileId(params.roomAttendantId)).id
@@ -87,16 +88,16 @@ export class RoomAttendantAvailabilityService {
     actor: ActorContext,
   ) {
     const client = await userRepository.findById(params.clientId);
-    if (!client || client.role !== "CLIENT") {
+    if (!client || client.role !== UserRole.CLIENT) {
       throw new NotFoundError("Client not found");
     }
 
     const roomAttendant = await userRepository.findById(params.roomAttendantId);
-    if (!roomAttendant || roomAttendant.role !== "ROOMATTENDATNT") {
+    if (!roomAttendant || roomAttendant.role !== UserRole.ROOM_ATTENDANT) {
       throw new NotFoundError("RoomAttendant not found");
     }
 
-    if (actor.role === "ROOMATTENDATNT" && actor.userId !== params.roomAttendantId) {
+    if (actor.role === UserRole.ROOM_ATTENDANT && actor.userId !== params.roomAttendantId) {
       throw new ForbiddenError();
     }
 
@@ -133,7 +134,7 @@ export class RoomAttendantAvailabilityService {
     const existing = await roomAttendantAvailabilityRepository.findById(id);
     if (!existing) throw new NotFoundError("Availability not found");
 
-    if (actor.role === "ROOMATTENDATNT" && actor.userId !== existing.roomAttendant.userId) {
+    if (actor.role === UserRole.ROOM_ATTENDANT && actor.userId !== existing.roomAttendant.userId) {
       throw new ForbiddenError();
     }
 
@@ -160,7 +161,7 @@ export class RoomAttendantAvailabilityService {
     const existing = await roomAttendantAvailabilityRepository.findById(id);
     if (!existing) throw new NotFoundError("Availability not found");
 
-    if (actor.role === "ROOMATTENDATNT" && actor.userId !== existing.roomAttendant.userId) {
+    if (actor.role === UserRole.ROOM_ATTENDANT && actor.userId !== existing.roomAttendant.userId) {
       throw new ForbiddenError();
     }
 

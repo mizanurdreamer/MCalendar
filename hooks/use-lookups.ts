@@ -1,15 +1,15 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api-client";
+import { api } from "@/util/api-client";
 import type { UserView } from "@/models/view";
 
-/** Active roomAttendants for assignment dropdowns. Optionally filter by clientId. */
+/** Active room-attendants for assignment dropdowns. Optionally filter by clientId. */
 export function useRoomAttendants(enabled = true, clientId?: string) {
   const query = clientId ? `?clientId=${clientId}` : "";
   return useQuery({
-    queryKey: ["lookup", "roomAttendants", clientId],
-    queryFn: () => api.get<UserView[]>(`/api/users/roomAttendants${query}`),
+    queryKey: ["lookup", "room-attendants", clientId],
+    queryFn: () => api.get<UserView[]>(`/api/users/room-attendants${query}`),
     enabled,
   });
 }

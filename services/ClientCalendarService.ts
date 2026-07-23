@@ -2,8 +2,8 @@ import type { ActorContext } from "@/models";
 import type { CalendarDataView, CalendarEventView } from "@/models/view";
 import { guestBookingInfoRepository } from "@/repositories/GuestBookingInfoRepository";
 import { roomAttendantTaskScheduleRepository } from "@/repositories/RoomAttendantTaskScheduleRepository";
-import { prisma } from "@/lib/prisma";
-import { NotFoundError } from "@/lib/errors";
+import { prisma } from "@/util/prisma";
+import { NotFoundError } from "@/util/errors";
 
 const STATUS_CLASS: Record<string, string> = {
   confirmed: "evt-blue",
@@ -53,7 +53,7 @@ export class ClientCalendarService {
       .map((row) => this.toCalendarEvent(row))
       .filter((item): item is CalendarEventView => item !== null);
 
-    // Cleaning assignments the client created for their roomAttendants.
+    // Cleaning assignments the client created for their room-attendants.
     const schedules = await roomAttendantTaskScheduleRepository.findActiveForClient(clientProfile.id);
     const cleaningEvents: CalendarEventView[] = schedules.map((s) => ({
       id: `cleaning:${s.id}`,

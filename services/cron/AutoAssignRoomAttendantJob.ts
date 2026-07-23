@@ -1,7 +1,7 @@
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/util/prisma";
 import { roomAttendantTaskScheduleRepository } from "@/repositories/RoomAttendantTaskScheduleRepository";
 import { smsViaEmailService } from "@/services/SmsViaEmailService";
-import { RoomAttendantTaskStatus } from "@/lib/enums/RoomAttendantTaskStatus";
+import { RoomAttendantTaskStatus } from "@/util/enums/RoomAttendantTaskStatus";
 
 interface ExecuteResult {
   total: number;

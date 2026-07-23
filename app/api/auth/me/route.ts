@@ -1,6 +1,6 @@
 import { authService } from "@/services/AuthService";
-import { ok, handleApiError } from "@/lib/response";
-import { requireAuth } from "@/lib/auth";
+import { ok, handleApiError } from "@/util/response";
+import { requireAuth } from "@/util/auth";
 
 export async function GET() {
   try {

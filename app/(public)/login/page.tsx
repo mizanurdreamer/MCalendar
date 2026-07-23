@@ -17,7 +17,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ApiError } from "@/lib/api-client";
+import { ApiError } from "@/util/api-client";
 
 export default function LoginPage() {
   const login = useLogin();

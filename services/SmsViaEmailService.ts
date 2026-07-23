@@ -1,6 +1,6 @@
 import nodemailer from "nodemailer";
-import { prisma } from "@/lib/prisma";
-import { BadRequestError, NotFoundError } from "@/lib/errors";
+import { prisma } from "@/util/prisma";
+import { BadRequestError, NotFoundError } from "@/util/errors";
 import type { SendSmsViaEmailDTO } from "@/dto/smsMail.dto";
 
 type ResolvedGateway = {

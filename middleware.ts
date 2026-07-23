@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { ACCESS_COOKIE, verifyAccessToken } from "@/lib/jwt";
+import { ACCESS_COOKIE, verifyAccessToken } from "@/util/jwt";
 import type { Role } from "@/models/role";
 
 /**
@@ -11,13 +11,13 @@ import type { Role } from "@/models/role";
 const ROLE_HOME: Record<Role, string> = {
   SUPER_ADMIN: "/admin/dashboard",
   CLIENT: "/client/today",
-  ROOMATTENDATNT: "/roomAttendant/today",
+  ROOM_ATTENDANT: "/room-attendant/today",
 };
 
 const ROLE_PREFIX: Record<Role, string> = {
   SUPER_ADMIN: "/admin",
   CLIENT: "/client",
-  ROOMATTENDATNT: "/roomAttendant",
+  ROOM_ATTENDANT: "/room-attendant",
 };
 
 const AUTH_PAGES = ["/login", "/register"];

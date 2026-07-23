@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
 import { authService } from "@/services/AuthService";
 import { registerSchema } from "@/dto/auth.dto";
-import { created, handleApiError } from "@/lib/response";
-import { setAuthCookies } from "@/lib/auth";
+import { created, handleApiError } from "@/util/response";
+import { setAuthCookies } from "@/util/auth";
 
 export async function POST(req: NextRequest) {
   try {

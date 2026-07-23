@@ -24,7 +24,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ApiError } from "@/lib/api-client";
+import { UserRole } from "@/util/enums/UserRole";
+import { ApiError } from "@/util/api-client";
 
 export default function RegisterPage() {
   const registerMutation = useRegister();
@@ -36,7 +37,7 @@ export default function RegisterPage() {
     formState: { errors },
   } = useForm<RegisterDTO>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { role: "CLIENT" },
+    defaultValues: { role: UserRole.CLIENT },
   });
 
   const role = watch("role");
@@ -115,8 +116,8 @@ export default function RegisterPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="CLIENT">Client</SelectItem>
-                <SelectItem value="ROOMATTENDATNT">RoomAttendant</SelectItem>
+                <SelectItem value={UserRole.CLIENT}>Client</SelectItem>
+                <SelectItem value={UserRole.ROOM_ATTENDANT}>RoomAttendant</SelectItem>
               </SelectContent>
             </Select>
           </div>

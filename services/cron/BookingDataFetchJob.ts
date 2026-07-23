@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { guestBookingInfoRepository } from "@/repositories/GuestBookingInfoRepository";
-import { prisma } from "@/lib/prisma";
-import { CRON_CONFIG } from "@/lib/cron/config";
+import { prisma } from "@/util/prisma";
+import { CRON_CONFIG } from "@/util/cron/config";
 
 /**
  * Booking Data Fetch Job.

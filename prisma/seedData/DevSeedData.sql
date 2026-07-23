@@ -19,7 +19,7 @@ BEGIN
   -- Ensure roles exist
   INSERT INTO "role" (id, name) VALUES (gen_random_uuid(), 'SUPER_ADMIN') ON CONFLICT (name) DO NOTHING;
   INSERT INTO "role" (id, name) VALUES (gen_random_uuid(), 'CLIENT')      ON CONFLICT (name) DO NOTHING;
-  INSERT INTO "role" (id, name) VALUES (gen_random_uuid(), 'ROOMATTENDATNT')     ON CONFLICT (name) DO NOTHING;
+  INSERT INTO "role" (id, name) VALUES (gen_random_uuid(), 'ROOM_ATTENDANT')     ON CONFLICT (name) DO NOTHING;
 
   -- ============================================================
   -- client@bookingcalendar.com  (CLIENT)
@@ -38,14 +38,14 @@ BEGIN
   ON CONFLICT ("userId") DO NOTHING;
 
   -- ============================================================
-  -- roomAttendant@bookingcalendar.com  (ROOMATTENDATNT)
+  -- roomAttendant@bookingcalendar.com  (ROOM_ATTENDANT)
   -- ============================================================
   SELECT id INTO v_roomAttendant_id FROM "user" WHERE email = 'roomAttendant@bookingcalendar.com';
 
   IF v_roomAttendant_id IS NULL THEN
     INSERT INTO "user" (id, email, "passwordHash", "displayName", "roleId", "isActive", "updatedAt")
     SELECT gen_random_uuid(), 'roomAttendant@bookingcalendar.com', v_hash, 'RoomAttendant User', id, true, now()
-    FROM "role" WHERE name = 'ROOMATTENDATNT'
+    FROM "role" WHERE name = 'ROOM_ATTENDANT'
     RETURNING id INTO v_roomAttendant_id;
   END IF;
 

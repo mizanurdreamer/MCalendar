@@ -1,6 +1,7 @@
 import { z } from "zod";
+import { UserRole } from "@/util/enums/UserRole";
 
-const REGISTER_ROLE_VALUES = ["CLIENT", "ROOMATTENDATNT"] as const;
+const REGISTER_ROLE_VALUES = [UserRole.CLIENT, UserRole.ROOM_ATTENDANT] as const;
 
 export const loginSchema = z.object({
   email: z.string().email("Enter a valid email"),
@@ -21,8 +22,8 @@ export const registerSchema = z
       .string()
       .min(8, "Password must be at least 8 characters")
       .max(100, "Password is too long"),
-    // Public registration is limited to CLIENT / ROOMATTENDATNT. SUPER_ADMIN is seeded.
-    role: z.enum(REGISTER_ROLE_VALUES).default("CLIENT"),
+    // Public registration is limited to CLIENT / ROOM_ATTENDANT. SUPER_ADMIN is seeded.
+    role: z.enum(REGISTER_ROLE_VALUES).default(UserRole.CLIENT),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",

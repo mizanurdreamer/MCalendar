@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { TableCell, TableRow } from "@/components/ui/table";
-import { ApiError } from "@/lib/api-client";
+import { ApiError } from "@/util/api-client";
 
 export function Field({
   label,

@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { cronJobScheduler } from "@/services/cron";
-import { CRON_CONFIG } from "@/lib/cron/config";
-import { ok, fail, handleApiError } from "@/lib/response";
+import { CRON_CONFIG } from "@/util/cron/config";
+import { ok, fail, handleApiError } from "@/util/response";
 
 /**
  * GET /api/cron/status

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
@@ -37,11 +37,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
+import { cn } from "@/util/utils";
+import { UserRole } from "@/util/enums/UserRole";
 import { Field, EmptyRow, Pagination, ConfirmDialog, msg } from "@/components/sections/shared-utils";
 import type { Role, UserView } from "@/models/view";
 
-type ManagedRole = Extract<Role, "CLIENT" | "ROOMATTENDATNT">;
+type ManagedRole = UserRole.CLIENT | UserRole.ROOM_ATTENDANT;
 
 type UiStatus = "active" | "inactive";
 
@@ -82,10 +83,10 @@ const COPY: Record<
       { label: "Sort: Name Z-A", value: "name_desc" },
     ],
   },
-  ROOMATTENDATNT: {
-    singular: "RoomAttendant",
-    plural: "RoomAttendants",
-    itemLabel: "roomAttendants",
+  ROOM_ATTENDANT: {
+    singular: "Room Attendant",
+    plural: "Room Attendants",
+    itemLabel: "Room Attendants",
     statuses: [
       { label: "All", value: "all" },
       { label: "Active", value: "active" },
@@ -128,7 +129,7 @@ function UserAvatar({ firstName, lastName }: { firstName: string; lastName: stri
 function getRowMeta(user: UserView, role: ManagedRole): UserRowMeta {
   const status: UiStatus = user.isActive ? "active" : "inactive";
 
-  if (role === "CLIENT") {
+  if (role === UserRole.CLIENT) {
     return {
       subtitle: user.email,
       status,
@@ -156,7 +157,7 @@ export function UsersSection({
   role,
   canCreate = true,
   canDelete = true,
-  availabilityBasePath = "/admin/roomAttendants",
+  availabilityBasePath = "/admin/room-attendants",
   clientId,
 }: {
   role: ManagedRole;
@@ -283,8 +284,8 @@ export function UsersSection({
             <TableHeader className="">
               <TableRow className="">
                 <TableHead className="w-12 px-4" />
-                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">{role === "CLIENT" ? "Client" : "RoomAttendant"}</TableHead>
-                {role === "CLIENT" ? (
+                <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">{role === UserRole.CLIENT ? "Client" : "Room Attendant"}</TableHead>
+                {role === UserRole.CLIENT ? (
                   <>
                     <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">Primary contact</TableHead>
                     <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">SMS gateway</TableHead>
@@ -333,7 +334,7 @@ export function UsersSection({
                         </div>
                       </TableCell>
 
-                      {role === "CLIENT" ? (
+                      {role === UserRole.CLIENT ? (
                         <>
                           <TableCell className="text-[17px] text-muted-foreground">{meta.primaryContact}</TableCell>
                           <TableCell className="text-[17px] text-muted-foreground">{u.smsGatewayName ?? "-"}</TableCell>
@@ -353,7 +354,7 @@ export function UsersSection({
 
                       <TableCell>
                         <div className="flex items-center justify-end gap-1">
-                          {role === "ROOMATTENDATNT" && (
+                          {role === UserRole.ROOM_ATTENDANT && (
                             <button
                               type="button"
                               title="View availability"
@@ -452,7 +453,7 @@ function UserFormDialog({
   const create = useCreateUser();
   const update = useUpdateUser(editing?.id ?? "");
   const { data: smsGatewayData } = useSmsGateways({ page: 1, pageSize: 100 });
-  const { data: clientData } = useClients(role === "ROOMATTENDATNT" && !clientId && !editing);
+  const { data: clientData } = useClients(role === UserRole.ROOM_ATTENDANT && !clientId && !editing);
 
   const {
     register,
@@ -550,7 +551,7 @@ function UserFormDialog({
           <Field label="Email" error={errors.email?.message}>
             <Input type="email" disabled={!!editing} {...register("email")} />
           </Field>
-          {role === "ROOMATTENDATNT" && !clientId && !editing && (
+          {role === UserRole.ROOM_ATTENDANT && !clientId && !editing && (
             <Field label="Client" error={errors.clientId?.message}>
               <Select
                 value={clientIdValue || "__none"}
@@ -592,7 +593,7 @@ function UserFormDialog({
             <Input {...register("phone")} />
           </Field>
 
-          {role === "CLIENT" ? (
+          {role === UserRole.CLIENT ? (
             <div className="grid grid-cols-2 gap-3">
               <Field label="Company / Brand">
                 <Input {...register("companyName")} />
@@ -711,7 +712,7 @@ function UserViewDialog({
               <div className="text-sm font-medium text-muted-foreground">Created</div>
               <div className="text-sm">{new Date(user.createdAt).toLocaleDateString()}</div>
             </div>
-            {role === "CLIENT" ? (
+            {role === UserRole.CLIENT ? (
               <>
                 <div>
                   <div className="text-sm font-medium text-muted-foreground">Company</div>

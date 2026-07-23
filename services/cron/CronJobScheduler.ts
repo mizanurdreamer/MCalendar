@@ -1,4 +1,4 @@
-import { CRON_CONFIG } from "@/lib/cron/config";
+import { CRON_CONFIG } from "@/util/cron/config";
 
 export type CronJobHandler = () => Promise<void>;
 

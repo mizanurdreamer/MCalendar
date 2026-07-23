@@ -4,9 +4,9 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogOut, Menu, X, Moon, PanelLeftClose, PanelLeftOpen, Sun, UserCircle2 } from "lucide-react";
-import { useTheme } from "@/lib/theme-context";
+import { useTheme } from "@/util/theme-context";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { cn, initials } from "@/lib/utils";
+import { cn, initials } from "@/util/utils";
 import { NAV_BY_ROLE, type NavItem } from "@/components/dashboard/nav";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -85,7 +85,7 @@ export function DashboardShell({
   const items = NAV_BY_ROLE[user.role];
   const profileHrefByRole: Partial<Record<Role, string>> = {
     CLIENT: "/client/profile",
-    ROOMATTENDATNT: "/roomAttendant/profile",
+    ROOM_ATTENDANT: "/room-attendant/profile",
   };
   const profileHref = profileHrefByRole[user.role];
 

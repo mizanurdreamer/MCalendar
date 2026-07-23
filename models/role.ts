@@ -1,4 +1,6 @@
-export const ROLE_VALUES = ["SUPER_ADMIN", "CLIENT", "ROOMATTENDATNT"] as const;
+import { UserRole } from "@/util/enums/UserRole";
+
+export const ROLE_VALUES = [UserRole.SUPER_ADMIN, UserRole.CLIENT, UserRole.ROOM_ATTENDANT] as const;
 export type Role = (typeof ROLE_VALUES)[number];
 
 export function isRole(value: string): value is Role {

@@ -2,13 +2,13 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Sparkles, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getCurrentUser, dashboardPathForRole } from "@/lib/auth";
+import { getCurrentUser, dashboardPathForRole } from "@/util/auth";
 
 const features = [
   {
     icon: Users,
     title: "Role-based access",
-    body: "Tailored dashboards for super admins, clients, and roomAttendants.",
+    body: "Tailored dashboards for super admins, clients, and Room Attendants.",
   },
   {
     icon: Sparkles,

@@ -1,15 +1,16 @@
 import type { User } from "@/repositories/UserRepository";
 import { userRepository } from "@/repositories/UserRepository";
 import { refreshTokenRepository } from "@/repositories/RefreshTokenRepository";
-import { hashPassword, verifyPassword, sha256 } from "@/lib/password";
+import { hashPassword, verifyPassword, sha256 } from "@/util/password";
 import {
   signAccessToken,
   signRefreshToken,
   verifyRefreshToken,
   ttlToSeconds,
   REFRESH_TTL,
-} from "@/lib/jwt";
-import { BadRequestError, ConflictError, UnauthorizedError } from "@/lib/errors";
+} from "@/util/jwt";
+import { BadRequestError, ConflictError, UnauthorizedError } from "@/util/errors";
+import { UserRole } from "@/util/enums/UserRole";
 import type { LoginDTO, RegisterDTO } from "@/dto/auth.dto";
 
 export type PublicUser = {
@@ -122,7 +123,7 @@ export class AuthService {
       phone: dto.phone || null,
       role: dto.role,
       clientProfile:
-        dto.role === "CLIENT"
+        dto.role === UserRole.CLIENT
           ? {
               companyName: null,
               portfolioSize: null,
@@ -130,7 +131,7 @@ export class AuthService {
             }
           : undefined,
       roomAttendantProfile:
-        dto.role === "ROOMATTENDATNT"
+        dto.role === UserRole.ROOM_ATTENDANT
           ? {
               serviceArea: null,
               hourlyRate: null,

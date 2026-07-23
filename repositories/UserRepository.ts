@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/util/prisma";
+import { UserRole } from "@/util/enums/UserRole";
 import type { ListParams, Role } from "@/models";
 
 type UserWithRelations = Prisma.UserGetPayload<{
@@ -278,7 +279,7 @@ export class UserRepository {
           createdBy: data.createdBy,
           updatedBy: data.updatedBy,
           role: { connect: { name: data.role } },
-          ...(data.role === "CLIENT"
+          ...(data.role === UserRole.CLIENT
             ? {
                 clientProfile: {
                   create: {
@@ -296,7 +297,7 @@ export class UserRepository {
                 },
               }
             : {}),
-          ...(data.role === "ROOMATTENDATNT"
+          ...(data.role === UserRole.ROOM_ATTENDANT
             ? {
                 roomAttendantProfile: {
                   create: {
@@ -352,7 +353,7 @@ export class UserRepository {
         },
       });
 
-      if (data.role === "CLIENT" || data.clientProfile) {
+      if (data.role === UserRole.CLIENT || data.clientProfile) {
         await tx.clientProfile.upsert({
           where: { userId: id },
           update: {
@@ -382,12 +383,12 @@ export class UserRepository {
             updatedBy: data.updatedBy,
           },
         });
-        if (data.role === "CLIENT") {
+        if (data.role === UserRole.CLIENT) {
           await tx.roomAttendantProfile.deleteMany({ where: { userId: id } });
         }
       }
 
-      if (data.role === "ROOMATTENDATNT" || data.roomAttendantProfile) {
+      if (data.role === UserRole.ROOM_ATTENDANT || data.roomAttendantProfile) {
         await tx.roomAttendantProfile.upsert({
           where: { userId: id },
           update: {
@@ -419,12 +420,12 @@ export class UserRepository {
             updatedBy: data.updatedBy,
           },
         });
-        if (data.role === "ROOMATTENDATNT") {
+        if (data.role === UserRole.ROOM_ATTENDANT) {
           await tx.clientProfile.deleteMany({ where: { userId: id } });
         }
       }
 
-      if (data.role === "SUPER_ADMIN") {
+      if (data.role === UserRole.SUPER_ADMIN) {
         await tx.clientProfile.deleteMany({ where: { userId: id } });
         await tx.roomAttendantProfile.deleteMany({ where: { userId: id } });
       }

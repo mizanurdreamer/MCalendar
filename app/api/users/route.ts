@@ -2,19 +2,20 @@ import { NextRequest } from "next/server";
 import { userService } from "@/services/UserService";
 import { createUserSchema } from "@/dto/user.dto";
 import { parseListParams } from "@/dto/common.dto";
-import { created, ok, handleApiError } from "@/lib/response";
-import { requireActor } from "@/lib/auth";
-import { ForbiddenError } from "@/lib/errors";
+import { created, ok, handleApiError } from "@/util/response";
+import { requireActor } from "@/util/auth";
+import { ForbiddenError } from "@/util/errors";
+import { UserRole } from "@/util/enums/UserRole";
 import { isRole, type Role } from "@/models/role";
 
 export async function GET(req: NextRequest) {
   try {
-    const actor = await requireActor("SUPER_ADMIN", "CLIENT");
+    const actor = await requireActor(UserRole.SUPER_ADMIN, UserRole.CLIENT);
     const rawRole = req.nextUrl.searchParams.get("role");
     const roleParam: Role | null = rawRole && isRole(rawRole) ? rawRole : null;
 
-    // Clients may only browse roomAttendants; super admins may browse anyone.
-    if (actor.role !== "SUPER_ADMIN" && roleParam !== "ROOMATTENDATNT") {
+    // Clients may only browse room-attendants; super admins may browse anyone.
+    if (actor.role !== UserRole.SUPER_ADMIN && roleParam !== UserRole.ROOM_ATTENDANT) {
       throw new ForbiddenError();
     }
 
@@ -34,11 +35,11 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const actor = await requireActor("SUPER_ADMIN", "CLIENT");
+    const actor = await requireActor(UserRole.SUPER_ADMIN, UserRole.CLIENT);
     const dto = createUserSchema.parse(await req.json());
 
     // Clients may only create roomAttendant accounts.
-    if (actor.role !== "SUPER_ADMIN" && dto.role !== "ROOMATTENDATNT") {
+    if (actor.role !== UserRole.SUPER_ADMIN && dto.role !== UserRole.ROOM_ATTENDANT) {
       throw new ForbiddenError();
     }
 

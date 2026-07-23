@@ -1,6 +1,6 @@
 import { clientBookingProviderRepository } from "@/repositories/ClientBookingProviderRepository";
-import { prisma } from "@/lib/prisma";
-import { ForbiddenError, NotFoundError } from "@/lib/errors";
+import { prisma } from "@/util/prisma";
+import { ForbiddenError, NotFoundError } from "@/util/errors";
 import type {
   CreateBookingProviderDTO,
   UpdateBookingProviderDTO,

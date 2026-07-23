@@ -1,5 +1,5 @@
 import { Prisma, type BookingFetchData, type GuestBookingInfo } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/util/prisma";
 
 /**
  * Data-access for client booking data (cron job responses).

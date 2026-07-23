@@ -1,5 +1,5 @@
 import { smsGatewayRepository } from "@/repositories/SmsGatewayRepository";
-import { NotFoundError } from "@/lib/errors";
+import { NotFoundError } from "@/util/errors";
 import type { ActorContext, Paginated } from "@/models";
 import type { PaginationDTO } from "@/dto/common.dto";
 import type { CreateSmsGatewayDTO, UpdateSmsGatewayDTO } from "@/dto/smsGateway.dto";

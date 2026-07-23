@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api-client";
+import { api } from "@/util/api-client";
 import type { UpdateClientProfileDTO, UpdateRoomAttendantProfileDTO } from "@/dto/profile.dto";
 
 export type ClientProfileView = {
@@ -47,17 +47,17 @@ export function useUpdateClientProfile() {
 
 export function useRoomAttendantProfile() {
   return useQuery({
-    queryKey: ["roomAttendant-profile"],
-    queryFn: () => api.get<RoomAttendantProfileView>("/api/roomAttendant-profile"),
+    queryKey: ["room-attendant-profile"],
+    queryFn: () => api.get<RoomAttendantProfileView>("/api/room-attendant-profile"),
   });
 }
 
 export function useUpdateRoomAttendantProfile() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (dto: UpdateRoomAttendantProfileDTO) => api.patch<RoomAttendantProfileView>("/api/roomAttendant-profile", dto),
+    mutationFn: (dto: UpdateRoomAttendantProfileDTO) => api.patch<RoomAttendantProfileView>("/api/room-attendant-profile", dto),
     onSuccess: (data) => {
-      qc.setQueryData(["roomAttendant-profile"], data);
+      qc.setQueryData(["room-attendant-profile"], data);
       qc.invalidateQueries({ queryKey: ["me"] });
     },
   });

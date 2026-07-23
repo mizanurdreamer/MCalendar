@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/util/prisma";
 
 export class RefreshTokenRepository {
   create(data: { userId: string; tokenHash: string; expiresAt: Date }) {

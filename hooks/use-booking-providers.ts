@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api-client";
+import { api } from "@/util/api-client";
 import type { BookingProviderView, Paginated } from "@/models/view";
 
 const KEY = "booking-providers";

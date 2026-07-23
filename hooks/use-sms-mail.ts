@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
-import { api } from "@/lib/api-client";
+import { api } from "@/util/api-client";
 
 export type SendSmsPayload = {
   gatewayId: string;

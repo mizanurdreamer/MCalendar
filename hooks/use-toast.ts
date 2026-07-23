@@ -69,6 +69,8 @@ export function toast(props: Omit<ToasterToast, "id">) {
     ].slice(0, TOAST_LIMIT),
   });
 
+  scheduleRemove(id);
+
   return { id, update, dismiss };
 }
 

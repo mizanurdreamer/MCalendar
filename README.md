@@ -253,7 +253,7 @@ DTO (validation) → Repository (Prisma) → Service (business logic) → API Ro
 | --- | --- |
 | SUPER_ADMIN | Full access to all users, providers, task schedules |
 | CLIENT | Manage own providers, view assigned roomAttendants |
-| ROOMATTENDATNT | View own schedule and task schedules |
+| ROOM_ATTENDANT | View own schedule and task schedules |
 
 ## Building for Production
 

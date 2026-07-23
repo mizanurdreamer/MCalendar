@@ -2,8 +2,9 @@ import { roomAttendantTaskScheduleRepository } from "@/repositories/RoomAttendan
 import { guestBookingInfoRepository } from "@/repositories/GuestBookingInfoRepository";
 import { roomAttendantAvailabilityRepository } from "@/repositories/RoomAttendantAvailabilityRepository";
 import { userRepository } from "@/repositories/UserRepository";
-import { RoomAttendantTaskStatus } from "@/lib/enums/RoomAttendantTaskStatus";
-import { ConflictError, ForbiddenError, NotFoundError } from "@/lib/errors";
+import { RoomAttendantTaskStatus } from "@/util/enums/RoomAttendantTaskStatus";
+import { UserRole } from "@/util/enums/UserRole";
+import { ConflictError, ForbiddenError, NotFoundError } from "@/util/errors";
 import type { ActorContext, Paginated } from "@/models";
 import type {
   CleaningStatus,
@@ -11,7 +12,7 @@ import type {
   RoomAttendantCalendarEventView,
 } from "@/models/view";
 import type { PaginationDTO } from "@/dto/common.dto";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/util/prisma";
 
 export const CLEANING_STATUSES: CleaningStatus[] = [
   RoomAttendantTaskStatus.ASSIGNED,
@@ -66,7 +67,7 @@ export function toTaskScheduleView(
 }
 
 /**
- * RoomAttendant task schedule management. Clients assign roomAttendants for date ranges.
+ * RoomAttendant task schedule management. Clients assign room-attendants for date ranges.
  */
 export class RoomAttendantTaskScheduleService {
   private async resolveClientProfileId(userId: string) {
@@ -93,13 +94,13 @@ export class RoomAttendantTaskScheduleService {
   ): Promise<Paginated<RoomAttendantTaskScheduleView>> {
     // Clients can only see their own task schedules
     const clientId =
-      actor.role === "CLIENT"
+      actor.role === UserRole.CLIENT
         ? (await this.resolveClientProfileId(actor.userId)).id
         : params.clientId
           ? (await this.resolveClientProfileId(params.clientId)).id
           : undefined;
     const roomAttendantId =
-      actor.role === "ROOMATTENDATNT"
+      actor.role === UserRole.ROOM_ATTENDANT
         ? (await this.resolveRoomAttendantProfileId(actor.userId)).id
         : params.roomAttendantId
           ? (await this.resolveRoomAttendantProfileId(params.roomAttendantId)).id
@@ -144,17 +145,17 @@ export class RoomAttendantTaskScheduleService {
   ) {
     // Verify both users exist with correct roles
     const client = await userRepository.findById(params.clientId);
-    if (!client || client.role !== "CLIENT") {
+    if (!client || client.role !== UserRole.CLIENT) {
       throw new NotFoundError("Client not found");
     }
 
     const roomAttendant = await userRepository.findById(params.roomAttendantId);
-    if (!roomAttendant || roomAttendant.role !== "ROOMATTENDATNT") {
+    if (!roomAttendant || roomAttendant.role !== UserRole.ROOM_ATTENDANT) {
       throw new NotFoundError("RoomAttendant not found");
     }
 
     // Non-admins can only assign to themselves
-    if (actor.role !== "SUPER_ADMIN" && actor.userId !== params.clientId) {
+    if (actor.role !== UserRole.SUPER_ADMIN && actor.userId !== params.clientId) {
       throw new ForbiddenError();
     }
 
@@ -181,13 +182,13 @@ export class RoomAttendantTaskScheduleService {
     const existing = await roomAttendantTaskScheduleRepository.findById(id);
     if (!existing) throw new NotFoundError("Task schedule not found");
 
-    // Clients own the schedule; roomAttendants may only advance the cleaning status.
-    if (actor.role === "ROOMATTENDATNT") {
+    // Clients own the schedule; room-attendants may only advance the cleaning status.
+    if (actor.role === UserRole.ROOM_ATTENDANT) {
       if (actor.userId !== existing.roomAttendant.userId) throw new ForbiddenError();
       if (params.status === undefined) {
-        throw new ForbiddenError("RoomAttendants may only update cleaning status");
+        throw new ForbiddenError("room-attendants may only update cleaning status");
       }
-    } else if (actor.role !== "SUPER_ADMIN" && actor.userId !== existing.client.userId) {
+    } else if (actor.role !== UserRole.SUPER_ADMIN && actor.userId !== existing.client.userId) {
       throw new ForbiddenError();
     }
 
@@ -205,7 +206,7 @@ export class RoomAttendantTaskScheduleService {
     if (!existing) throw new NotFoundError("Task schedule not found");
 
     // Non-admins can only remove their own task schedules
-    if (actor.role !== "SUPER_ADMIN" && actor.userId !== existing.client.userId) {
+    if (actor.role !== UserRole.SUPER_ADMIN && actor.userId !== existing.client.userId) {
       throw new ForbiddenError();
     }
 

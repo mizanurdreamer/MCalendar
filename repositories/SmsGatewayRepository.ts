@@ -1,5 +1,5 @@
 import { Prisma, type SmsGateway } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/util/prisma";
 import type { ListParams } from "@/models";
 
 /**
