@@ -40,8 +40,6 @@ export type RoomAttendantTaskScheduleView = {
   roomAttendantEmail: string;
   assignedDate: string;
   status: CleaningStatus;
-  isSentSms: boolean;
-  smsSentDate: string | null;
   isActive: boolean;
   createdAt: string;
 };
@@ -59,8 +57,6 @@ export function toTaskScheduleView(
     roomAttendantEmail: item.roomAttendant.Email,
     assignedDate: item.assignedDate.toISOString(),
     status: item.status as CleaningStatus,
-    isSentSms: item.isSentSms,
-    smsSentDate: item.smsSentDate?.toISOString() ?? null,
     isActive: item.isActive,
     createdAt: item.createdAt.toISOString(),
   };

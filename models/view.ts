@@ -55,8 +55,6 @@ export type RoomAttendantTaskScheduleView = {
   roomAttendantEmail: string;
   assignedDate: string;
   status: CleaningStatus;
-  isSentSms: boolean;
-  smsSentDate: string | null;
   isActive: boolean;
   createdAt: string;
 };

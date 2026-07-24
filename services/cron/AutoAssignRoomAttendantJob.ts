@@ -113,7 +113,6 @@ export class AutoAssignRoomAttendantJob {
           roomAttendant: { connect: { id: roomAttendant.id } },
           assignedDate: cleaningDate,
           status: RoomAttendantTaskStatus.ASSIGNED,
-          isSentSms: false,
         });
         existingScheduleKeys.add(scheduleKey);
         assigned++;
@@ -126,8 +125,7 @@ export class AutoAssignRoomAttendantJob {
               gatewayName: roomAttendant.smsGateway.name,
             });
             await roomAttendantTaskScheduleRepository.update(schedule.id, {
-              isSentSms: true,
-              smsSentDate: new Date(),
+              status : 0
             });
             smsSent++;
           } catch (smsError) {
