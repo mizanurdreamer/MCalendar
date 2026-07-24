@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CalendarClock, Download, Eye, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
-import { createUserSchema, type CreateUserDTO } from "@/dto/user.dto";
+import { createUserSchema, updateUserSchema, type CreateUserDTO } from "@/dto/user.dto";
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from "@/hooks/use-users";
 import { useSmsGateways } from "@/hooks/use-sms-gateways";
 import { useClients } from "@/hooks/use-lookups";
@@ -462,7 +462,7 @@ function UserFormDialog({
     watch,
     formState: { errors },
   } = useForm<CreateUserDTO>({
-    resolver: zodResolver(createUserSchema),
+    resolver: zodResolver(editing ? updateUserSchema : createUserSchema),
     defaultValues: editing
       ? {
           firstName: editing.firstName,
