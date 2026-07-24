@@ -31,6 +31,7 @@ export type PublicUser = {
   hourlyRate: number | null;
   rating: number | null;
   clientId: string | null;
+  clientName: string | null;
   clientProfileId: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -67,6 +68,7 @@ function toPublicUser(user: User): PublicUser {
     hourlyRate: roomAttendantProfile?.hourlyRate ?? null,
     rating: roomAttendantProfile?.rating ? Number(roomAttendantProfile.rating) : null,
     clientId: roomAttendantProfile?.clientId ?? null,
+    clientName: roomAttendantProfile?.clientName ?? null,
     clientProfileId: clientProfile?.id ?? null,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,

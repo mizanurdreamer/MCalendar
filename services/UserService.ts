@@ -40,7 +40,59 @@ export class UserService {
 
   async create(dto: CreateUserDTO, actor: ActorContext): Promise<PublicUser> {
     const email = dto.email.toLowerCase();
-    if (await userRepository.findAnyByEmail(email)) {
+
+    if (dto.role === UserRole.ROOM_ATTENDANT) {
+      if (dto.clientId) {
+        const existingForClient = await userRepository.findRoomAttendantByClientAndEmail(
+          dto.clientId,
+          email,
+        );
+        if (existingForClient) {
+          throw new ConflictError("A room attendant with this email already exists for this client");
+        }
+      }
+
+      const existing = await userRepository.findAnyByEmail(email);
+      if (existing) {
+        if (existing.role !== UserRole.ROOM_ATTENDANT) {
+          throw new ConflictError("An account with this email already exists");
+        }
+        if (!dto.reuseExistingUser) {
+          throw new ConflictError("An account with this email already exists");
+        }
+
+        const createdFromExisting = await userRepository.create({
+          email,
+          passwordHash: existing.passwordHash,
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+          smsGatewayId: dto.smsGatewayId || null,
+          phone: dto.phone || null,
+          role: dto.role,
+          isActive: dto.isActive,
+          roomAttendantProfile: {
+            serviceArea: dto.serviceArea || null,
+            hourlyRate: dto.hourlyRate ?? null,
+            rating: dto.rating ?? null,
+            clientId: dto.clientId ?? null,
+          },
+          createdBy: actor.userId,
+          updatedBy: actor.userId,
+        });
+
+        return toPublicUser(createdFromExisting);
+      }
+    }
+
+    if (dto.role === UserRole.ROOM_ATTENDANT) {
+      const nonRoomAttendant = await userRepository.findAnyNonRoomAttendantByEmail(email);
+      if (nonRoomAttendant) {
+        throw new ConflictError("An account with this email already exists");
+      }
+      if (!dto.clientId && (await userRepository.findAnyByEmail(email))) {
+        throw new ConflictError("An account with this email already exists");
+      }
+    } else if (await userRepository.findAnyByEmail(email)) {
       throw new ConflictError("An account with this email already exists");
     }
 
@@ -79,6 +131,22 @@ export class UserService {
     const isAdmin = actor.role === UserRole.SUPER_ADMIN;
     if (!isAdmin && !(actor.role === UserRole.CLIENT && existing.role === UserRole.ROOM_ATTENDANT.toString())) {
       throw new ForbiddenError();
+    }
+
+    const targetRole = isAdmin && dto.role ? dto.role : existing.role;
+    if (
+      targetRole === UserRole.ROOM_ATTENDANT &&
+      dto.clientId !== undefined &&
+      dto.clientId !== null &&
+      dto.clientId !== ""
+    ) {
+      const duplicate = await userRepository.findRoomAttendantByClientAndEmail(
+        dto.clientId,
+        existing.email,
+      );
+      if (duplicate && duplicate.id !== id) {
+        throw new ConflictError("A room attendant with this email already exists for this client");
+      }
     }
 
     const user = await userRepository.update(id, {
@@ -127,6 +195,20 @@ export class UserService {
 
   listClients() {
     return userRepository.listByRole(UserRole.CLIENT).then((users) => users.map(toPublicUser));
+  }
+
+  async checkEmailExists(email: string): Promise<{ exists: boolean; role?: Role }> {
+    const user = await userRepository.findByEmail(email.toLowerCase());
+    if (!user) return { exists: false };
+    return { exists: true, role: user.role };
+  }
+
+  async checkRoomAttendantEmailExistsForClient(
+    clientId: string,
+    email: string,
+  ): Promise<{ exists: boolean }> {
+    const user = await userRepository.findRoomAttendantByClientAndEmail(clientId, email.toLowerCase());
+    return { exists: !!user };
   }
 }
 

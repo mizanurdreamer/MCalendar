@@ -7,7 +7,18 @@ type UserWithRelations = Prisma.UserGetPayload<{
   include: {
     role: true;
     clientProfile: { include: { smsGateway: true } };
-    roomAttendantProfile: { include: { smsGateway: true } };
+    roomAttendantProfile: {
+      include: {
+        smsGateway: true;
+        client: {
+          select: {
+            firstName: true;
+            lastName: true;
+            companyName: true;
+          };
+        };
+      };
+    };
   };
 }>;
 
@@ -21,6 +32,7 @@ type MappedProfile = {
   hourlyRate: number | null;
   rating: Prisma.Decimal | null;
   clientId: string | null;
+  clientName: string | null;
 };
 
 export type User = {
@@ -98,7 +110,18 @@ export class UserRepository {
   private withRole = {
     role: true,
     clientProfile: { include: { smsGateway: true } },
-    roomAttendantProfile: { include: { smsGateway: true } },
+    roomAttendantProfile: {
+      include: {
+        smsGateway: true,
+        client: {
+          select: {
+            firstName: true,
+            lastName: true,
+            companyName: true,
+          },
+        },
+      },
+    },
   } satisfies Prisma.UserInclude;
 
   private emptyToNull(value?: string | null) {
@@ -172,6 +195,7 @@ export class UserRepository {
             hourlyRate: null,
             rating: null,
             clientId: null,
+            clientName: null,
           }
         : null,
       roomAttendantProfile: user.roomAttendantProfile
@@ -185,6 +209,9 @@ export class UserRepository {
             hourlyRate: user.roomAttendantProfile.hourlyRate,
             rating: user.roomAttendantProfile.rating,
             clientId: user.roomAttendantProfile.clientId,
+            clientName: user.roomAttendantProfile.client
+              ? `${user.roomAttendantProfile.client.firstName} ${user.roomAttendantProfile.client.lastName}`
+              : null,
           }
         : null,
     };
@@ -215,6 +242,38 @@ export class UserRepository {
     return this.mapUser(user);
   }
 
+  async findAnyNonRoomAttendantByEmail(email: string) {
+    const user = await prisma.user.findFirst({
+      where: {
+        email: email.toLowerCase(),
+        isActive: true,
+        isDeleted: false,
+        role: { name: { not: UserRole.ROOM_ATTENDANT } },
+      },
+      include: this.withRole,
+    });
+    return this.mapUser(user);
+  }
+
+  async findRoomAttendantByClientAndEmail(clientId: string, email: string) {
+    const user = await prisma.user.findFirst({
+      where: {
+        isActive: true,
+        isDeleted: false,
+        role: { name: UserRole.ROOM_ATTENDANT },
+        roomAttendantProfile: {
+          is: {
+            clientId,
+            deletedAt: null,
+            Email: { equals: email.toLowerCase(), mode: "insensitive" },
+          },
+        },
+      },
+      include: this.withRole,
+    });
+    return this.mapUser(user);
+  }
+
   async list(params: ListParams & { role?: Role }) {
     const { page, pageSize, search, role, status, clientId } = params;
     const where: Prisma.UserWhereInput = {
@@ -222,7 +281,7 @@ export class UserRepository {
       ...(role ? { role: { name: role } } : {}),
       ...(status === "active" ? { isActive: true } : {}),
       ...(status === "inactive" ? { isActive: false } : {}),
-      ...(clientId ? { roomAttendantProfile: { clientId } } : {}),
+      ...(clientId ? { roomAttendantProfile: { is: { clientId } } } : {}),
       ...(search
         ? {
             OR: [
@@ -256,7 +315,7 @@ export class UserRepository {
       role: { name: role },
       isActive: true,
       ...this.notDeleted,
-      ...(clientId ? { roomAttendantProfile: { clientId } } : {}),
+      ...(clientId ? { roomAttendantProfile: { is: { clientId } } } : {}),
     };
 
     const users = await prisma.user.findMany({

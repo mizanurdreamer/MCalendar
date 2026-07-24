@@ -24,6 +24,7 @@ export type UserView = {
   hourlyRate?: number | null;
   rating?: number | null;
   clientId?: string | null;
+  clientName?: string | null;
   clientProfileId?: string | null;
   createdAt: string;
 };
