@@ -9,7 +9,7 @@ import type { LoginDTO, RegisterDTO } from "@/dto/auth.dto";
 const dashboardPath: Record<UserView["role"], string> = {
   SUPER_ADMIN: "/admin/dashboard",
   CLIENT: "/client/today",
-  ROOM_ATTENDANT: "/room-attendant/today",
+  ROOM_ATTENDANT: "/select-client",
 };
 
 export function useMe() {

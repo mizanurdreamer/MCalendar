@@ -1,12 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ACCESS_COOKIE, verifyAccessToken } from "@/util/jwt";
 import type { Role } from "@/models/role";
-
-/**
- * Edge middleware — protects dashboard pages and routes users to the section
- * that matches their role. API routes enforce their own auth (returning JSON
- * 401/403), so they are intentionally excluded here.
- */
+import { ROOM_ATTENDANT_SELECT_REQUIRED_COOKIE } from "@/util/auth";
 
 const ROLE_HOME: Record<Role, string> = {
   SUPER_ADMIN: "/admin/dashboard",
@@ -21,7 +16,6 @@ const ROLE_PREFIX: Record<Role, string> = {
 };
 
 const AUTH_PAGES = ["/login", "/register"];
-
 const PUBLIC_PREFIXES = ["/_next", "/api", "/icon.svg", "/favicon.ico"];
 
 function isPublic(pathname: string): boolean {
@@ -52,7 +46,6 @@ export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const role = await readRole(req);
 
-  // Login/register must stay reachable for everyone (sign-in would loop otherwise).
   if (AUTH_PAGES.includes(pathname)) {
     if (role) {
       return NextResponse.redirect(new URL(ROLE_HOME[role], req.url));
@@ -60,26 +53,42 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // Public assets / API are not gated here (APIs return JSON 401/403).
   if (isPublic(pathname)) return NextResponse.next();
 
-  // Unauthenticated → login (preserving the intended destination).
   if (!role) {
     return toLogin(req, pathname);
   }
 
-  // Authenticated users: bare role root → its home screen.
   const matchedPrefix = (Object.keys(ROLE_PREFIX) as Role[]).find(
     (r) => pathname === ROLE_PREFIX[r] || pathname.startsWith(ROLE_PREFIX[r] + "/"),
   );
 
+  if (pathname === "/select-client") {
+    if (role !== "ROOM_ATTENDANT") {
+      return NextResponse.redirect(new URL(ROLE_HOME[role], req.url));
+    }
+    const selectionRequired = req.cookies.get(ROOM_ATTENDANT_SELECT_REQUIRED_COOKIE)?.value === "1";
+    if (!selectionRequired) {
+      return NextResponse.redirect(new URL("/room-attendant/today", req.url));
+    }
+    return NextResponse.next();
+  }
+
   if (matchedPrefix) {
-    // Bare role root (e.g. /client) → its dashboard/today.
+    const selectionRequired = req.cookies.get(ROOM_ATTENDANT_SELECT_REQUIRED_COOKIE)?.value === "1";
+
+    if (
+      role === "ROOM_ATTENDANT" &&
+      pathname.startsWith("/room-attendant") &&
+      selectionRequired
+    ) {
+      return NextResponse.redirect(new URL("/select-client", req.url));
+    }
+
     if (pathname === ROLE_PREFIX[role]) {
       return NextResponse.redirect(new URL(ROLE_HOME[role], req.url));
     }
 
-    // Keep each role within its own section.
     if (pathname !== ROLE_HOME[role] && !pathname.startsWith(ROLE_PREFIX[role] + "/")) {
       return NextResponse.redirect(new URL(ROLE_HOME[role], req.url));
     }

@@ -15,6 +15,7 @@ import { UserRole } from "@/util/enums/UserRole";
 import type { ActorContext } from "@/models";
 
 const isProd = process.env.NODE_ENV === "production";
+export const ROOM_ATTENDANT_SELECT_REQUIRED_COOKIE = "sth_ra_select_required";
 
 const baseCookieOptions = {
   httpOnly: true,
@@ -43,6 +44,18 @@ export function setAuthCookies(
 export function clearAuthCookies(response: NextResponse) {
   response.cookies.set(ACCESS_COOKIE, "", { ...baseCookieOptions, maxAge: 0 });
   response.cookies.set(REFRESH_COOKIE, "", { ...baseCookieOptions, maxAge: 0 });
+  response.cookies.set(ROOM_ATTENDANT_SELECT_REQUIRED_COOKIE, "", {
+    ...baseCookieOptions,
+    maxAge: 0,
+  });
+  return response;
+}
+
+export function setRoomAttendantSelectionRequired(response: NextResponse, required: boolean) {
+  response.cookies.set(ROOM_ATTENDANT_SELECT_REQUIRED_COOKIE, required ? "1" : "", {
+    ...baseCookieOptions,
+    maxAge: required ? ttlToSeconds(REFRESH_TTL) : 0,
+  });
   return response;
 }
 

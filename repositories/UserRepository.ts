@@ -242,6 +242,15 @@ export class UserRepository {
     return this.mapUser(user);
   }
 
+  async findAllByEmail(email: string) {
+    const users = await prisma.user.findMany({
+      where: { email: email.toLowerCase(), ...this.notDeleted },
+      include: this.withRole,
+      orderBy: { createdAt: "asc" },
+    });
+    return users.map((user) => this.mapUser(user) as User);
+  }
+
   async findAnyNonRoomAttendantByEmail(email: string) {
     const user = await prisma.user.findFirst({
       where: {

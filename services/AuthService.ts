@@ -46,6 +46,14 @@ export type AuthResult = {
   refreshToken: string;
 };
 
+export type RoomAttendantLoginOption = {
+  userId: string;
+  clientId: string | null;
+  clientName: string | null;
+  firstName: string;
+  lastName: string;
+};
+
 function toPublicUser(user: User): PublicUser {
   const clientProfile = user.clientProfile;
   const roomAttendantProfile = user.roomAttendantProfile;
@@ -147,15 +155,51 @@ export class AuthService {
   }
 
   async login(dto: LoginDTO): Promise<AuthResult> {
-    const user = await userRepository.findByEmail(dto.email);
-    if (!user) throw new UnauthorizedError("Invalid email");
-    if (!user.isActive) throw new UnauthorizedError("This account is disabled");
+    const candidates = await userRepository.findAllByEmail(dto.email);
+    if (candidates.length === 0) throw new UnauthorizedError("Invalid email");
 
-    const valid = await verifyPassword(dto.password, user.passwordHash);
-    if (!valid) throw new UnauthorizedError("Invalid password");
+    const activeCandidates = candidates.filter((candidate) => candidate.isActive);
+    if (activeCandidates.length === 0) {
+      throw new UnauthorizedError("This account is disabled");
+    }
 
-    const tokens = await this.issueTokens(user);
-    return { user: toPublicUser(user), ...tokens };
+    for (const candidate of activeCandidates) {
+      const valid = await verifyPassword(dto.password, candidate.passwordHash);
+      if (!valid) continue;
+      const tokens = await this.issueTokens(candidate);
+      return { user: toPublicUser(candidate), ...tokens };
+    }
+
+    throw new UnauthorizedError("Invalid password");
+  }
+
+  async listRoomAttendantLoginOptionsByEmail(email: string): Promise<RoomAttendantLoginOption[]> {
+    const users = await userRepository.findAllByEmail(email.toLowerCase());
+    return users
+      .filter((user) => user.isActive && user.role === UserRole.ROOM_ATTENDANT)
+      .map((user) => ({
+        userId: user.id,
+        clientId: user.roomAttendantProfile?.clientId ?? null,
+        clientName: user.roomAttendantProfile?.clientName ?? null,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      }));
+  }
+
+  async switchRoomAttendantSession(currentUserId: string, targetUserId: string): Promise<AuthResult> {
+    const current = await userRepository.findById(currentUserId);
+    const target = await userRepository.findById(targetUserId);
+    if (!current || !target) throw new UnauthorizedError("Account unavailable");
+    if (!current.isActive || !target.isActive) throw new UnauthorizedError("Account unavailable");
+    if (current.role !== UserRole.ROOM_ATTENDANT || target.role !== UserRole.ROOM_ATTENDANT) {
+      throw new UnauthorizedError("Invalid account switch");
+    }
+    if (current.email.toLowerCase() !== target.email.toLowerCase()) {
+      throw new UnauthorizedError("Invalid account switch");
+    }
+
+    const tokens = await this.issueTokens(target);
+    return { user: toPublicUser(target), ...tokens };
   }
 
   /** Rotate a refresh token: verify, revoke the old, issue a new pair. */
