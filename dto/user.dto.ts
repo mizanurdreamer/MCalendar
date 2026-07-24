@@ -19,6 +19,7 @@ export const createUserSchema = z
     hourlyRate: z.coerce.number().int().min(0).max(10000).optional(),
     rating: z.coerce.number().min(0).max(5).optional(),
     clientId: z.string().uuid().optional().or(z.literal("")),
+    reuseExistingUser: z.boolean().optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",

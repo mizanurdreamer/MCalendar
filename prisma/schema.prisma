@@ -257,10 +257,10 @@ model RoomAttendantTaskNotificationHistory {
     phoneNo  String
     notificationType Int @default(0)
     notificationDate DateTime?
-    emailSentStatus  Int @default(0)
+    emailSentStatus  Int?
     emailFailedCount Int @default(0)
     emailFailedResult String
-    smsSentStatus  Int @default(0)
+    smsSentStatus  Int?
     smsFailedCount Int @default(0)
     smsFailedResult String
     isDeleted  Boolean  @default(false)

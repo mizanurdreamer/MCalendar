@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
+import { useQuery } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CalendarClock, Download, Eye, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { createUserSchema, updateUserSchema, type CreateUserDTO } from "@/dto/user.dto";
@@ -41,6 +42,7 @@ import { cn } from "@/util/utils";
 import { UserRole } from "@/util/enums/UserRole";
 import { Field, EmptyRow, Pagination, ConfirmDialog, msg } from "@/components/sections/shared-utils";
 import type { Role, UserView } from "@/models/view";
+import { ApiError, api } from "@/util/api-client";
 
 type ManagedRole = UserRole.CLIENT | UserRole.ROOM_ATTENDANT;
 
@@ -294,6 +296,7 @@ export function UsersSection({
                   </>
                 ) : (
                   <>
+                    <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">Client</TableHead>
                     <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">Service area</TableHead>
                     <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">SMS gateway</TableHead>
                     <TableHead className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">Phone</TableHead>
@@ -307,7 +310,7 @@ export function UsersSection({
 
             <TableBody>
               {isLoading ? (
-                <EmptyRow colSpan={8}>Loading...</EmptyRow>
+                <EmptyRow colSpan={role === UserRole.CLIENT ? 8 : 9}>Loading...</EmptyRow>
               ) : filteredItems.length > 0 ? (
                 filteredItems.map((u) => {
                   const meta = getRowMeta(u, role);
@@ -343,6 +346,7 @@ export function UsersSection({
                         </>
                       ) : (
                         <>
+                          <TableCell className="text-[17px] text-muted-foreground">{u.clientName ?? "-"}</TableCell>
                           <TableCell className="text-[17px] text-muted-foreground">{meta.serviceArea}</TableCell>
                           <TableCell className="text-[17px] text-muted-foreground">{u.smsGatewayName ?? "-"}</TableCell>
                           <TableCell className="text-[17px] text-muted-foreground">{u.phone ?? "-"}</TableCell>
@@ -400,7 +404,9 @@ export function UsersSection({
                   );
                 })
               ) : (
-                <EmptyRow colSpan={8}>No {copy.plural.toLowerCase()} found.</EmptyRow>
+                <EmptyRow colSpan={role === UserRole.CLIENT ? 8 : 9}>
+                  No {copy.plural.toLowerCase()} found.
+                </EmptyRow>
               )}
             </TableBody>
           </Table>
@@ -449,16 +455,19 @@ function UserFormDialog({
   clientId?: string;
   onClose: () => void;
 }) {
+  const LINK_MODE_PASSWORD = "existing-user-password";
   const copy = COPY[role];
   const create = useCreateUser();
   const update = useUpdateUser(editing?.id ?? "");
   const { data: smsGatewayData } = useSmsGateways({ page: 1, pageSize: 100 });
-  const { data: clientData } = useClients(role === UserRole.ROOM_ATTENDANT && !clientId && !editing);
+  const { data: clientData } = useClients(role === UserRole.ROOM_ATTENDANT && !clientId);
 
   const {
     register,
     handleSubmit,
     setValue,
+    setError,
+    clearErrors,
     watch,
     formState: { errors },
   } = useForm<CreateUserDTO>({
@@ -501,6 +510,62 @@ function UserFormDialog({
   const isActive = watch("isActive");
   const smsGatewayId = watch("smsGatewayId");
   const clientIdValue = watch("clientId");
+  const emailValue = (watch("email") ?? "").trim().toLowerCase();
+  const emailLooksValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue);
+  const emailExists = useQuery({
+    queryKey: ["users", "email-exists", emailValue],
+    queryFn: () =>
+      api.get<{ exists: boolean; role?: Role }>(
+        `/api/users/email-exists?email=${encodeURIComponent(emailValue)}`,
+      ),
+    enabled: role === UserRole.ROOM_ATTENDANT && !editing && emailLooksValid,
+  });
+  const roomAttendantExistsForClient = useQuery({
+    queryKey: ["users", "room-attendant-email-exists", clientIdValue ?? "", emailValue],
+    queryFn: () =>
+      api.get<{ exists: boolean }>(
+        `/api/users/room-attendant-email-exists?clientId=${encodeURIComponent(clientIdValue ?? "")}&email=${encodeURIComponent(emailValue)}`,
+      ),
+    enabled:
+      role === UserRole.ROOM_ATTENDANT &&
+      !editing &&
+      emailLooksValid &&
+      !!clientIdValue,
+  });
+  const shouldLinkExistingCleaner =
+    role === UserRole.ROOM_ATTENDANT &&
+    !editing &&
+    emailExists.data?.exists === true &&
+    emailExists.data?.role === UserRole.ROOM_ATTENDANT;
+
+  React.useEffect(() => {
+    if (editing) return;
+    if (shouldLinkExistingCleaner) {
+      setValue("password", LINK_MODE_PASSWORD, { shouldValidate: true });
+      setValue("confirmPassword", LINK_MODE_PASSWORD, { shouldValidate: true });
+      clearErrors(["password", "confirmPassword"]);
+      return;
+    }
+    if (watch("password") === LINK_MODE_PASSWORD) {
+      setValue("password", "", { shouldValidate: false });
+    }
+    if (watch("confirmPassword") === LINK_MODE_PASSWORD) {
+      setValue("confirmPassword", "", { shouldValidate: false });
+    }
+  }, [editing, shouldLinkExistingCleaner, setValue, clearErrors, watch, LINK_MODE_PASSWORD]);
+
+  React.useEffect(() => {
+    if (roomAttendantExistsForClient.data?.exists) {
+      setError("email", {
+        type: "manual",
+        message: "This email already exists for the selected client",
+      });
+      return;
+    }
+    if (errors.email?.type === "manual") {
+      clearErrors("email");
+    }
+  }, [roomAttendantExistsForClient.data?.exists, setError, clearErrors, errors.email?.type]);
 
   const onSubmit = async (values: CreateUserDTO) => {
     try {
@@ -522,11 +587,44 @@ function UserFormDialog({
         });
         toast({ title: `${copy.singular} updated`, variant: "success" });
       } else {
-        await create.mutateAsync({ ...values, role });
+        if (roomAttendantExistsForClient.data?.exists) {
+          toast({
+            title: "Duplicate cleaner",
+            description: "This email already exists for the selected client",
+            variant: "error",
+          });
+          setError("email", {
+            type: "manual",
+            message: "This email already exists for the selected client",
+          });
+          return;
+        }
+        await create.mutateAsync({
+          ...values,
+          role,
+          reuseExistingUser: shouldLinkExistingCleaner,
+          password: shouldLinkExistingCleaner ? LINK_MODE_PASSWORD : values.password,
+          confirmPassword: shouldLinkExistingCleaner ? LINK_MODE_PASSWORD : values.confirmPassword,
+        });
         toast({ title: `${copy.singular} created`, variant: "success" });
       }
       onClose();
     } catch (e) {
+      if (
+        e instanceof ApiError &&
+        e.message.toLowerCase().includes("already exists for this client")
+      ) {
+        toast({
+          title: "Duplicate cleaner",
+          description: "This email already exists for the selected client",
+          variant: "error",
+        });
+        setError("email", {
+          type: "manual",
+          message: "This email already exists for the selected client",
+        });
+        return;
+      }
       toast({ title: "Save failed", description: msg(e), variant: "error" });
     }
   };
@@ -549,13 +647,30 @@ function UserFormDialog({
             </Field>
           </div>
           <Field label="Email" error={errors.email?.message}>
-            <Input type="email" disabled={!!editing} {...register("email")} />
+            <Input
+              type="email"
+              disabled={!!editing}
+              {...register("email", {
+                onChange: () => {
+                  if (errors.email?.type === "manual") clearErrors("email");
+                },
+              })}
+            />
           </Field>
-          {role === UserRole.ROOM_ATTENDANT && !clientId && !editing && (
+          {shouldLinkExistingCleaner && (
+            <div className="rounded-md bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
+              <p className="font-medium">Existing cleaner found for this email.</p>
+              <p>Password fields are hidden. This form will link that existing user.</p>
+            </div>
+          )}
+          {role === UserRole.ROOM_ATTENDANT && !clientId && (
             <Field label="Client" error={errors.clientId?.message}>
               <Select
                 value={clientIdValue || "__none"}
-                onValueChange={(v) => setValue("clientId", v === "__none" ? "" : v)}
+                onValueChange={(v) => {
+                  setValue("clientId", v === "__none" ? "" : v);
+                  if (errors.email?.type === "manual") clearErrors("email");
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select client" />
@@ -635,7 +750,7 @@ function UserFormDialog({
             </div>
           )}
 
-          {!editing && (
+          {!editing && !shouldLinkExistingCleaner && (
             <>
               <Field label="Password" error={errors.password?.message}>
                 <Input type="password" autoComplete="new-password" {...register("password")} />
@@ -737,6 +852,10 @@ function UserViewDialog({
               </>
             ) : (
               <>
+                <div>
+                  <div className="text-sm font-medium text-muted-foreground">Client</div>
+                  <div className="text-sm">{user.clientName || "-"}</div>
+                </div>
                 <div>
                   <div className="text-sm font-medium text-muted-foreground">Service area</div>
                   <div className="text-sm">{user.serviceArea || "-"}</div>
