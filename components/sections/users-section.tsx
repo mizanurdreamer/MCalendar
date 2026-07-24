@@ -518,7 +518,7 @@ function UserFormDialog({
           serviceArea: values.serviceArea,
           hourlyRate: values.hourlyRate,
           rating: values.rating,
-          clientId: values.clientId || null,
+          clientId: values.clientId,
         });
         toast({ title: `${copy.singular} updated`, variant: "success" });
       } else {
