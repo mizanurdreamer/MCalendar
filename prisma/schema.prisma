@@ -181,11 +181,8 @@ model RoomAttendantTaskSchedule {
   roomAttendantId String   @db.Uuid
   client    ClientProfile     @relation( fields: [clientId], references: [id], onDelete: Cascade)
   roomAttendant   RoomAttendantProfile     @relation(fields: [roomAttendantId], references: [id], onDelete: Cascade)
-
   assignedDate DateTime
-  status    Int @default(0)
-  isSentSms Boolean  @default(false)
-  smsSentDate DateTime?
+  status  Int @default(0)
   isActive  Boolean  @default(true)
   isDeleted    Boolean @default(false)
   createdAt DateTime  @default(now())
@@ -193,13 +190,12 @@ model RoomAttendantTaskSchedule {
   createdBy String?   @db.Uuid
   updatedBy String?   @db.Uuid
   deletedAt DateTime?
-
+  roomAttendantTaskNotificationHistory RoomAttendantTaskNotificationHistory[]
   @@unique([clientId, roomAttendantId, assignedDate], map: "taskSchedule_clientId_roomAttendantId_assignedDate_key")
   @@index([clientId], map: "roomAttendantTaskSchedule_clientId_idx")
   @@index([roomAttendantId], map: "roomAttendantTaskSchedule_roomAttendantId_idx")
   @@index([status], map: "roomAttendantTaskSchedule_status_idx")
   @@index([assignedDate], map: "roomAttendantTaskSchedule_assignedDate_idx")
-  @@index([isSentSms], map: "roomAttendantTaskSchedule_isSentSms_idx")
   @@index([deletedAt], map: "roomAttendantTaskSchedule_deletedAt_idx")
   @@map("roomAttendantTaskSchedule")
 }
@@ -246,4 +242,27 @@ model SmsGateway {
 
   @@index([deletedAt], map: "smsGateway_deletedAt_idx")
   @@map("smsGateway")
+}
+
+model RoomAttendantTaskNotificationHistory {
+    id        String   @id @default(uuid()) @db.Uuid
+    clientId  String   @db.Uuid
+    roomAttendantId String   @db.Uuid
+    taskScheduleId String @db.Uuid
+    taskSchedule RoomAttendantTaskSchedule @relation(fields : [taskScheduleId], references:[id], onDelete : Cascade)
+    Email     String
+    firstName String
+    lastName String
+    smsGatewayId String? @db.Uuid
+    phoneNo  String
+    notificationType Int @default(0)
+    notificationDate DateTime?
+    emailSentStatus  Int @default(0)
+    emailFailedCount Int @default(0)
+    emailFailedResult String
+    smsSentStatus  Int @default(0)
+    smsFailedCount Int @default(0)
+    smsFailedResult String
+    isDeleted  Boolean  @default(false)
+    @@map("roomAttendantTaskNotificationHistory")
 }
