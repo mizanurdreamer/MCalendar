@@ -179,7 +179,6 @@ export class AutoAssignRoomAttendantJob {
     const schedules = await prisma.roomAttendantTaskSchedule.findMany({
       where: {
         assignedDate: { gte: today, lt: thirtyDaysFromNow },
-        deletedAt: null,
       },
       select: { clientId: true, assignedDate: true },
     });

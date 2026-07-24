@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { prisma } from "@/util/prisma";
 import { requireRole } from "@/util/auth";
 import { UserRole } from "@/util/enums/UserRole";
 import { RoomAttendantAvailabilityManager } from "@/components/sections/room-attendant-availability-manager";
@@ -12,6 +13,14 @@ export default async function RoomAttendantAvailabilityScreen({
   await requireRole(UserRole.SUPER_ADMIN);
   const { roomAttendantId } = await params;
 
+  const roomAttendantProfile = await prisma.roomAttendantProfile.findUnique({
+    where: { userId: roomAttendantId },
+    select: {
+      clientId: true,
+      client: { select: { userId: true } },
+    },
+  });
+
   return (
     <div className="space-y-4">
       <Link
@@ -21,7 +30,10 @@ export default async function RoomAttendantAvailabilityScreen({
       >
         <ArrowLeft className="h-5 w-5" />
       </Link>
-      <RoomAttendantAvailabilityManager roomAttendantId={roomAttendantId} />
+      <RoomAttendantAvailabilityManager
+        roomAttendantId={roomAttendantId}
+        clientId={roomAttendantProfile?.client?.userId}
+      />
     </div>
   );
 }
