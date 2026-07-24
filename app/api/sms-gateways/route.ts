@@ -8,7 +8,7 @@ import { UserRole } from "@/util/enums/UserRole";
 
 export async function GET(req: NextRequest) {
   try {
-    await requireActor(UserRole.SUPER_ADMIN);
+    await requireActor(UserRole.SUPER_ADMIN, UserRole.CLIENT, UserRole.ROOM_ATTENDANT);
     const params = parseListParams(req.nextUrl.searchParams);
     const result = await smsGatewayService.list({ ...params, status: params.status });
     return ok(result);

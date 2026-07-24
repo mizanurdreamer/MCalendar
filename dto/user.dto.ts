@@ -29,7 +29,7 @@ export const updateUserSchema = z.object({
   firstName: z.string().trim().min(1, "First name cannot be empty").max(80).optional(),
   lastName: z.string().trim().min(1, "Last name cannot be empty").max(80).optional(),
   smsGatewayId: z.string().uuid().optional().or(z.literal("")),
-  phone: z.string().trim().min(1, "Phone number cannot be empty").max(30).optional(),
+  phone: z.string().trim().min(1, "Phone number is required").max(30),
   role: z.enum(ROLE_VALUES).optional(),
   isActive: z.boolean().optional(),
   companyName: z.string().trim().max(160).optional().or(z.literal("")),

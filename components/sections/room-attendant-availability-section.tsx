@@ -34,7 +34,7 @@ export function RoomAttendantAvailabilitySection() {
   return (
     <Card className="rounded-2xl">
       <CardHeader className="pb-3">
-        <CardTitle className="text-2xl font-bold ">My Availability</CardTitle>
+        <CardTitle className="text-2xl font-bold ">Room Attendant Availability</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {(roomAttendants.data ?? []).map((roomAttendant) => {
