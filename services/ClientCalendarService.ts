@@ -1,9 +1,11 @@
 import type { ActorContext } from "@/models";
-import type { CalendarDataView, CalendarEventView } from "@/models/view";
+import type { CalendarDataView, CalendarEventView, CleaningStatus } from "@/models/view";
 import { guestBookingInfoRepository } from "@/repositories/GuestBookingInfoRepository";
 import { roomAttendantTaskScheduleRepository } from "@/repositories/RoomAttendantTaskScheduleRepository";
 import { prisma } from "@/util/prisma";
 import { NotFoundError } from "@/util/errors";
+import { RoomAttendantTaskStatus } from "@/util/enums/RoomAttendantTaskStatus";
+import { STATUS_LABEL, STATUS_CLASS as CLEANING_STATUS_CLASS } from "@/util/enums/CleaningStatusLabels";
 
 const STATUS_CLASS: Record<string, string> = {
   confirmed: "evt-blue",
@@ -55,18 +57,21 @@ export class ClientCalendarService {
 
     // Cleaning assignments the client created for their room-attendants.
     const schedules = await roomAttendantTaskScheduleRepository.findActiveForClient(clientProfile.id);
-    const cleaningEvents: CalendarEventView[] = schedules.map((s) => ({
-      id: `cleaning:${s.id}`,
-      title: `Cleaning · ${s.roomAttendant.firstName} ${s.roomAttendant.lastName}`,
-      start: s.assignedDate.toISOString(),
-      end: undefined,
-      allDay: true,
-      classNames: ["evt-cleaning"],
-      extendedProps: {
-        property: "Assigned cleaning",
-        status: String(s.status ?? 0),
-      },
-    }));
+    const cleaningEvents: CalendarEventView[] = schedules.map((s) => {
+      const status = (s.status as CleaningStatus) ?? RoomAttendantTaskStatus.ASSIGNED;
+      return {
+        id: `cleaning:${s.id}`,
+        title: `Cleaner - ${s.roomAttendant.firstName} ${s.roomAttendant.lastName}`,
+        start: s.assignedDate.toISOString(),
+        end: undefined,
+        allDay: true,
+        classNames: ["evt-cleaning", CLEANING_STATUS_CLASS[status]],
+        extendedProps: {
+          property: "Assigned cleaning",
+          status: STATUS_LABEL[status],
+        },
+      };
+    });
 
     const events = [...bookingEvents, ...cleaningEvents];
 

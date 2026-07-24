@@ -292,6 +292,23 @@ export class RoomAttendantTaskScheduleService {
       });
     }
 
+    // Cleaning assignments the roomAttendant is responsible for.
+    for (const s of schedules) {
+      if (s.assignedDate < from || s.assignedDate > to) continue;
+      const status = (s.status as CleaningStatus) ?? RoomAttendantTaskStatus.ASSIGNED;
+      events.push({
+        id: `cleaning:${s.id}`,
+        kind: "cleaning",
+        title: "Cleaning",
+        start: s.assignedDate.toISOString(),
+        end: undefined,
+        allDay: true,
+        property: "Assigned cleaning",
+        clientName: `${s.client.firstName} ${s.client.lastName}`,
+        cleaningStatus: status,
+      });
+    }
+
     return {
       events,
       assignments: schedules.map((s) => ({

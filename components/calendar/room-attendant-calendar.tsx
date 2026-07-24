@@ -15,22 +15,7 @@ import { UpcomingCleanings } from "@/components/calendar/upcoming-cleanings";
 import { useRoomAttendantCalendarData } from "@/hooks/use-room-attendant-calendar";
 import type { RoomAttendantCalendarEventView, CleaningStatus } from "@/models/view";
 import { RoomAttendantTaskStatus } from "@/util/enums/RoomAttendantTaskStatus";
-
-const STATUS_CLASS: Record<CleaningStatus, string> = {
-  [RoomAttendantTaskStatus.ASSIGNED]: "evt-assigned",
-  [RoomAttendantTaskStatus.CONFIRMED]: "evt-confirmed",
-  [RoomAttendantTaskStatus.IN_PROGRESS]: "evt-inprogress",
-  [RoomAttendantTaskStatus.DONE]: "evt-done",
-  [RoomAttendantTaskStatus.CANCELLED]: "evt-cancelled",
-};
-
-export const STATUS_LABEL: Record<CleaningStatus, string> = {
-  [RoomAttendantTaskStatus.ASSIGNED]: "Assigned",
-  [RoomAttendantTaskStatus.CONFIRMED]: "Confirmed",
-  [RoomAttendantTaskStatus.IN_PROGRESS]: "In progress",
-  [RoomAttendantTaskStatus.DONE]: "Done",
-  [RoomAttendantTaskStatus.CANCELLED]: "Cancelled",
-};
+import { STATUS_CLASS, STATUS_LABEL } from "@/util/enums/CleaningStatusLabels";
 
 const DEFAULT_PROPERTY = "All properties";
 
@@ -44,6 +29,25 @@ function toEventInput(event: RoomAttendantCalendarEventView): EventInput {
       allDay: event.allDay,
       classNames: ["evt-booking", "evt-availability"],
       extendedProps: { kind: "availability" },
+    };
+  }
+
+  if (event.kind === "cleaning") {
+    const status = event.cleaningStatus ?? RoomAttendantTaskStatus.ASSIGNED;
+    return {
+      id: event.id,
+      title: event.title,
+      start: event.start,
+      end: event.end,
+      allDay: event.allDay,
+      classNames: ["evt-cleaning", STATUS_CLASS[status]],
+      extendedProps: {
+        kind: "cleaning",
+        property: event.property,
+        clientName: event.clientName,
+        cleaningStatus: status,
+        status: STATUS_LABEL[status],
+      },
     };
   }
 

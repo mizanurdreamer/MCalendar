@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useRoomAttendantCalendarData, useUpdateTaskScheduleStatus } from "@/hooks/use-room-attendant-calendar";
-import { STATUS_LABEL } from "@/components/calendar/room-attendant-calendar";
+import { STATUS_LABEL } from "@/util/enums/CleaningStatusLabels";
 import type { CleaningStatus } from "@/models/view";
 import { RoomAttendantTaskStatus } from "@/util/enums/RoomAttendantTaskStatus";
 import { toast } from "@/hooks/use-toast";

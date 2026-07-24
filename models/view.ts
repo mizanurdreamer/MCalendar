@@ -104,7 +104,7 @@ export type CleaningStatus = RoomAttendantTaskStatus;
 
 export type RoomAttendantCalendarEventView = {
   id: string;
-  kind: "booking" | "availability";
+  kind: "booking" | "availability" | "cleaning";
   title: string;
   start: string;
   end?: string;

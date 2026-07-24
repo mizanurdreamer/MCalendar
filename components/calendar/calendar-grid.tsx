@@ -14,8 +14,15 @@ const VIEW_NAME: Record<CalendarViewMode, "dayGridMonth" | "dayGridWeek" | "dayG
 };
 
 function BookingEvent({ event }: EventContentArg) {
+  const status = event.extendedProps?.status as string | undefined;
+
   if (event.classNames.includes("evt-cleaning")) {
-    return <span className="text-xs font-semibold">{`* ${event.title}`}</span>;
+    return (
+      <span className="text-xs font-semibold">
+        <span className="block">{event.title}</span>
+        {status && <span className="block">* {status}</span>}
+      </span>
+    );
   }
 
   if (event.classNames.includes("evt-availability")) {
@@ -27,14 +34,13 @@ function BookingEvent({ event }: EventContentArg) {
     );
   }
 
-  const status = event.extendedProps?.cleaningStatus as string | undefined;
   const guest = event.title[0] ?? "G";
   return (
     <span className="inline-flex items-center gap-2 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold">
       <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-black/20 text-[11px] font-bold uppercase">
         {guest}
       </span>
-      {event.title}
+      {event.title} 
       {/* {status && status !== "ASSIGNED" && (
         <span className="ml-auto rounded-full bg-white/30 px-1.5 text-[10px] font-bold uppercase tracking-wide">
           {status.replace("_", " ")}
