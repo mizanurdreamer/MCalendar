@@ -33,7 +33,9 @@ export class AutoAssignRoomAttendantJob {
     }
 
     const clientIds = clients.map((c) => c.id);
-    const clientNameMap = new Map(clients.map((c) => [c.id, { firstName: c.firstName, lastName: c.lastName }]));
+    const clientNameMap = new Map(
+      clients.map((c) => [c.id, { firstName: c.firstName, lastName: c.lastName }]),
+    );
 
     const bookings = await this.getUpcomingBookings(clientIds, today);
     if (!bookings.length) {
@@ -42,7 +44,7 @@ export class AutoAssignRoomAttendantJob {
 
     const existingScheduleKeys = await this.getExistingScheduleKeys(today);
     const dedicatedRoomAttendantMap = await this.getDedicatedRoomAttendantMap(clientIds);
-    const freeRoomAttendants = await this.getFreeRoomAttendants();
+    const freeRoomAttendants = await this.getFreeRoomAttendants(clientIds);
 
     const usedFreeRoomAttendants = new Set<string>();
 
@@ -75,32 +77,44 @@ export class AutoAssignRoomAttendantJob {
         if (!(await this.isRoomAttendantBusyOnDate(candidate.id, cleaningDate))) {
           roomAttendant = candidate;
         } else {
-          const fallback = this.findFreeRoomAttendant(freeRoomAttendants, usedFreeRoomAttendants);
+          const fallback = this.findFreeRoomAttendant(
+            freeRoomAttendants,
+            usedFreeRoomAttendants,
+          );
           if (fallback) {
             roomAttendant = fallback;
           }
         }
       } else {
-        const candidate = this.findFreeRoomAttendant(freeRoomAttendants, usedFreeRoomAttendants);
+        const candidate = this.findFreeRoomAttendant(
+          freeRoomAttendants,
+          usedFreeRoomAttendants,
+        );
         if (candidate) {
           roomAttendant = candidate;
         }
       }
 
       if (!roomAttendant) {
-        console.log(`[AutoAssignRoomAttendant] No roomAttendant available for client ${booking.clientId} on ${cleaningDate.toISOString()}`);
+        console.log(
+          `[AutoAssignRoomAttendant] No roomAttendant available for client ${booking.clientId} on ${cleaningDate.toISOString()}`,
+        );
         skipped++;
         continue;
       }
 
       if (await this.isRoomAttendantBusyOnDate(roomAttendant.id, cleaningDate)) {
-        console.log(`[AutoAssignRoomAttendant] RoomAttendant ${roomAttendant.firstName} ${roomAttendant.lastName} already busy on ${cleaningDate.toISOString()}`);
+        console.log(
+          `[AutoAssignRoomAttendant] RoomAttendant ${roomAttendant.firstName} ${roomAttendant.lastName} already busy on ${cleaningDate.toISOString()}`,
+        );
         skipped++;
         continue;
       }
 
       if (!(await this.checkRoomAttendantAvailability(roomAttendant.id, cleaningDate))) {
-        console.log(`[AutoAssignRoomAttendant] RoomAttendant ${roomAttendant.firstName} ${roomAttendant.lastName} not available on ${cleaningDate.toISOString()}`);
+        console.log(
+          `[AutoAssignRoomAttendant] RoomAttendant ${roomAttendant.firstName} ${roomAttendant.lastName} not available on ${cleaningDate.toISOString()}`,
+        );
         skipped++;
         continue;
       }
@@ -131,11 +145,17 @@ export class AutoAssignRoomAttendantJob {
             });
             smsSent++;
           } catch (smsError) {
-            console.error(`[AutoAssignRoomAttendant] SMS to ${roomAttendant.firstName} failed:`, smsError);
+            console.error(
+              `[AutoAssignRoomAttendant] SMS to ${roomAttendant.firstName} failed:`,
+              smsError,
+            );
           }
         }
       } catch (error) {
-        console.error(`[AutoAssignRoomAttendant] Assignment failed for client ${booking.clientId}:`, error);
+        console.error(
+          `[AutoAssignRoomAttendant] Assignment failed for client ${booking.clientId}:`,
+          error,
+        );
       }
     }
 
@@ -216,9 +236,12 @@ export class AutoAssignRoomAttendantJob {
     return map;
   }
 
-  private async getFreeRoomAttendants(): Promise<RoomAttendantInfo[]> {
+  private async getFreeRoomAttendants(clientIds: string[]): Promise<RoomAttendantInfo[]> {
     return prisma.roomAttendantProfile.findMany({
-      where: { clientId: null, isDeleted: false },
+      where: {
+        clientId: { in: clientIds },
+        isDeleted: false,
+      },
       select: {
         id: true,
         firstName: true,
@@ -245,7 +268,10 @@ export class AutoAssignRoomAttendantJob {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   }
 
-  private async isRoomAttendantBusyOnDate(roomAttendantId: string, date: Date): Promise<boolean> {
+  private async isRoomAttendantBusyOnDate(
+    roomAttendantId: string,
+    date: Date,
+  ): Promise<boolean> {
     const nextDay = new Date(date);
     nextDay.setDate(nextDay.getDate() + 1);
 
@@ -259,7 +285,10 @@ export class AutoAssignRoomAttendantJob {
     return count > 0;
   }
 
-  private async checkRoomAttendantAvailability(roomAttendantId: string, date: Date): Promise<boolean> {
+  private async checkRoomAttendantAvailability(
+    roomAttendantId: string,
+    date: Date,
+  ): Promise<boolean> {
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
