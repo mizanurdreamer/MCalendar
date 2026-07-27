@@ -20,6 +20,18 @@ import { STATUS_CLASS, STATUS_LABEL } from "@/util/enums/CleaningStatusLabels";
 const DEFAULT_PROPERTY = "All properties";
 
 function toEventInput(event: RoomAttendantCalendarEventView): EventInput {
+  if (event.kind === "booking") {
+    return {
+      id: event.id,
+      title: event.title,
+      start: event.start,
+      end: event.end,
+      allDay: event.allDay,
+      classNames: ["evt-booking"],
+      extendedProps: { kind: "booking" },
+    };
+  }
+
   if (event.kind === "availability") {
     return {
       id: event.id,
@@ -27,7 +39,7 @@ function toEventInput(event: RoomAttendantCalendarEventView): EventInput {
       start: event.start,
       end: event.end,
       allDay: event.allDay,
-      classNames: ["evt-booking", "evt-availability"],
+      classNames: ["evt-availability"],
       extendedProps: { kind: "availability" },
     };
   }
@@ -93,6 +105,7 @@ export function RoomAttendantCalendar() {
 
   const events = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
+    console.log(data);
     return (data?.events ?? [])
       .filter((e) =>
         activeProperty === DEFAULT_PROPERTY ? true : e.property === activeProperty,

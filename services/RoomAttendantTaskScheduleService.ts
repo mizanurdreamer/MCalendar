@@ -296,11 +296,12 @@ export class RoomAttendantTaskScheduleService {
     for (const s of schedules) {
       if (s.assignedDate < from || s.assignedDate > to) continue;
       const status = (s.status as CleaningStatus) ?? RoomAttendantTaskStatus.ASSIGNED;
+      const dateOnly = new Date(s.assignedDate).toISOString().split('T')[0];
       events.push({
         id: `cleaning:${s.id}`,
         kind: "cleaning",
         title: "Cleaning",
-        start: s.assignedDate.toISOString(),
+        start: dateOnly,
         end: undefined,
         allDay: true,
         property: "Assigned cleaning",
@@ -309,15 +310,20 @@ export class RoomAttendantTaskScheduleService {
       });
     }
 
-    return {
-      events,
-      assignments: schedules.map((s) => ({
+    const assignments = schedules.map((s) => {
+      const formattedDate = new Date(s.assignedDate).toISOString().split("T")[0];
+      return {
         id: s.id,
         clientId: s.client.userId,
         clientName: `${s.client.firstName} ${s.client.lastName}`,
-        assignedDate: s.assignedDate.toISOString(),
+        assignedDate: formattedDate,
         status: (s.status as CleaningStatus) ?? RoomAttendantTaskStatus.ASSIGNED,
-      })),
+      };
+    });
+
+    return {
+      events,
+      assignments,
     };
   }
 }
