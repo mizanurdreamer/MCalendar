@@ -59,10 +59,11 @@ export class ClientCalendarService {
     const schedules = await roomAttendantTaskScheduleRepository.findActiveForClient(clientProfile.id);
     const cleaningEvents: CalendarEventView[] = schedules.map((s) => {
       const status = (s.status as CleaningStatus) ?? RoomAttendantTaskStatus.ASSIGNED;
+      const dateOnly = new Date(s.assignedDate).toISOString().split('T')[0];
       return {
         id: `cleaning:${s.id}`,
-        title: `RA - ${s.roomAttendant.firstName} ${s.roomAttendant.lastName}`,
-        start: s.assignedDate.toISOString(),
+        title: `Cleaner - ${s.roomAttendant.firstName} ${s.roomAttendant.lastName}`,
+        start: dateOnly,
         end: undefined,
         allDay: true,
         classNames: ["evt-cleaning", CLEANING_STATUS_CLASS[status]],
