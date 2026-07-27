@@ -61,7 +61,7 @@ export class ClientCalendarService {
       const status = (s.status as CleaningStatus) ?? RoomAttendantTaskStatus.ASSIGNED;
       return {
         id: `cleaning:${s.id}`,
-        title: `Cleaner - ${s.roomAttendant.firstName} ${s.roomAttendant.lastName}`,
+        title: `RA - ${s.roomAttendant.firstName} ${s.roomAttendant.lastName}`,
         start: s.assignedDate.toISOString(),
         end: undefined,
         allDay: true,
