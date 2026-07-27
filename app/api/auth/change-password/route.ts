@@ -6,10 +6,8 @@ import { authService } from "@/services/AuthService";
 export async function POST(req: NextRequest) {
   try {
     const actor = await requireActor(UserRole.CLIENT, UserRole.ROOM_ATTENDANT, UserRole.SUPER_ADMIN);
-    console.log(actor.userId + " ");
     // Parse body and extract authorization headers
     const { currentPassword, newPassword } = await req.json();
-   console.log(currentPassword + " " + newPassword);
 
     const authHeader = req.headers.get("authorization");
 

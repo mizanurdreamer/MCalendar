@@ -589,7 +589,7 @@ function UserFormDialog({
       } else {
         if (roomAttendantExistsForClient.data?.exists) {
           toast({
-            title: "Duplicate cleaner",
+            title: "Duplicate Room Attendant",
             description: "This email already exists for the selected client",
             variant: "error",
           });
@@ -615,7 +615,7 @@ function UserFormDialog({
         e.message.toLowerCase().includes("already exists for this client")
       ) {
         toast({
-          title: "Duplicate cleaner",
+          title: "Duplicate Room Attendant",
           description: "This email already exists for the selected client",
           variant: "error",
         });
