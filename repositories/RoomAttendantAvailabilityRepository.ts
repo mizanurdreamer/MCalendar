@@ -87,6 +87,39 @@ export class RoomAttendantAvailabilityRepository {
     });
   }
 
+  async hasOverlap(params: {
+    clientId: string;
+    roomAttendantId: string;
+    fromDate: Date;
+    toDate: Date | null;
+    excludeId?: string;
+  }) {
+    const maxDate = new Date("9999-12-31T00:00:00.000Z");
+    const to = params.toDate ?? maxDate;
+
+    const existing = await prisma.roomAttendantAvailability.findFirst({
+      where: {
+        deletedAt: null,
+        isActive: true,
+        clientId: params.clientId,
+        roomAttendantId: params.roomAttendantId,
+        ...(params.excludeId ? { id: { not: params.excludeId } } : {}),
+        AND: [
+          { fromDate: { lte: to } },
+          {
+            OR: [
+              { toDate: null },
+              { toDate: { gte: params.fromDate } },
+            ],
+          },
+        ],
+      },
+      select: { id: true },
+    });
+
+    return !!existing;
+  }
+
   softDelete(id: string, deletedBy?: string) {
     return prisma.roomAttendantAvailability.update({
       where: { id },

@@ -56,9 +56,21 @@ type CalendarGridProps = {
   onDateTitleChange: (title: string) => void;
   initialDate: string;
   viewMode: CalendarViewMode;
+  onDateSelect?: (date: string) => void;
+  onEventSelect?: (eventId: string) => void;
+  showLegend?: boolean;
 };
 
-export function CalendarGrid({ calendarRef, events, onDateTitleChange, initialDate, viewMode }: CalendarGridProps) {
+export function CalendarGrid({
+  calendarRef,
+  events,
+  onDateTitleChange,
+  initialDate,
+  viewMode,
+  onDateSelect,
+  onEventSelect,
+  showLegend = true,
+}: CalendarGridProps) {
   return (
     <div className="booking-fc space-y-4 rounded-3xl border p-3 shadow-sm">
       <div className="overflow-x-auto">
@@ -81,17 +93,21 @@ export function CalendarGrid({ calendarRef, events, onDateTitleChange, initialDa
             events={events}
             eventContent={(arg) => <BookingEvent {...arg} />}
             datesSet={(arg) => onDateTitleChange(arg.view.title)}
+            dateClick={(arg) => onDateSelect?.(arg.dateStr)}
+            eventClick={(arg) => onEventSelect?.(arg.event.id)}
           />
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-4 px-1 pb-1 text-sm text-muted-foreground">
-        <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full legend-dot-blue" />Confirmed</span>
-        <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full legend-dot-green" />Checked in</span>
-        <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full legend-dot-amber" />Pending</span>
-        <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full legend-dot-neutral" />Checked out</span>
-        <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full legend-dot-red" />Cancelled</span>
-        <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full legend-dot-purple" />* Cleaning (checkout day)</span>
-      </div>
+      {showLegend && (
+        <div className="flex flex-wrap items-center gap-4 px-1 pb-1 text-sm text-muted-foreground">
+          <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full legend-dot-blue" />Confirmed</span>
+          <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full legend-dot-green" />Checked in</span>
+          <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full legend-dot-amber" />Pending</span>
+          <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full legend-dot-neutral" />Checked out</span>
+          <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full legend-dot-red" />Cancelled</span>
+          <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full legend-dot-purple" />* Cleaning (checkout day)</span>
+        </div>
+      )}
     </div>
   );
 }

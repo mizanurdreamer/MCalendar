@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import FullCalendar from "@fullcalendar/react";
+import type { EventInput } from "@fullcalendar/core";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -17,6 +19,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CalendarGrid } from "@/components/calendar/calendar-grid";
 import {
   Dialog,
   DialogContent,
@@ -60,6 +63,12 @@ function fmt(iso: string) {
 
 function formatRange(from: string, to: string | null) {
   return to ? `${fmt(from)} – ${fmt(to)}` : `${fmt(from)} (open-ended)`;
+}
+
+function addDays(iso: string, days: number) {
+  const d = new Date(`${iso}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
 }
 
 export function RoomAttendantAvailabilityManager({
@@ -148,6 +157,30 @@ export function RoomAttendantAvailabilityManager({
   };
 
   const slots = data?.items ?? [];
+  const calendarRef = React.useRef<FullCalendar | null>(null);
+  const [, setCalendarTitle] = React.useState("");
+
+  const availabilityEvents = React.useMemo<EventInput[]>(() => {
+    return slots.map((slot) => ({
+      id: slot.id,
+      title: slot.note?.trim() ? `Available: ${slot.note}` : "Available",
+      start: slot.fromDate,
+      end: slot.toDate ? addDays(slot.toDate, 1) : undefined,
+      allDay: true,
+      classNames: ["evt-availability"],
+      extendedProps: { kind: "availability" },
+    }));
+  }, [slots]);
+
+  const onCalendarDateSelect = (date: string) => {
+    reset({ fromDate: date, toDate: date, note: "" });
+    setEditing(null);
+    setOpen(true);
+  };
+
+  const onCalendarEventSelect = (eventId: string) => {
+    setToDelete({ id: eventId });
+  };
 
   return (
     <div className="space-y-4">
@@ -167,6 +200,32 @@ export function RoomAttendantAvailabilityManager({
           Add availability
         </Button>
       </div>
+
+      <Card className="overflow-hidden rounded-2xl">
+        <CardContent className="p-4">
+          {isLoading ? (
+            <div className="flex min-h-[360px] items-center justify-center rounded-2xl border">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="text-sm text-muted-foreground">
+                Click a date to mark available. Click an availability event to delete.
+              </div>
+              <CalendarGrid
+                calendarRef={calendarRef}
+                events={availabilityEvents}
+                onDateTitleChange={setCalendarTitle}
+                initialDate={today}
+                viewMode="month"
+                onDateSelect={onCalendarDateSelect}
+                onEventSelect={onCalendarEventSelect}
+                showLegend={false}
+              />
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card className="overflow-hidden rounded-2xl">
         <Table>

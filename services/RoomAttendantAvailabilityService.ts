@@ -113,6 +113,16 @@ export class RoomAttendantAvailabilityService {
 
     const roomAttendantProfile = await this.resolveRoomAttendantProfileId(params.roomAttendantId);
 
+    const hasOverlap = await roomAttendantAvailabilityRepository.hasOverlap({
+      clientId: clientProfile.id,
+      roomAttendantId: roomAttendantProfile.id,
+      fromDate: params.fromDate,
+      toDate: params.toDate ?? null,
+    });
+    if (hasOverlap) {
+      throw new ConflictError("Overlapping availability is not allowed");
+    }
+
     const availability = await roomAttendantAvailabilityRepository.create({
       client: { connect: { id: clientProfile.id } },
       roomAttendant: { connect: { id: roomAttendantProfile.id } },
@@ -138,12 +148,22 @@ export class RoomAttendantAvailabilityService {
       throw new ForbiddenError();
     }
 
-    if (
-      params.fromDate &&
-      params.toDate &&
-      params.toDate < params.fromDate
-    ) {
+    const nextFromDate = params.fromDate ?? existing.fromDate;
+    const nextToDate = params.toDate === undefined ? existing.toDate : params.toDate;
+
+    if (nextToDate && nextToDate < nextFromDate) {
       throw new ConflictError("To date must be on or after from date");
+    }
+
+    const hasOverlap = await roomAttendantAvailabilityRepository.hasOverlap({
+      clientId: existing.client.id,
+      roomAttendantId: existing.roomAttendant.id,
+      fromDate: nextFromDate,
+      toDate: nextToDate ?? null,
+      excludeId: id,
+    });
+    if (hasOverlap) {
+      throw new ConflictError("Overlapping availability is not allowed");
     }
 
     const availability = await roomAttendantAvailabilityRepository.update(id, {
