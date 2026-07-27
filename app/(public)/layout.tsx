@@ -10,7 +10,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
           className="mb-6 flex items-center justify-center gap-2 font-semibold"
         >
           <Sparkles className="h-5 w-5 text-primary" />
-          bookingCalendar
+          Booking Calendar
         </Link>
         {children}
       </div>

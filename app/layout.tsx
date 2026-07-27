@@ -6,7 +6,7 @@ import { Providers } from "@/components/providers";
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
-  title: "bookingCalendar",
+  title: "Booking Calendar",
   description: "Short-term rental operations & cleaning management platform",
 };
 

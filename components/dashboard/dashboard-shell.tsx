@@ -107,10 +107,10 @@ export function DashboardShell({
         >
           {!collapsed && (
             <div className="flex items-center gap-2.5">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-xs font-bold text-primary-foreground">
+              {/* <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-xs font-bold text-primary-foreground">
                 {user.firstName[0]}
-              </div>
-              <span className="text-sm font-semibold">bookingCalendar</span>
+              </div> */}
+              <a href="/"><span className="text-sm font-semibold">Booking Calendar</span></a>
             </div>
           )}
           <Button
