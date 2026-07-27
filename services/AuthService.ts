@@ -2,6 +2,7 @@ import type { User } from "@/repositories/UserRepository";
 import { userRepository } from "@/repositories/UserRepository";
 import { refreshTokenRepository } from "@/repositories/RefreshTokenRepository";
 import { hashPassword, verifyPassword, sha256 } from "@/util/password";
+import type { ActorContext } from "@/models";
 import {
   signAccessToken,
   signRefreshToken,
@@ -12,6 +13,7 @@ import {
 import { BadRequestError, ConflictError, UnauthorizedError } from "@/util/errors";
 import { UserRole } from "@/util/enums/UserRole";
 import type { LoginDTO, RegisterDTO } from "@/dto/auth.dto";
+import { NextResponse } from "next/server";
 
 export type PublicUser = {
   id: string;
@@ -171,6 +173,10 @@ export class AuthService {
     }
 
     throw new UnauthorizedError("Invalid password");
+  }
+
+  async changePassword(actor: ActorContext,currentPassword: string, newPassword: string): Promise<NextResponse> {
+     return await userRepository.updatePassword(actor.userId,currentPassword,newPassword);
   }
 
   async listRoomAttendantLoginOptionsByEmail(email: string): Promise<RoomAttendantLoginOption[]> {

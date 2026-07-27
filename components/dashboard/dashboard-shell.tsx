@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, Menu, X, Moon, PanelLeftClose, PanelLeftOpen, Sun, UserCircle2 } from "lucide-react";
+import { LogOut, Menu, X, Moon, PanelLeftClose, PanelLeftOpen, Sun, UserCircle2, KeyRound } from "lucide-react";
 import { useTheme } from "@/util/theme-context";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn, initials } from "@/util/utils";
@@ -253,6 +253,12 @@ export function DashboardShell({
                   </Link>
                 </DropdownMenuItem>
               )}
+              <DropdownMenuItem asChild>
+                <Link href="/change-password">
+                  <KeyRound className="h-4 w-4 mr-2" />
+                  <span>Change Password</span>
+                </Link>
+             </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => logout.mutate()}
                 className="text-destructive"

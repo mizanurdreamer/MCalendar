@@ -31,7 +31,7 @@ export default function RoomAttendantSelectClientPage() {
       router.refresh();
     },
     onError: () => {
-      toast({ title: "Could not switch cleaner session", variant: "error" });
+      toast({ title: "Could not switch Room Attendant session", variant: "error" });
     },
   });
 

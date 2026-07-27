@@ -2,6 +2,8 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/util/prisma";
 import { UserRole } from "@/util/enums/UserRole";
 import type { ListParams, Role } from "@/models";
+import { hashPassword, verifyPassword } from "@/util/password";
+import { NextResponse } from "next/server";
 
 type UserWithRelations = Prisma.UserGetPayload<{
   include: {
@@ -215,6 +217,40 @@ export class UserRepository {
           }
         : null,
     };
+  }
+
+  async updatePassword(id : string, currentPassword : string, newPassword : string){
+      const user = await prisma.user.findUnique({
+        where: { id }
+      });
+
+      if (!user) {
+          return NextResponse.json(
+            { message: "User not found." },
+            { status: 404 }
+          );
+        }
+    
+      // Check current password
+      const isMatch = await verifyPassword(currentPassword, user.passwordHash);
+      if (!isMatch) {
+        return NextResponse.json(
+          { message: "Incorrect current password." },
+          { status: 401 }
+        );
+      }
+  
+      // Hash new password & update database;
+      var newPasswordHash = await hashPassword(newPassword);
+      await prisma.user.update({
+        where: { id: id},
+        data: { passwordHash: newPasswordHash },
+      });
+  
+      return NextResponse.json(
+        { message: "Password updated successfully." },
+        { status: 200 }
+      );
   }
 
   async findById(id: string) {

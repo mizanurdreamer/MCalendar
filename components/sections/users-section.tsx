@@ -589,7 +589,7 @@ function UserFormDialog({
       } else {
         if (roomAttendantExistsForClient.data?.exists) {
           toast({
-            title: "Duplicate cleaner",
+            title: "Duplicate Room Attendant",
             description: "This email already exists for the selected client",
             variant: "error",
           });
@@ -615,7 +615,7 @@ function UserFormDialog({
         e.message.toLowerCase().includes("already exists for this client")
       ) {
         toast({
-          title: "Duplicate cleaner",
+          title: "Duplicate Room Attendant",
           description: "This email already exists for the selected client",
           variant: "error",
         });
@@ -657,12 +657,6 @@ function UserFormDialog({
               })}
             />
           </Field>
-          {shouldLinkExistingCleaner && (
-            <div className="rounded-md bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
-              <p className="font-medium">Existing cleaner found for this email.</p>
-              <p>Password fields are hidden. This form will link that existing user.</p>
-            </div>
-          )}
           {role === UserRole.ROOM_ATTENDANT && !clientId && (
             <Field label="Client" error={errors.clientId?.message}>
               <Select
@@ -750,16 +744,12 @@ function UserFormDialog({
             </div>
           )}
 
-          {!editing && !shouldLinkExistingCleaner && (
-            <>
-              <Field label="Password" error={errors.password?.message}>
-                <Input type="password" autoComplete="new-password" {...register("password")} />
-              </Field>
-              <Field label="Confirm password" error={errors.confirmPassword?.message}>
-                <Input type="password" autoComplete="new-password" {...register("confirmPassword")} />
-              </Field>
-            </>
-          )}
+          <Field label="Password" error={errors.password?.message}>
+              <Input type="password" autoComplete="new-password" {...register("password")} />
+          </Field>
+          <Field label="Confirm password" error={errors.confirmPassword?.message}>
+              <Input type="password" autoComplete="new-password" {...register("confirmPassword")} />
+          </Field>
           <Field label="Status">
             <div className="flex items-center gap-3">
               <Switch checked={isActive} onCheckedChange={(v) => setValue("isActive", v)} />
