@@ -181,11 +181,11 @@
 }
 
 .booking-fc .evt-availability {
-  color: #475569;
+  background-color: #48b89f;
 }
 
 .dark .booking-fc .evt-availability {
-  color: #94a3b8;
+  background-color: #48b89f;
 }
 
 .booking-fc .evt-assigned {
