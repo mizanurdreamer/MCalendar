@@ -123,10 +123,10 @@ export function BookingProvidersSection() {
         count={data?.total}
         action={
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm">
+            {/* <Button variant="outline" size="sm">
               <Download className="h-4 w-4" />
               Export
-            </Button>
+            </Button> */}
             <Button size="sm" onClick={() => setDialog({ open: true })}>
               <Plus className="h-4 w-4" /> Add provider
             </Button>

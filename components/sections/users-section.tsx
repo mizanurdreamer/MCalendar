@@ -220,10 +220,10 @@ export function UsersSection({
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="h-10 rounded-xl border-border px-4 text-[17px] font-semibold text-muted-foreground">
+          {/* <Button variant="outline" size="sm" className="h-10 rounded-xl border-border px-4 text-[17px] font-semibold text-muted-foreground">
             <Download className="mr-1 h-4 w-4" />
             Export
-          </Button>
+          </Button> */}
           {canCreate && (
             <Button size="sm" onClick={() => setDialog({ open: true })} className="h-10 rounded-xl px-4 text-[17px] font-semibold">
               <Plus className="mr-1 h-4 w-4" />

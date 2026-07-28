@@ -7,10 +7,10 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
       <div className="w-full max-w-md">
         <Link
           href="/"
-          className="mb-6 flex items-center justify-center gap-2 font-semibold"
+          className="mb-4 flex items-center justify-center gap-2 font-semibold"
         >
-          <Sparkles className="h-5 w-5 text-primary" />
-          Booking Calendar
+          <span className="text-[#4F7ABD] font-bold text-4xl">booking </span>
+          <span className="text-[#826FAE] font-bold text-4xl">calendar</span>
         </Link>
         {children}
       </div>
