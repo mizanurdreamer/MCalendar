@@ -6,7 +6,7 @@ import type { EventInput } from "@fullcalendar/core";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import {
   useRoomAttendantAvailability,
   useCreateAvailability,
@@ -19,7 +19,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { CalendarGrid } from "@/components/calendar/calendar-grid";
+import { CalendarGrid, moveCalendar } from "@/components/calendar/calendar-grid";
 import {
   Dialog,
   DialogContent,
@@ -158,7 +158,7 @@ export function RoomAttendantAvailabilityManager({
 
   const slots = data?.items ?? [];
   const calendarRef = React.useRef<FullCalendar | null>(null);
-  const [, setCalendarTitle] = React.useState("");
+  const [calendarTitle, setCalendarTitle] = React.useState("");
 
   const availabilityEvents = React.useMemo<EventInput[]>(() => {
     return slots.map((slot) => ({
@@ -181,28 +181,56 @@ export function RoomAttendantAvailabilityManager({
   const onCalendarEventSelect = (eventId: string) => {
     setToDelete({ id: eventId });
   };
+  const onCalendarNavigate = (direction: "prev" | "next") => {
+    const nextTitle = moveCalendar(calendarRef, direction);
+    if (nextTitle) setCalendarTitle(nextTitle);
+  };
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <h1 className="text-[38px] font-extrabold tracking-tight ">Your Availability</h1>
-          <span className="rounded-full px-3 py-1 text-sm font-semibold text-muted-foreground">
-            {slots.length} total
-          </span>
-        </div>
-        <Button
-          size="sm"
-          onClick={openNew}
-          className="h-10 rounded-xl px-4 text-[16px] font-semibold"
-        >
-          <Plus className="mr-1 h-4 w-4" />
-          Add availability
-        </Button>
-      </div>
-
       <Card className="overflow-hidden rounded-2xl">
         <CardContent className="p-4">
+          <div className="mb-3 grid grid-cols-1 items-center gap-3 md:grid-cols-[1fr_auto_1fr]">
+            <div className="flex items-center gap-3">
+              <h2 className="text-3xl font-extrabold tracking-tight">{calendarTitle}</h2>
+              <div className="inline-flex items-center gap-1 rounded-full p-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-full"
+                  onClick={() => onCalendarNavigate("prev")}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-full"
+                  onClick={() => onCalendarNavigate("next")}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            <h1 className="text-3xl font-extrabold tracking-tight md:justify-self-center">
+              Your Availability
+              {calendarTitle ? (
+                <span className="ml-2 rounded-full px-3 py-1 text-sm font-semibold text-muted-foreground">
+                  {slots.length} total
+                </span>
+              ) : null}
+            </h1>
+            <Button
+              size="sm"
+              onClick={openNew}
+              className="h-10 rounded-xl px-4 text-[16px] font-semibold md:justify-self-end"
+            >
+              <Plus className="mr-1 h-4 w-4" />
+              Add availability
+            </Button>
+          </div>
           {isLoading ? (
             <div className="flex min-h-[360px] items-center justify-center rounded-2xl border">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />

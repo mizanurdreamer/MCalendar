@@ -59,6 +59,7 @@ type CalendarGridProps = {
   onDateSelect?: (date: string) => void;
   onEventSelect?: (eventId: string) => void;
   showLegend?: boolean;
+  showCalendarHeader?: boolean;
 };
 
 export function CalendarGrid({
@@ -70,6 +71,7 @@ export function CalendarGrid({
   onDateSelect,
   onEventSelect,
   showLegend = true,
+  showCalendarHeader = false,
 }: CalendarGridProps) {
   return (
     <div className="booking-fc space-y-4 rounded-3xl border p-3 shadow-sm">
@@ -87,7 +89,11 @@ export function CalendarGrid({
             initialDate={initialDate}
             contentHeight="auto"
             aspectRatio={viewMode === "month" ? 2.0 : 1.8}
-            headerToolbar={false}
+            headerToolbar={
+              showCalendarHeader
+                ? { left: "title", center: "", right: "prev,next" }
+                : false
+            }
             fixedWeekCount={false}
             dayMaxEventRows={4}
             events={events}
