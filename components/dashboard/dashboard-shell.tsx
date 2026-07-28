@@ -3,7 +3,17 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, Menu, X, Moon, PanelLeftClose, PanelLeftOpen, Sun, UserCircle2, KeyRound } from "lucide-react";
+import {
+  LogOut,
+  Menu,
+  X,
+  Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Sun,
+  UserCircle2,
+  KeyRound,
+} from "lucide-react";
 import { useTheme } from "@/util/theme-context";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn, initials } from "@/util/utils";
@@ -101,16 +111,15 @@ export function DashboardShell({
         {/* Header */}
         <div
           className={cn(
-            "flex h-14 items-center border-b",
+            "flex gap-2 h-14 items-center border-b",
             collapsed ? "justify-center px-2" : "justify-between px-4",
           )}
         >
           {!collapsed && (
             <div className="flex items-center gap-2.5">
-              {/* <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-xs font-bold text-primary-foreground">
-                {user.firstName[0]}
-              </div> */}
-              <a href="/"><span className="text-sm font-semibold">Booking Calendar</span></a>
+              <a href="/" className="flex gap-3 items-center">
+                <img src="/logos/logo.png" width="100%"></img>
+              </a>
             </div>
           )}
           <Button
@@ -144,9 +153,19 @@ export function DashboardShell({
                 "flex items-center rounded-lg text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                 collapsed ? "justify-center px-2 py-2.5" : "mx-2 gap-3 px-3 py-2.5",
               )}
-              title={collapsed ? (theme === "dark" ? "Switch to light mode" : "Switch to dark mode") : undefined}
+              title={
+                collapsed
+                  ? theme === "dark"
+                    ? "Switch to light mode"
+                    : "Switch to dark mode"
+                  : undefined
+              }
             >
-              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              {theme === "dark" ? (
+                <Sun className="h-4 w-4" />
+              ) : (
+                <Moon className="h-4 w-4" />
+              )}
               {!collapsed && <span>{theme === "dark" ? "Light mode" : "Dark mode"}</span>}
             </button>
 
@@ -258,7 +277,7 @@ export function DashboardShell({
                   <KeyRound className="h-4 w-4 mr-2" />
                   <span>Change Password</span>
                 </Link>
-             </DropdownMenuItem>
+              </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => logout.mutate()}
                 className="text-destructive"

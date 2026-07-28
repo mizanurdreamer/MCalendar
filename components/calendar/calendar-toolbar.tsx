@@ -89,10 +89,10 @@ export function CalendarToolbar({
               Day
             </Button>
           </div>
-          <Button className="h-12 rounded-2xl px-5 text-[17px] font-semibold">
+          {/* <Button className="h-12 rounded-2xl px-5 text-[17px] font-semibold">
             <Plus className="mr-1 h-4 w-4" />
             New booking
-          </Button>
+          </Button> */}
         </div>
       </div>
 

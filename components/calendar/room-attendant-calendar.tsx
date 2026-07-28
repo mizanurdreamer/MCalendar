@@ -146,7 +146,7 @@ export function RoomAttendantCalendar() {
   };
 
   return (
-    <div className="grid gap-4 rounded-3xl p-4 2xl:grid-cols-[minmax(0,1fr)_340px]">
+    <div className="rounded-xl p-4">
       <section className="space-y-3 md:space-y-4">
         <CalendarToolbar
           title={title}
@@ -184,9 +184,9 @@ export function RoomAttendantCalendar() {
         </div>
       </section>
 
-      <aside className="space-y-4">
+      {/* <aside className="space-y-4">
         <UpcomingCleanings items={upcoming} />
-      </aside>
+      </aside> */}
     </div>
   );
 }
