@@ -28,8 +28,8 @@ const SUPER_ADMIN_NAV: NavItem[] = [
 ];
 
 const CLIENT_NAV: NavItem[] = [
-  { label: "Today", href: "/client/today", icon: Sun, exact: true },
-  { label: "Calendar", href: "/client/calendar", icon: CalendarDays },
+  // { label: "Today", href: "/client/today", icon: Sun, exact: true },
+  { label: "Activity Calendar", href: "/client/calendar", icon: CalendarDays },
   {
     label: "Booking Providers",
     href: "/client/booking-providers",
@@ -39,8 +39,8 @@ const CLIENT_NAV: NavItem[] = [
 ];
 
 const ROOM_ATTENDANT_NAV: NavItem[] = [
-  { label: "Today", href: "/room-attendant/today", icon: Sun, exact: true },
-  { label: "Calendar", href: "/room-attendant/calendar", icon: CalendarDays },
+  { label: "Task Schedule", href: "/room-attendant/task-schedule", icon: Sun, exact: true },
+  { label: "Activity Calendar", href: "/room-attendant/calendar", icon: CalendarDays },
   { label: "Availability", href: "/room-attendant/availability", icon: CalendarClock }
 ];
 

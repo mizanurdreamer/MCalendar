@@ -19,7 +19,7 @@ import { cn } from "@/util/utils";
 
 const MAIN_ITEMS = [
   { label: "Today", icon: Sun, active: false },
-  { label: "Calendar", icon: CalendarDays, active: true },
+  { label: "Activity Calendar", icon: CalendarDays, active: true },
   { label: "Properties", icon: Home, active: false },
   { label: "Booking history", icon: Clock3, active: false },
   { label: "Messages", icon: MessageSquare, active: false },

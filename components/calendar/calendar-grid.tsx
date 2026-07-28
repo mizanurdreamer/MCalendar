@@ -105,7 +105,7 @@ export function CalendarGrid({
           <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full legend-dot-amber" />Pending</span>
           <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full legend-dot-neutral" />Checked out</span>
           <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full legend-dot-red" />Cancelled</span>
-          <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full legend-dot-purple" />* Cleaning (checkout day)</span>
+          <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full legend-dot-purple" />* Room Service (checkout day)</span>
         </div>
       )}
     </div>

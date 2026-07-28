@@ -13,7 +13,7 @@ export default function RoomAttendantToday() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title={`Welcome, ${me?.firstName ?? "Room Attendant"}`}
+        title={`Welcome, ${me? (me.firstName +" "+ me.lastName) : "Room Attendant"}`}
         description="Your dashboard at a glance."
       />
       {isLoading ? (

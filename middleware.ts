@@ -5,8 +5,8 @@ import { ROOM_ATTENDANT_SELECT_REQUIRED_COOKIE } from "@/util/auth";
 
 const ROLE_HOME: Record<Role, string> = {
   SUPER_ADMIN: "/admin/dashboard",
-  CLIENT: "/client/today",
-  ROOM_ATTENDANT: "/room-attendant/today",
+  CLIENT: "/client/calendar",
+  ROOM_ATTENDANT: "/room-attendant/task-schedule",
 };
 
 const ROLE_PREFIX: Record<Role, string> = {
@@ -69,7 +69,7 @@ export async function middleware(req: NextRequest) {
     }
     const selectionRequired = req.cookies.get(ROOM_ATTENDANT_SELECT_REQUIRED_COOKIE)?.value === "1";
     if (!selectionRequired) {
-      return NextResponse.redirect(new URL("/room-attendant/today", req.url));
+      return NextResponse.redirect(new URL("/room-attendant/task-schedule", req.url));
     }
     return NextResponse.next();
   }

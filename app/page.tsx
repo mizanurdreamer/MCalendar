@@ -42,7 +42,7 @@ export default async function LandingPage() {
           Short-term rental operations, simplified
         </span>
         <h1 className="max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl">
-          Run your rental cleaning operation from a single hub
+          Run your rental room service operation from a single hub
         </h1>
         <p className="mt-4 max-w-2xl text-muted-foreground">
           bookingCalendar connects administrators and team members so operations stay

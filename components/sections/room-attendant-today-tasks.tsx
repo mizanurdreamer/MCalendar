@@ -60,7 +60,7 @@ export function RoomAttendantTodayTasks() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg font-bold">My cleaning assignments</CardTitle>
+        <CardTitle className="text-lg font-bold">Your room service assignments</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         {assignments.length === 0 ? (

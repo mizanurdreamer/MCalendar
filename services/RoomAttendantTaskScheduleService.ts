@@ -182,7 +182,7 @@ export class RoomAttendantTaskScheduleService {
     if (actor.role === UserRole.ROOM_ATTENDANT) {
       if (actor.userId !== existing.roomAttendant.userId) throw new ForbiddenError();
       if (params.status === undefined) {
-        throw new ForbiddenError("room-attendants may only update cleaning status");
+        throw new ForbiddenError("room-attendants may only update room service status");
       }
     } else if (actor.role !== UserRole.SUPER_ADMIN && actor.userId !== existing.client.userId) {
       throw new ForbiddenError();
@@ -300,11 +300,11 @@ export class RoomAttendantTaskScheduleService {
       events.push({
         id: `cleaning:${s.id}`,
         kind: "cleaning",
-        title: "Cleaning",
+        title: "Room Service",
         start: dateOnly,
         end: undefined,
         allDay: true,
-        property: "Assigned cleaning",
+        property: "Assigned room service",
         clientName: `${s.client.firstName} ${s.client.lastName}`,
         cleaningStatus: status,
       });

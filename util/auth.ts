@@ -103,9 +103,9 @@ export function dashboardPathForRole(role: Role): string {
     case UserRole.SUPER_ADMIN:
       return "/admin/dashboard";
     case UserRole.ROOM_ATTENDANT:
-      return "/room-attendant/today";
+      return "/room-attendant/task-schedule";
     case UserRole.CLIENT:
     default:
-      return "/client/today";
+      return "/client/calendar";
   }
 }

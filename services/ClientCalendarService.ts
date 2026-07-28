@@ -62,14 +62,14 @@ export class ClientCalendarService {
       const dateOnly = new Date(s.assignedDate).toISOString().split('T')[0];
       return {
         id: `cleaning:${s.id}`,
-        title: `Cleaner - ${s.roomAttendant.firstName} ${s.roomAttendant.lastName}`,
+        title: `Room Service: ${STATUS_LABEL[status]} `,
         start: dateOnly,
         end: undefined,
         allDay: true,
         classNames: ["evt-cleaning", CLEANING_STATUS_CLASS[status]],
         extendedProps: {
-          property: "Assigned cleaning",
-          status: STATUS_LABEL[status],
+          property: "Assigned room service",
+          status: "RA: "+s.roomAttendant.firstName + " " + s.roomAttendant.lastName,
         },
       };
     });

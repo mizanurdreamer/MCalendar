@@ -27,7 +27,7 @@ export default function RoomAttendantSelectClientPage() {
     mutationFn: (userId: string) =>
       api.post<{ user: unknown }>("/api/auth/room-attendant-client", { userId }),
     onSuccess: () => {
-      router.replace("/room-attendant/today");
+      router.replace("/room-attendant/task-schedule");
       router.refresh();
     },
     onError: () => {
