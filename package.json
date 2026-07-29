@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && prisma migrate deploy && next build",
+    "build": "prisma generate && prisma migrate deploy && tsx prisma/seedData/seed.ts && next build",
     "start": "next start",
     "lint": "next lint",
     "lint:fix": "next lint --fix",
