@@ -11,7 +11,7 @@ export const CALENDAR_EVENTS: EventInput[] = [
   },
   {
     id: "b2",
-    title: "Michele +1 - Dolores Duplex",
+    title: "Michele +1 - Dolores Duplex1",
     start: "2026-07-05",
     end: "2026-07-10",
     allDay: true,
