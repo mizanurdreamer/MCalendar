@@ -105,7 +105,7 @@ export class RoomAttendantTaskScheduleRepository {
         deletedAt: null,
       },
       include: taskScheduleInclude,
-      orderBy: { assignedDate: "desc" },
+      orderBy: { assignedDate: "asc" },
     });
   }
 
