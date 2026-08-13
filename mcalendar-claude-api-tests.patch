@@ -1,0 +1,131 @@
+You've got two places you could use an API key (a GitHub Personal Access Token): on your own machine, or trying it here in this sandbox. I'd recommend the first — it's guaranteed to work and keeps your token out of this chat.
+
+Option 1 — On your own machine (recommended)
+Create a token at https://github.com/settings/tokens (classic token with repo scope, or a fine-grained token scoped to MCalendar with Contents: Read and write).
+Apply the patch locally as I described earlier (git am mcalendar-login-tests.patch), or just make your own commit if you'd rather.
+Push using the token as the password — GitHub ignores the username when a token is passed as the password over HTTPS, so any placeholder works:
+bash
+git push https://<your-username>:<YOUR_TOKEN>@github.com/mizanurdreamer/MCalendar.git tests/login-check-e2e
+
+Or store it once so you don't have to type it inline every time:
+
+bash
+git remote set-url origin https://<your-username>:<YOUR_TOKEN>@github.com/mizanurdreamer/MCalendar.git
+git push -u origin tests/login-check-e2e
+
+(If you'd rather not put the token in the remote URL at all, use a credential helper — git config --global credential.helper store — and git will prompt once and remember it, or use the gh CLI: gh auth login then git push picks up the stored credential automatically.)
+
+Option 2 — Try it from this sandbox session
+
+I can run the push command here if you give me a token, but it's worth knowing upfront: the error I hit wasn't "missing credential," it was "this repo isn't in this session's authorized repository set" — that reads like a proxy-level allowlist, which a token may not bypass regardless. It's worth a shot, but no guarantee.
+
+If you want to try, don't paste the token directly in chat — instead tell me and I'll run a command that reads it from a one-time environment variable you set, so it doesn't sit in the visible transcript. Just say the word and I'll set that up.
+
+Which do you want to do?
+
+How to generate entire process issue read to report generation using claude api in my system
+
+Searched the web, ran a command, loaded tools
+Searched the web, ran a command, loaded tools
+
+Here's how to build that exact "issue → analyze → generate tests → execute → report" pipeline on your own machine, using the Claude API. There are three ways to do it, from least to most code — I'd pick the middle one.
+
+Option A — Zero code: Claude Code CLI in headless mode
+
+If you just want a script you can drop in a cron job or CI step, no Python/TS needed:
+
+bash
+npm install -g @anthropic-ai/claude-code   # or your platform's installer
+export ANTHROPIC_API_KEY=your-api-key
+
+claude -p "Read GitHub issue #2 in mizanurdreamer/MCalendar (use gh issue view), \
+analyze the login/dashboard code it describes, generate a Playwright test file \
+covering its acceptance criteria, execute the tests, and write the results to \
+report.md." \
+  --allowedTools "Read,Write,Edit,Bash,Glob,Grep,WebFetch" \
+  --permission-mode acceptEdits \
+  --output-format json > run.json
+
+This is literally what's driving this conversation — same agent loop, same tools, just invoked as a subprocess instead of interactively.
+
+Option B — Claude Agent SDK (recommended)
+
+This is the library version of the CLI — you write a script, but the tool loop (read files, run bash, write files, decide what's next) is handled for you. It's the right layer for something you'll run repeatedly or wire into your own tooling.
+
+bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install claude-agent-sdk
+export ANTHROPIC_API_KEY=your-api-key
+gh auth login   # needed if the agent will call `gh` to read the issue
+python
+# run_pipeline.py
+import asyncio
+from claude_agent_sdk import query, ClaudeAgentOptions, AssistantMessage, ResultMessage
+
+PROMPT = """
+1. Read GitHub issue #2 in mizanurdreamer/MCalendar (`gh issue view 2 --json title,body`).
+2. Analyze the repo code the issue describes (login flow, dashboard routes).
+3. Generate a Playwright test file under tests/e2e/ covering the issue's
+   acceptance criteria.
+4. Install dependencies and execute the tests.
+5. Write a markdown report (REPORT.md) summarizing what was tested, the
+   pass/fail result, and any caveats.
+"""
+
+async def main():
+    options = ClaudeAgentOptions(
+        cwd="/path/to/your/local/clone/MCalendar",
+        allowed_tools=["Read", "Write", "Edit", "Bash", "Glob", "Grep", "WebFetch"],
+        permission_mode="acceptEdits",  # auto-approve edits; still asks for risky Bash by default
+        system_prompt=(
+            "You are a QA automation engineer. Work end-to-end: read the "
+            "story, write real tests, actually run them, and report the "
+            "real result — never claim a test passed without executing it."
+        ),
+    )
+
+    async for message in query(prompt=PROMPT, options=options):
+        if isinstance(message, AssistantMessage):
+            for block in message.content:
+                if hasattr(block, "text"):
+                    print(block.text)
+                elif hasattr(block, "name"):
+                    print(f"→ tool: {block.name}")
+        elif isinstance(message, ResultMessage):
+            print(f"Done: {message.subtype}")
+
+asyncio.run(main())
+bash
+python run_pipeline.py
+
+Key options worth knowing:
+
+allowed_tools — whitelist exactly what the agent can touch (add WebSearch if it needs to look things up online).
+permission_mode — "acceptEdits" auto-approves file edits but still prompts for shell commands by default; "bypassPermissions" auto-approves everything (only use this in a disposable sandbox/VM — a Bash-enabled agent with no guardrails can run destructive commands).
+system_prompt — this is where you bake in "always actually execute the tests" so it doesn't just narrate.
+
+TypeScript works the same way via npm install @anthropic-ai/claude-agent-sdk and the query() function — same shape, async for/for await either way.
+
+Option C — Raw Messages API (full control, most work)
+
+If you're not using Python/TS, or want to own the loop yourself, use the API directly with the bash tool and implement the read-execute-respond cycle:
+
+python
+import anthropic
+
+client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from env
+
+response = client.messages.create(
+    model="claude-opus-5",
+    max_tokens=4096,
+    tools=[{"type": "bash_20250124", "name": "bash"}],
+    messages=[{"role": "user", "content": PROMPT}],
+)
+# Loop: while response.stop_reason == "tool_use", execute the requested
+# command yourself, send back a tool_result, and call messages.create again.
+
+This is what the Agent SDK is doing internally — you'd need to write the persistent bash session, the loop, retries, and context management yourself, which is why B is usually the better starting point unless you have a reason to avoid the SDK.
+
+A few things that'll matter regardless of which option you pick
+
+Run it in a disposable environment (container/VM), not your main machine — a Bash-enabled agent executes real shell commands. Scope allowed_tools to what the task needs. And put "actually execute, don't just describe" in your prompt/system prompt — it's the difference between a real report and a plausible-sounding one.
