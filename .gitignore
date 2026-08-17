@@ -33,3 +33,12 @@ yarn-error.log*
 
 # prisma
 /prisma/*.db
+
+# playwright
+/playwright-report/
+/test-results/
+/tests/e2e/utils/.env-cache
+
+# next dev auto-generated agent scaffolding files
+/AGENTS.md
+/CLAUDE.md
