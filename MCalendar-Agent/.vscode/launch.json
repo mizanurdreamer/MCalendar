@@ -1,0 +1,59 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug: issue",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "--import",
+        "tsx/esm",
+        "src/index.ts",
+        "issue",
+        "${input:issueNumber}"
+      ],
+      "skipFiles": ["<node_internals>/**"],
+      "console": "integratedTerminal",
+      "sourceMaps": true
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug: watch",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "--import",
+        "tsx/esm",
+        "src/index.ts",
+        "watch"
+      ],
+      "skipFiles": ["<node_internals>/**"],
+      "console": "integratedTerminal",
+      "sourceMaps": true
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug: list",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "--import",
+        "tsx/esm",
+        "src/index.ts",
+        "list"
+      ],
+      "skipFiles": ["<node_internals>/**"],
+      "console": "integratedTerminal",
+      "sourceMaps": true
+    }
+  ],
+  "inputs": [
+    {
+      "id": "issueNumber",
+      "description": "GitHub issue number to process",
+      "type": "promptString",
+      "default": "1"
+    }
+  ]
+}
