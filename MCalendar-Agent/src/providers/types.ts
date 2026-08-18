@@ -36,7 +36,6 @@ export interface ChatResponse {
 export interface ProviderConfig {
   apiKeyEnv?: string;
   baseURL?: string;
-  model?: string;
   _comment?: string;
 }
 
@@ -48,6 +47,5 @@ export interface TaskConfig {
 }
 
 export interface AgentConfig {
-  tasks: Record<string, TaskConfig>;
-  providers: Record<string, ProviderConfig>;
+  [taskName: string]: TaskConfig;
 }

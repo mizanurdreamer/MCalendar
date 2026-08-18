@@ -1,58 +1,26 @@
 {
-  "tasks": {
-    "Agent_Analyze_Issue": {
-      "provider": "anthropic",
-      "model": "claude-sonnet-4-6",
-      "maxTokens": 4096,
-      "temperature": 0.3
-    },
-    "Agent_Analyze_Commit": {
-      "provider": "anthropic",
-      "model": "claude-sonnet-4-6",
-      "maxTokens": 4096,
-      "temperature": 0.3
-    },
-    "Agent_Generate_Tests": {
-      "provider": "anthropic",
-      "model": "claude-sonnet-4-6",
-      "maxTokens": 8192,
-      "temperature": 0.2
-    },
-    "Agent_Review_Tests": {
-      "provider": "anthropic",
-      "model": "claude-sonnet-4-6",
-      "maxTokens": 4096,
-      "temperature": 0.1
-    },
-    "Agent_Fix_Tests": {
-      "provider": "anthropic",
-      "model": "claude-sonnet-4-6",
-      "maxTokens": 8192,
-      "temperature": 0.2
-    },
-    "Agent_Summarize": {
-      "provider": "anthropic",
-      "model": "claude-sonnet-4-6",
-      "maxTokens": 2048,
-      "temperature": 0.3
-    }
+  "Agent_Analyze_Issue": {
+    "maxTokens": 4096,
+    "temperature": 0.3
   },
-  "providers": {
-    "anthropic": {
-      "apiKeyEnv": "ANTHROPIC_API_KEY"
-    },
-    "openai": {
-      "apiKeyEnv": "OPENAI_API_KEY",
-      "_comment": "UNCOMMENT src/providers/openai.ts AND registry.ts CASE TO ENABLE"
-    },
-    "google": {
-      "apiKeyEnv": "GOOGLE_API_KEY",
-      "_comment": "UNCOMMENT src/providers/google.ts AND registry.ts CASE TO ENABLE"
-    },
-    "ollama": {
-      "baseURL": "http://localhost:11434/v1",
-      "model": "llama3.2",
-      "_comment": "UNCOMMENT src/providers/ollama.ts AND registry.ts CASE TO ENABLE"
-    }
+  "Agent_Analyze_Commit": {
+    "maxTokens": 4096,
+    "temperature": 0.3
+  },
+  "Agent_Generate_Tests": {
+    "maxTokens": 8192,
+    "temperature": 0.2
+  },
+  "Agent_Review_Tests": {
+    "maxTokens": 4096,
+    "temperature": 0.1
+  },
+  "Agent_Fix_Tests": {
+    "maxTokens": 8192,
+    "temperature": 0.2
+  },
+  "Agent_Summarize": {
+    "maxTokens": 2048,
+    "temperature": 0.3
   }
 }

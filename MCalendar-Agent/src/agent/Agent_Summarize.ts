@@ -24,8 +24,8 @@ export async function summarizeResults(
       runner,
       testOutputPath,
       mcalendarPath,
-      maxTokens: agentConfig.tasks.Agent_Summarize?.maxTokens,
-      temperature: agentConfig.tasks.Agent_Summarize?.temperature,
+      maxTokens: agentConfig["Agent_Summarize"]?.maxTokens,
+      temperature: agentConfig["Agent_Summarize"]?.temperature,
     },
     SYSTEM_PROMPTS.Agent_Summarize,
     userMessage

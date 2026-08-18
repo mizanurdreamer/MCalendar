@@ -57,8 +57,8 @@ export async function processIssue(
       runner,
       testOutputPath,
       mcalendarPath,
-      maxTokens: agentConfig.tasks.Agent_Analyze_Issue?.maxTokens,
-      temperature: agentConfig.tasks.Agent_Analyze_Issue?.temperature,
+      maxTokens: agentConfig["Agent_Analyze_Issue"]?.maxTokens,
+      temperature: agentConfig["Agent_Analyze_Issue"]?.temperature,
     },
     SYSTEM_PROMPTS.Agent_Analyze_Issue,
     `Analyze this issue and determine what E2E tests need to be written:\n\n${issueContext}`
@@ -79,8 +79,8 @@ export async function processIssue(
       runner,
       testOutputPath,
       mcalendarPath,
-      maxTokens: agentConfig.tasks.Agent_Generate_Tests?.maxTokens,
-      temperature: agentConfig.tasks.Agent_Generate_Tests?.temperature,
+      maxTokens: agentConfig["Agent_Generate_Tests"]?.maxTokens,
+      temperature: agentConfig["Agent_Generate_Tests"]?.temperature,
     },
     SYSTEM_PROMPTS.Agent_Generate_Tests,
     `Generate a Playwright E2E test file for this issue.\n\nFilename: ${testFilename}\n\nAnalysis:\n${analysis}\n\nIssue Context:\n${issueContext}\n\nIMPORTANT: Use the write_test_file tool to save the test as "${testFilename}".`
@@ -114,8 +114,8 @@ export async function processIssue(
           runner,
           testOutputPath,
           mcalendarPath,
-          maxTokens: agentConfig.tasks.Agent_Fix_Tests?.maxTokens,
-          temperature: agentConfig.tasks.Agent_Fix_Tests?.temperature,
+          maxTokens: agentConfig["Agent_Fix_Tests"]?.maxTokens,
+          temperature: agentConfig["Agent_Fix_Tests"]?.temperature,
         },
         SYSTEM_PROMPTS.Agent_Fix_Tests,
         `Fix the failing test. Here are the errors:\n\n${errorContext}\n\nCurrent test file:\n\`\`\`typescript\n${testContent}\n\`\`\`\n\nFilename: ${testFilename}`
@@ -142,8 +142,8 @@ export async function processIssue(
       runner,
       testOutputPath,
       mcalendarPath,
-      maxTokens: agentConfig.tasks.Agent_Review_Tests?.maxTokens,
-      temperature: agentConfig.tasks.Agent_Review_Tests?.temperature,
+      maxTokens: agentConfig["Agent_Review_Tests"]?.maxTokens,
+      temperature: agentConfig["Agent_Review_Tests"]?.temperature,
     },
     SYSTEM_PROMPTS.Agent_Review_Tests,
     `Review this generated test for quality:\n\n\`\`\`typescript\n${testContent}\n\`\`\`\n\nIssue: ${issue.title}\nAnalysis: ${analysis}`

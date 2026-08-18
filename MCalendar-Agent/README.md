@@ -4,7 +4,9 @@ An autonomous AI agent that reads GitHub issues and branch commits, analyzes the
 
 ## Agent Overview
 
-The agent is a pipeline of specialized AI sub-agents. Each sub-agent has a single responsibility and runs independently with its own AI provider, model, and prompt. The orchestrator agents (`Agent_Issue_Analyzer`, `Agent_Commit_Analyzer`) chain these sub-agents together into a full workflow.
+The agent is a pipeline of specialized AI sub-agents. Each sub-agent has a single responsibility and runs independently with its own system prompt. The orchestrator agents (`Agent_Issue_Analyzer`, `Agent_Commit_Analyzer`) chain these sub-agents together into a full workflow.
+
+Provider and model are configured via `.env` — all tasks use the same provider/model automatically.
 
 ### Sub-Agents
 
@@ -20,7 +22,7 @@ The agent is a pipeline of specialized AI sub-agents. Each sub-agent has a singl
 
 ### AI Task Agents
 
-These are the AI-powered tasks that run inside `Agent_Runner_Engine`. Each has its own system prompt and can use a different AI provider:
+These are the AI-powered tasks that run inside `Agent_Runner_Engine`. Each has its own system prompt:
 
 | Task | Prompt | Purpose |
 |------|--------|---------|
@@ -98,7 +100,8 @@ Agent_Runner_Engine + Agent_Summarize  -> format GitHub comment
 - **Auto-detect new GitHub issues** via configurable polling
 - **Auto-detect new commits** on a branch — triages diffs to decide if tests are needed
 - **Generate Playwright E2E tests** using AI (Claude, OpenAI, Gemini, Ollama)
-- **User-configurable AI providers** — assign any AI provider to any task
+- **One-line provider switch** — change `PROVIDER` in `.env`, all tasks use it automatically
+- **Model auto-selection** — set `MODEL=auto` to use the best model for your provider, or specify a custom model
 - **Auto-create branches, commits, and PRs** for generated tests
 - **Retry loop** for fixing failing tests (configurable max retries)
 - **Post results as GitHub comments** with test summaries
@@ -109,7 +112,7 @@ Agent_Runner_Engine + Agent_Summarize  -> format GitHub comment
 - Node.js >= 20.0.0
 - npm
 - GitHub Personal Access Token (with `repo` scope)
-- Anthropic API Key (or other provider keys)
+- AI provider API key (Anthropic, OpenAI, Google, or Ollama running locally)
 
 ## Quick Start
 
@@ -126,13 +129,10 @@ Agent_Runner_Engine + Agent_Summarize  -> format GitHub comment
 3. Configure environment:
    ```bash
    cp .env.example .env
-   # Edit .env with your API keys
+   # Edit .env with your API key and provider
    ```
 
-4. Configure AI providers (optional):
-   Edit `agent.config.json` to assign different providers to different tasks.
-
-5. Run the agent:
+4. Run the agent:
    ```bash
    # Process a specific issue
    npm start -- issue 5
@@ -156,9 +156,11 @@ Agent_Runner_Engine + Agent_Summarize  -> format GitHub comment
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `ANTHROPIC_API_KEY` | Yes | Anthropic API key for Claude |
-| `OPENAI_API_KEY` | No | OpenAI API key (for future use) |
-| `GOOGLE_API_KEY` | No | Google Gemini API key (for future use) |
+| `PROVIDER` | Yes | AI provider: `anthropic`, `openai`, `google`, or `ollama` |
+| `MODEL` | No | Model name or `auto` (default: `auto` — uses best model for provider) |
+| `ANTHROPIC_API_KEY` | If using Anthropic | Anthropic API key |
+| `OPENAI_API_KEY` | If using OpenAI | OpenAI API key |
+| `GOOGLE_API_KEY` | If using Google | Google Gemini API key |
 | `GITHUB_TOKEN` | Yes | GitHub PAT with `repo` scope |
 | `REPO_OWNER` | Yes | GitHub repo owner |
 | `REPO_NAME` | Yes | GitHub repo name |
@@ -169,55 +171,52 @@ Agent_Runner_Engine + Agent_Summarize  -> format GitHub comment
 | `AGENT_ENABLED` | No | Enable/disable agent (default: `true`). Set to `false` to stop all processing |
 | `WATCH_BRANCH` | No | Branch to watch for commits (alternative to `--branch` flag) |
 
+### Model Auto-Selection
+
+| `MODEL` value | Behavior |
+|---------------|----------|
+| `auto` (default) | Uses the best default model for your provider |
+| `claude-opus-4-6` | Overrides to specific model for all tasks |
+| *(empty)* | Same as `auto` |
+
+Default models per provider:
+
+| Provider | Default Model |
+|----------|---------------|
+| `anthropic` | `claude-sonnet-4-20250514` |
+| `openai` | `gpt-4.1` |
+| `google` | `gemini-2.5-flash` |
+| `ollama` | `llama3.2` |
+
 ### agent.config.json
 
-Each task can use a different AI provider and model:
+Per-task tuning for `maxTokens` and `temperature`. Provider and model come from `.env`.
 
 ```json
 {
-  "tasks": {
-    "Agent_Analyze_Issue": {
-      "provider": "anthropic",
-      "model": "claude-sonnet-4-20250514",
-      "maxTokens": 4096,
-      "temperature": 0.3
-    },
-    "Agent_Analyze_Commit": {
-      "provider": "anthropic",
-      "model": "claude-sonnet-4-20250514",
-      "maxTokens": 4096,
-      "temperature": 0.3
-    },
-    "Agent_Generate_Tests": {
-      "provider": "anthropic",
-      "model": "claude-sonnet-4-20250514",
-      "maxTokens": 8192,
-      "temperature": 0.2
-    },
-    "Agent_Review_Tests": {
-      "provider": "anthropic",
-      "model": "claude-sonnet-4-20250514",
-      "maxTokens": 4096,
-      "temperature": 0.1
-    },
-    "Agent_Fix_Tests": {
-      "provider": "anthropic",
-      "model": "claude-sonnet-4-20250514",
-      "maxTokens": 8192,
-      "temperature": 0.2
-    },
-    "Agent_Summarize": {
-      "provider": "anthropic",
-      "model": "claude-sonnet-4-20250514",
-      "maxTokens": 2048,
-      "temperature": 0.3
-    }
+  "Agent_Analyze_Issue": {
+    "maxTokens": 4096,
+    "temperature": 0.3
   },
-  "providers": {
-    "anthropic": { "apiKeyEnv": "ANTHROPIC_API_KEY" },
-    "openai": { "apiKeyEnv": "OPENAI_API_KEY" },
-    "google": { "apiKeyEnv": "GOOGLE_API_KEY" },
-    "ollama": { "baseURL": "http://localhost:11434/v1", "model": "llama3.2" }
+  "Agent_Analyze_Commit": {
+    "maxTokens": 4096,
+    "temperature": 0.3
+  },
+  "Agent_Generate_Tests": {
+    "maxTokens": 8192,
+    "temperature": 0.2
+  },
+  "Agent_Review_Tests": {
+    "maxTokens": 4096,
+    "temperature": 0.1
+  },
+  "Agent_Fix_Tests": {
+    "maxTokens": 8192,
+    "temperature": 0.2
+  },
+  "Agent_Summarize": {
+    "maxTokens": 2048,
+    "temperature": 0.3
   }
 }
 ```
@@ -237,7 +236,7 @@ Each task can use a different AI provider and model:
 
 ```
 MCalendar-Agent/
-  agent.config.json              # Task -> provider mapping
+  agent.config.json              # Per-task maxTokens/temperature
   src/
     index.ts                     # CLI entry point
     config/                      # Configuration loading
@@ -287,6 +286,42 @@ MCalendar-Agent/
       types.ts                   # TaskName, TaskResult
 ```
 
+## Switching Providers
+
+Change `PROVIDER` in `.env` and add the corresponding API key:
+
+```bash
+# Switch to OpenAI
+PROVIDER=openai
+MODEL=auto
+OPENAI_API_KEY=sk-...
+
+# Switch to Google
+PROVIDER=google
+MODEL=auto
+GOOGLE_API_KEY=AIza...
+
+# Switch to Anthropic
+PROVIDER=anthropic
+MODEL=auto
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+To enable OpenAI, Google, or Ollama providers:
+
+1. Uncomment the provider file in `src/providers/` (e.g., `openai.ts`)
+2. Uncomment the matching `case` block in `src/providers/registry.ts`
+3. Set `PROVIDER` and API key in `.env`
+
+## Supported Providers
+
+| Provider | Package | Default Model | Status |
+|----------|---------|---------------|--------|
+| **Anthropic** | `@anthropic-ai/sdk` | `claude-sonnet-4-20250514` | Active |
+| **OpenAI** | `openai` | `gpt-4.1` | Uncomment to enable |
+| **Google Gemini** | `@google/genai` | `gemini-2.5-flash` | Uncomment to enable |
+| **Ollama** | `openai` (compat) | `llama3.2` | Uncomment to enable |
+
 ## Acceptance Criteria
 
 The agent parses GitHub issue descriptions for structured acceptance criteria. Supported formats:
@@ -297,50 +332,6 @@ The agent parses GitHub issue descriptions for structured acceptance criteria. S
 - `## Test Hints` section for additional testing guidance
 
 Each acceptance criterion is mapped to at least one test case during generation.
-
-## Adding a New AI Provider
-
-### Step 1: Uncomment the provider file
-
-Edit the provider file in `src/providers/`:
-
-- `openai.ts` — OpenAI GPT models
-- `google.ts` — Google Gemini models
-- `ollama.ts` — Local models via Ollama
-
-### Step 2: Uncomment the registry case
-
-Edit `src/providers/registry.ts` and uncomment the matching `case` block.
-
-### Step 3: Add the API key to .env
-
-```
-OPENAI_API_KEY=sk-...
-# or
-GOOGLE_API_KEY=AIza...
-```
-
-### Step 4: Update agent.config.json
-
-```json
-{
-  "tasks": {
-    "Agent_Generate_Tests": {
-      "provider": "openai",
-      "model": "gpt-5.4"
-    }
-  }
-}
-```
-
-## Supported Providers
-
-| Provider | Package | Models | Status |
-|----------|---------|--------|--------|
-| **Anthropic** | `@anthropic-ai/sdk` | claude-sonnet-4-20250514, claude-opus-4-6 | Active |
-| **OpenAI** | `openai` | gpt-5.4, gpt-4.1, o3 | Commented out |
-| **Google Gemini** | `@google/genai` | gemini-2.5-flash, gemini-2.5-pro | Commented out |
-| **Ollama** | `openai` (compat) | llama3.2, codellama, etc. | Commented out |
 
 ## Workspace Layout
 
@@ -369,8 +360,11 @@ npx playwright test --debug                  # step through tests
 
 ## Troubleshooting
 
-### "ANTHROPIC_API_KEY not set"
-Ensure `.env` file exists and contains your API key.
+### "Missing required env var: PROVIDER"
+Ensure `.env` has `PROVIDER=anthropic` (or openai/google/ollama).
+
+### "Missing env var: ANTHROPIC_API_KEY"
+Ensure `.env` has the API key for your chosen provider.
 
 ### "Git not initialized"
 The agent needs git to create branches and commits. Ensure MCalendar is a git repo.

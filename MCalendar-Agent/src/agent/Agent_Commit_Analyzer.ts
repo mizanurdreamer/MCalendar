@@ -43,8 +43,8 @@ export async function processCommit(
     runner,
     testOutputPath,
     mcalendarPath,
-    maxTokens: agentConfig.tasks.Agent_Analyze_Commit?.maxTokens,
-    temperature: agentConfig.tasks.Agent_Analyze_Commit?.temperature,
+    maxTokens: agentConfig["Agent_Analyze_Commit"]?.maxTokens,
+    temperature: agentConfig["Agent_Analyze_Commit"]?.temperature,
   });
 
   if (!analysis.needsTests) {
@@ -93,8 +93,8 @@ ${diff.files.map((f) => `### ${f.filename}\n\`\`\`diff\n${f.patch ?? "(no patch)
       runner,
       testOutputPath,
       mcalendarPath,
-      maxTokens: agentConfig.tasks.Agent_Generate_Tests?.maxTokens,
-      temperature: agentConfig.tasks.Agent_Generate_Tests?.temperature,
+      maxTokens: agentConfig["Agent_Generate_Tests"]?.maxTokens,
+      temperature: agentConfig["Agent_Generate_Tests"]?.temperature,
     },
     SYSTEM_PROMPTS.Agent_Generate_Tests,
     `Generate a Playwright E2E test file for this commit.\n\nFilename: ${testFilename}\n\nScope: ${analysis.scope ?? "General E2E testing"}\n\nCommit Context:\n${commitContext}\n\nIMPORTANT: Use the write_test_file tool to save the test as "${testFilename}".`
@@ -126,8 +126,8 @@ ${diff.files.map((f) => `### ${f.filename}\n\`\`\`diff\n${f.patch ?? "(no patch)
           runner,
           testOutputPath,
           mcalendarPath,
-          maxTokens: agentConfig.tasks.Agent_Fix_Tests?.maxTokens,
-          temperature: agentConfig.tasks.Agent_Fix_Tests?.temperature,
+          maxTokens: agentConfig["Agent_Fix_Tests"]?.maxTokens,
+          temperature: agentConfig["Agent_Fix_Tests"]?.temperature,
         },
         SYSTEM_PROMPTS.Agent_Fix_Tests,
         `Fix the failing test. Here are the errors:\n\n${errorContext}\n\nCurrent test file:\n\`\`\`typescript\n${testContent}\n\`\`\`\n\nFilename: ${testFilename}`
@@ -153,8 +153,8 @@ ${diff.files.map((f) => `### ${f.filename}\n\`\`\`diff\n${f.patch ?? "(no patch)
       runner,
       testOutputPath,
       mcalendarPath,
-      maxTokens: agentConfig.tasks.Agent_Review_Tests?.maxTokens,
-      temperature: agentConfig.tasks.Agent_Review_Tests?.temperature,
+      maxTokens: agentConfig["Agent_Review_Tests"]?.maxTokens,
+      temperature: agentConfig["Agent_Review_Tests"]?.temperature,
     },
     SYSTEM_PROMPTS.Agent_Review_Tests,
     `Review this generated test for quality:\n\n\`\`\`typescript\n${testContent}\n\`\`\`\n\nCommit: ${shortSha} — ${diff.message.split("\n")[0]}`
