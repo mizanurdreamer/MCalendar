@@ -1,9 +1,9 @@
 import { Command } from "commander";
-import { loadConfig } from "./config.js";
+import { loadConfig } from "./config/index.js";
 import { GitHubClient } from "./github/client.js";
-import { processIssue } from "./agent/orchestrator.js";
-import { processCommit } from "./agent/commit-orchestrator.js";
-import { startWatcher } from "./watcher/polling.js";
+import { processIssue } from "./agent/Agent_Issue_Analyzer.js";
+import { processCommit } from "./agent/Agent_Commit_Analyzer.js";
+import { startWatcher } from "./watcher/Agent_Issue_Analyzer_Watcher.js";
 import { logger } from "./utils/logger.js";
 
 const program = new Command();

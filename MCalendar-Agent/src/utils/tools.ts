@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { ToolDefinition } from "../providers/types.js";
 import type { CodebaseReader } from "../codebase/reader.js";
-import type { PlaywrightRunner } from "../runner/playwright.js";
+import type { PlaywrightRunner } from "../test_runner/playwright.js";
 
 export function createAgentTools(
   reader: CodebaseReader,

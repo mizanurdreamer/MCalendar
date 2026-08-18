@@ -1,8 +1,8 @@
 import type { ProviderInterface, ChatMessage, ContentBlock } from "../providers/types.js";
 import type { CodebaseReader } from "../codebase/reader.js";
-import { SYSTEM_PROMPTS } from "./prompts.js";
-import { createAgentTools, executeTool } from "./tools.js";
-import type { PlaywrightRunner } from "../runner/playwright.js";
+import { SYSTEM_PROMPTS } from "../prompts/index.js";
+import { createAgentTools, executeTool } from "../utils/tools.js";
+import type { PlaywrightRunner } from "../test_runner/playwright.js";
 import { logger } from "../utils/logger.js";
 
 export interface TaskContext {

@@ -1,13 +1,104 @@
 # MCalendar Multi-AI Test Agent
 
-An autonomous agentic AI that reads GitHub issues, analyzes the MCalendar codebase, generates Playwright E2E tests using configurable AI providers, executes them, and creates PRs with the results. Also watches branch commits for testable changes.
+An autonomous AI agent that reads GitHub issues and branch commits, analyzes the MCalendar codebase, generates Playwright E2E tests using configurable AI providers, executes them, and creates PRs with the results.
+
+## Agent Overview
+
+The agent is a pipeline of specialized AI sub-agents. Each sub-agent has a single responsibility and runs independently with its own AI provider, model, and prompt. The orchestrator agents (`Agent_Issue_Analyzer`, `Agent_Commit_Analyzer`) chain these sub-agents together into a full workflow.
+
+### Sub-Agents
+
+| Agent | File | Purpose |
+|-------|------|---------|
+| `Agent_Runner_Engine` | `src/agent/Agent_Runner_Engine.ts` | Core engine that runs any sub-agent in a loop. Handles tool calls (read files, write tests, run Playwright) and conversation management. Every sub-agent runs through this engine. |
+| `Agent_Issue_Analyzer` | `src/agent/Agent_Issue_Analyzer.ts` | **Orchestrator** — takes a GitHub issue and runs the full pipeline: analyze issue → generate tests → run → fix → review → summarize → commit → PR → post comment. |
+| `Agent_Commit_Analyzer` | `src/agent/Agent_Commit_Analyzer.ts` | **Orchestrator** — takes a branch commit, analyzes the diff, decides if tests are needed, and runs the pipeline: analyze commit → generate tests → run → fix → review → summarize → commit → PR. |
+| `Agent_Commit_Triage` | `src/agent/Agent_Commit_Triage.ts` | **Triage** — reads a commit diff and decides whether it needs new or updated E2E tests. Returns a verdict: `needs_tests` or `skip`. Runs before the full pipeline to avoid unnecessary work. |
+| `Agent_Summarize` | `src/agent/Agent_Summarize.ts` | **Formatter** — takes test results, review output, and PR info and produces a clean GitHub comment summarizing what was done. |
+| `Agent_Issue_Context_Builder` | `src/agent/Agent_Issue_Context_Builder.ts` | **Context** — reads a GitHub issue and builds a context string for the AI: parses acceptance criteria, test hints, labels, and determines the correct base branch. |
+| `Agent_Git_Operations` | `src/agent/Agent_Git_Operations.ts` | **Git** — handles branch creation, checkout, commit, and push operations for the agent. |
+
+### AI Task Agents
+
+These are the AI-powered tasks that run inside `Agent_Runner_Engine`. Each has its own system prompt and can use a different AI provider:
+
+| Task | Prompt | Purpose |
+|------|--------|---------|
+| `Agent_Analyze_Issue` | `src/prompts/analyze_issue_prompt.ts` | Understands the issue and determines what E2E tests need to be written. |
+| `Agent_Analyze_Commit` | `src/prompts/analyze_commit_prompt.ts` | Reviews a commit diff and decides if new or updated tests are needed. |
+| `Agent_Generate_Tests` | `src/prompts/generate_tests_prompt.ts` | Generates Playwright test code based on analysis. Uses tools to write test files. |
+| `Agent_Review_Tests` | `src/prompts/review_tests_prompt.ts` | Reviews generated tests for quality, coverage, and correctness. |
+| `Agent_Fix_Tests` | `src/prompts/fix_tests_prompt.ts` | Takes failing test output and fixes the test code. Runs in a retry loop. |
+| `Agent_Summarize` | `src/prompts/summarize_prompt.ts` | Formats test results into a GitHub comment. |
+
+## How It Works
+
+### Issue Mode
+
+```
+GitHub Issue Created
+        |
+        v
+Agent_Issue_Context_Builder  -> parse issue, acceptance criteria
+        |
+        v
+Agent_Runner_Engine + Agent_Analyze_Issue  -> understand what to test
+        |
+        v
+Agent_Runner_Engine + Agent_Generate_Tests -> write Playwright test code
+        |
+        v
+Playwright runs tests
+        |
+        v  (if failures)
+Agent_Runner_Engine + Agent_Fix_Tests  -> fix failing tests (up to 3x)
+        |
+        v
+Agent_Runner_Engine + Agent_Review_Tests  -> quality check
+        |
+        v
+Git commit + push + create PR
+        |
+        v
+Agent_Runner_Engine + Agent_Summarize  -> format GitHub comment
+```
+
+### Commit Mode
+
+```
+Commit pushed to branch
+        |
+        v
+Agent_Commit_Triage  -> decide if tests needed
+        |
+        v  (if needed)
+Agent_Runner_Engine + Agent_Analyze_Commit  -> review diff
+        |
+        v
+Agent_Runner_Engine + Agent_Generate_Tests -> write test code
+        |
+        v
+Playwright runs tests
+        |
+        v  (if failures)
+Agent_Runner_Engine + Agent_Fix_Tests  -> fix failing tests (up to 3x)
+        |
+        v
+Agent_Runner_Engine + Agent_Review_Tests  -> quality check
+        |
+        v
+Git commit + push + create PR
+        |
+        v
+Agent_Runner_Engine + Agent_Summarize  -> format GitHub comment
+```
 
 ## Features
 
 - **Auto-detect new GitHub issues** via configurable polling
-- **Auto-detect new commits** on a branch — analyzes diffs with AI to decide if tests are needed
+- **Auto-detect new commits** on a branch — triages diffs to decide if tests are needed
 - **Generate Playwright E2E tests** using AI (Claude, OpenAI, Gemini, Ollama)
-- **User-configurable AI providers** — assign any AI to any task
+- **User-configurable AI providers** — assign any AI provider to any task
 - **Auto-create branches, commits, and PRs** for generated tests
 - **Retry loop** for fixing failing tests (configurable max retries)
 - **Post results as GitHub comments** with test summaries
@@ -85,31 +176,37 @@ Each task can use a different AI provider and model:
 ```json
 {
   "tasks": {
-    "analyze_issue": {
+    "Agent_Analyze_Issue": {
       "provider": "anthropic",
       "model": "claude-sonnet-4-20250514",
       "maxTokens": 4096,
       "temperature": 0.3
     },
-    "generate_tests": {
+    "Agent_Analyze_Commit": {
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-20250514",
+      "maxTokens": 4096,
+      "temperature": 0.3
+    },
+    "Agent_Generate_Tests": {
       "provider": "anthropic",
       "model": "claude-sonnet-4-20250514",
       "maxTokens": 8192,
       "temperature": 0.2
     },
-    "review_tests": {
+    "Agent_Review_Tests": {
       "provider": "anthropic",
       "model": "claude-sonnet-4-20250514",
       "maxTokens": 4096,
       "temperature": 0.1
     },
-    "fix_tests": {
+    "Agent_Fix_Tests": {
       "provider": "anthropic",
       "model": "claude-sonnet-4-20250514",
       "maxTokens": 8192,
       "temperature": 0.2
     },
-    "summarize": {
+    "Agent_Summarize": {
       "provider": "anthropic",
       "model": "claude-sonnet-4-20250514",
       "maxTokens": 2048,
@@ -136,105 +233,58 @@ Each task can use a different AI provider and model:
 | `npm start -- watch-branch <branch> --poll-interval 5` | Watch commits with 5 min interval |
 | `npm start -- list` | List open GitHub issues |
 
-## How It Works
-
-### Issue Mode
-
-```
-GitHub Issue Created
-        |
-        v
-Agent detects via polling (every 1 min)
-        |
-        v
-Fetches issue details from GitHub API
-        |
-        v
-Creates branch: test/issue-{n}-{slug}
-        |
-        v
-+------------------------------------------+
-|  Task Pipeline (each uses AI):           |
-|  1. analyze_issue  -> understand issue   |
-|  2. generate_tests -> write test code    |
-|  3. Run Playwright tests                 |
-|  4. fix_tests (if failures, up to 3x)   |
-|  5. review_tests   -> quality check      |
-|  6. summarize      -> format comment     |
-+------------------------------------------+
-        |
-        v
-Git commit + push branch
-        |
-        v
-Create Pull Request
-        |
-        v
-Post GitHub comment with results
-```
-
-### Commit Mode
-
-```
-Commit pushed to branch
-        |
-        v
-Agent detects via polling
-        |
-        v
-Fetches commit diff from GitHub API
-        |
-        v
-+------------------------------------------+
-|  AI decides if tests needed:             |
-|  - analyze_commit -> review diff         |
-|  - If no tests needed -> skip            |
-|  - If tests needed -> continue           |
-+------------------------------------------+
-        |
-        v
-Creates branch: test/commit-{sha}
-        |
-        v
-+------------------------------------------+
-|  Task Pipeline (each uses AI):           |
-|  1. generate_tests -> write test code    |
-|  2. Run Playwright tests                 |
-|  3. fix_tests (if failures, up to 3x)   |
-|  4. review_tests   -> quality check      |
-|  5. summarize      -> format comment     |
-+------------------------------------------+
-        |
-        v
-Git commit + push branch
-        |
-        v
-Create Pull Request
-```
-
 ## Project Structure
 
 ```
-D:\Projects\MCalendar\
-  ├── .git/
-  ├── MCalendar/              (source app — agent READS code here)
-  ├── MCalendar-Agent/        (agent code — runs from here)
-  └── MCalendar-Tests/        (test project — agent WRITES tests here)
-                              ├── playwright.config.ts
-                              ├── utils/token.ts
-                              └── tests/e2e/
-```
-
-The agent **reads** source code from `MCalendar/` but **writes and runs** tests in `MCalendar-Tests/`. This keeps test generation isolated from the main app.
-
-### Running Tests Manually
-
-```bash
-cd MCalendar-Tests
-npx playwright test                          # run all tests
-npx playwright test tests/e2e/issue-5-*.spec.ts  # run specific test
-npx playwright test --headed                 # run with browser visible
-npx playwright test --debug                  # step through tests
+MCalendar-Agent/
+  agent.config.json              # Task -> provider mapping
+  src/
+    index.ts                     # CLI entry point
+    config/                      # Configuration loading
+      index.ts                   # Barrel re-export
+      config.ts                  # Env + agent.config.json loader
+    agent/                       # All agent logic
+      Agent_Runner_Engine.ts     # Core engine (tool-use loop)
+      Agent_Issue_Analyzer.ts    # Issue pipeline orchestrator
+      Agent_Commit_Analyzer.ts   # Commit pipeline orchestrator
+      Agent_Commit_Triage.ts     # Decide if commit needs tests
+      Agent_Summarize.ts         # Format results for GitHub comment
+      Agent_Issue_Context_Builder.ts  # Parse issue + acceptance criteria
+      Agent_Git_Operations.ts    # Git branch/commit/push
+    prompts/                     # System prompts (per AI task)
+      index.ts                   # Barrel re-export
+      analyze_issue_prompt.ts
+      analyze_commit_prompt.ts
+      generate_tests_prompt.ts
+      review_tests_prompt.ts
+      fix_tests_prompt.ts
+      summarize_prompt.ts
+    providers/                   # AI provider abstraction
+      types.ts                   # ProviderInterface, TaskConfig
+      registry.ts                # Provider factory
+      anthropic.ts               # Claude (active)
+      openai.ts                  # OpenAI (commented)
+      google.ts                  # Gemini (commented)
+      ollama.ts                  # Local models (commented)
+    github/                      # GitHub API integration
+      client.ts                  # REST API + commit methods
+      types.ts                   # Issue, PR, Commit types
+    codebase/                    # Project analysis
+      reader.ts                  # Read MCalendar files
+      structure.ts               # Build project map
+    watcher/                     # Auto-detection
+      Agent_Issue_Analyzer_Watcher.ts  # Polling loop (issues + commits)
+      Agent_Commit_Analyzer_Watcher.ts # Poll branch for new commits
+      Issue_State_Tracker.ts     # Processed issue tracking
+      Commit_State_Tracker.ts    # Last-seen commit SHA per branch
+    test_runner/                 # Test execution
+      playwright.ts              # Playwright runner
+      reporter.ts                # Result formatting
+    utils/                       # Shared utilities
+      logger.ts                  # Colored output
+      file.ts                    # File I/O
+      tools.ts                   # Agent tool definitions
+      types.ts                   # TaskName, TaskResult
 ```
 
 ## Acceptance Criteria
@@ -247,17 +297,6 @@ The agent parses GitHub issue descriptions for structured acceptance criteria. S
 - `## Test Hints` section for additional testing guidance
 
 Each acceptance criterion is mapped to at least one test case during generation.
-
-## Task Reference
-
-| Task | Purpose | When It Runs |
-|------|---------|-------------|
-| `analyze_issue` | Understand what needs testing from the issue | Issue mode — always |
-| `analyze_commit` | Decide if a commit needs tests (reviews diff) | Commit mode — always |
-| `generate_tests` | Generate Playwright test code | After analysis (if tests needed) |
-| `review_tests` | Review test quality and coverage | After generation |
-| `fix_tests` | Fix failing tests from error output | If tests fail |
-| `summarize` | Format results for GitHub comment | After PR creation |
 
 ## Adding a New AI Provider
 
@@ -286,7 +325,7 @@ GOOGLE_API_KEY=AIza...
 ```json
 {
   "tasks": {
-    "generate_tests": {
+    "Agent_Generate_Tests": {
       "provider": "openai",
       "model": "gpt-5.4"
     }
@@ -303,50 +342,29 @@ GOOGLE_API_KEY=AIza...
 | **Google Gemini** | `@google/genai` | gemini-2.5-flash, gemini-2.5-pro | Commented out |
 | **Ollama** | `openai` (compat) | llama3.2, codellama, etc. | Commented out |
 
-## Architecture
+## Workspace Layout
 
 ```
-MCalendar-Agent/
-  agent.config.json          # Task -> provider mapping
-  src/
-    index.ts                 # CLI entry point
-    config.ts                # Environment + config loading
-    providers/               # AI provider abstraction layer
-      types.ts               # ProviderInterface, TaskConfig
-      registry.ts            # Provider factory
-      anthropic.ts           # Claude (active)
-      openai.ts              # OpenAI (commented)
-      google.ts              # Gemini (commented)
-      ollama.ts              # Local models (commented)
-    tasks/                   # Individual task implementations
-      types.ts               # TaskName, TaskResult
-      tools.ts               # Agent tool definitions
-      prompts.ts             # System prompts
-      agent-runner.ts        # Agent loop (tool-use)
-    github/                  # GitHub API integration
-      client.ts              # REST API + commit methods
-      types.ts               # Issue, PR, Commit types
-    codebase/                # Project analysis
-      reader.ts              # Read MCalendar files
-      structure.ts           # Build project map
-    agent/                   # Orchestration
-      orchestrator.ts        # Issue pipeline
-      commit-orchestrator.ts # Commit pipeline
-      commit-analyzer.ts     # AI decides if commit needs tests
-      context-builder.ts     # Issue context + acceptance criteria parsing
-      branch.ts              # Git operations
-      context-builder.ts     # Context assembly
-    watcher/                 # Auto-detection
-      polling.ts             # Polling loop (issues + commits)
-      state.ts               # Processed issue tracking
-      commit-state.ts        # Last-seen commit SHA per branch
-      commit-watcher.ts      # Poll branch for new commits
-    runner/                  # Test execution
-      playwright.ts          # Playwright runner
-      reporter.ts            # Result formatting
-    utils/                   # Shared utilities
-      logger.ts              # Colored output
-      file.ts                # File I/O
+D:\Projects\MCalendar\
+  ├── .git/
+  ├── MCalendar/              (source app — agent READS code here)
+  ├── MCalendar-Agent/        (agent code — runs from here)
+  └── MCalendar-Tests/        (test project — agent WRITES tests here)
+                              ├── playwright.config.ts
+                              ├── utils/token.ts
+                              └── tests/e2e/
+```
+
+The agent **reads** source code from `MCalendar/` but **writes and runs** tests in `MCalendar-Tests/`. This keeps test generation isolated from the main app.
+
+### Running Tests Manually
+
+```bash
+cd MCalendar-Tests
+npx playwright test                          # run all tests
+npx playwright test tests/e2e/issue-5-*.spec.ts  # run specific test
+npx playwright test --headed                 # run with browser visible
+npx playwright test --debug                  # step through tests
 ```
 
 ## Troubleshooting

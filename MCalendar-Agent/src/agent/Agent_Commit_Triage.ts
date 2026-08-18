@@ -1,7 +1,7 @@
 import type { CommitDiff } from "../github/types.js";
-import type { TaskContext } from "../tasks/agent-runner.js";
-import { runAgentLoop } from "../tasks/agent-runner.js";
-import { SYSTEM_PROMPTS } from "../tasks/prompts.js";
+import type { TaskContext } from "./Agent_Runner_Engine.js";
+import { runAgentLoop } from "./Agent_Runner_Engine.js";
+import { SYSTEM_PROMPTS } from "../prompts/index.js";
 import { logger } from "../utils/logger.js";
 
 export interface CommitAnalysis {
@@ -40,7 +40,7 @@ Respond with ONLY valid JSON (no markdown, no code fences):
 
   const result = await runAgentLoop(
     ctx,
-    SYSTEM_PROMPTS.analyze_commit,
+    SYSTEM_PROMPTS.Agent_Analyze_Commit,
     prompt,
     5
   );

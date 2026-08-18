@@ -1,6 +1,6 @@
 import type { GitHubClient } from "../github/client.js";
 import type { CommitDiff } from "../github/types.js";
-import { CommitStateManager } from "./commit-state.js";
+import { CommitStateManager } from "./Commit_State_Tracker.js";
 import { logger } from "../utils/logger.js";
 
 export async function checkForNewCommits(

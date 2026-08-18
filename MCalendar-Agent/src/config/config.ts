@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import dotenv from "dotenv";
-import type { AgentConfig } from "./providers/types.js";
+import type { AgentConfig } from "../providers/types.js";
 
 export interface AppConfig {
   anthropicApiKey: string;

@@ -4,13 +4,14 @@ import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers
 import type { GitHubIssue } from "../github/types.js";
 import { GitHubClient } from "../github/client.js";
 import { CodebaseReader } from "../codebase/reader.js";
-import { PlaywrightRunner } from "../runner/playwright.js";
-import { formatTestReport } from "../runner/reporter.js";
-import { GitBranch } from "./branch.js";
-import { buildIssueContext, determineBaseBranch } from "./context-builder.js";
-import { runAgentLoop } from "../tasks/agent-runner.js";
-import { SYSTEM_PROMPTS } from "../tasks/prompts.js";
-import type { TaskResult } from "../tasks/types.js";
+import { PlaywrightRunner } from "../test_runner/playwright.js";
+import { formatTestReport } from "../test_runner/reporter.js";
+import { GitBranch } from "./Agent_Git_Operations.js";
+import { buildIssueContext, determineBaseBranch } from "./Agent_Issue_Context_Builder.js";
+import { runAgentLoop } from "./Agent_Runner_Engine.js";
+import { summarizeResults } from "./Agent_Summarize.js";
+import { SYSTEM_PROMPTS } from "../prompts/index.js";
+import type { TaskResult } from "../utils/types.js";
 import { logger } from "../utils/logger.js";
 
 export interface OrchestratorConfig {
@@ -46,8 +47,8 @@ export async function processIssue(
   const issueContext = buildIssueContext(issue, reader);
 
   // Task 1: Analyze issue
-  const analyzeProvider = getTaskProvider("analyze_issue", agentConfig);
-  logger.task("analyze_issue", `${getTaskProviderName("analyze_issue", agentConfig)}/${getTaskModel("analyze_issue", agentConfig)}`);
+  const analyzeProvider = getTaskProvider("Agent_Analyze_Issue", agentConfig);
+  logger.task("Agent_Analyze_Issue", `${getTaskProviderName("Agent_Analyze_Issue", agentConfig)}/${getTaskModel("Agent_Analyze_Issue", agentConfig)}`);
 
   const analysis = await runAgentLoop(
     {
@@ -56,18 +57,18 @@ export async function processIssue(
       runner,
       testOutputPath,
       mcalendarPath,
-      maxTokens: agentConfig.tasks.analyze_issue?.maxTokens,
-      temperature: agentConfig.tasks.analyze_issue?.temperature,
+      maxTokens: agentConfig.tasks.Agent_Analyze_Issue?.maxTokens,
+      temperature: agentConfig.tasks.Agent_Analyze_Issue?.temperature,
     },
-    SYSTEM_PROMPTS.analyze_issue,
+    SYSTEM_PROMPTS.Agent_Analyze_Issue,
     `Analyze this issue and determine what E2E tests need to be written:\n\n${issueContext}`
   );
 
   logger.success(`Analysis complete`);
 
   // Task 2: Generate tests
-  const generateProvider = getTaskProvider("generate_tests", agentConfig);
-  logger.task("generate_tests", `${getTaskProviderName("generate_tests", agentConfig)}/${getTaskModel("generate_tests", agentConfig)}`);
+  const generateProvider = getTaskProvider("Agent_Generate_Tests", agentConfig);
+  logger.task("Agent_Generate_Tests", `${getTaskProviderName("Agent_Generate_Tests", agentConfig)}/${getTaskModel("Agent_Generate_Tests", agentConfig)}`);
 
   const testFilename = `issue-${issue.number}-${GitBranch.slugify(issue.title)}.spec.ts`;
 
@@ -78,10 +79,10 @@ export async function processIssue(
       runner,
       testOutputPath,
       mcalendarPath,
-      maxTokens: agentConfig.tasks.generate_tests?.maxTokens,
-      temperature: agentConfig.tasks.generate_tests?.temperature,
+      maxTokens: agentConfig.tasks.Agent_Generate_Tests?.maxTokens,
+      temperature: agentConfig.tasks.Agent_Generate_Tests?.temperature,
     },
-    SYSTEM_PROMPTS.generate_tests,
+    SYSTEM_PROMPTS.Agent_Generate_Tests,
     `Generate a Playwright E2E test file for this issue.\n\nFilename: ${testFilename}\n\nAnalysis:\n${analysis}\n\nIssue Context:\n${issueContext}\n\nIMPORTANT: Use the write_test_file tool to save the test as "${testFilename}".`
   );
 
@@ -97,10 +98,10 @@ export async function processIssue(
   // Task 3: Fix tests (if failures)
   let retries = 0;
   if (!testResult.success && testResult.errors.length > 0) {
-    const fixProvider = getTaskProvider("fix_tests", agentConfig);
+    const fixProvider = getTaskProvider("Agent_Fix_Tests", agentConfig);
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      logger.task("fix_tests", `attempt ${attempt}/${maxRetries}`);
+      logger.task("Agent_Fix_Tests", `attempt ${attempt}/${maxRetries}`);
       retries++;
 
       const errorContext = testResult.errors.join("\n\n");
@@ -113,10 +114,10 @@ export async function processIssue(
           runner,
           testOutputPath,
           mcalendarPath,
-          maxTokens: agentConfig.tasks.fix_tests?.maxTokens,
-          temperature: agentConfig.tasks.fix_tests?.temperature,
+          maxTokens: agentConfig.tasks.Agent_Fix_Tests?.maxTokens,
+          temperature: agentConfig.tasks.Agent_Fix_Tests?.temperature,
         },
-        SYSTEM_PROMPTS.fix_tests,
+        SYSTEM_PROMPTS.Agent_Fix_Tests,
         `Fix the failing test. Here are the errors:\n\n${errorContext}\n\nCurrent test file:\n\`\`\`typescript\n${testContent}\n\`\`\`\n\nFilename: ${testFilename}`
       );
 
@@ -130,8 +131,8 @@ export async function processIssue(
   }
 
   // Task 4: Review tests
-  const reviewProvider = getTaskProvider("review_tests", agentConfig);
-  logger.task("review_tests", `${getTaskProviderName("review_tests", agentConfig)}/${getTaskModel("review_tests", agentConfig)}`);
+  const reviewProvider = getTaskProvider("Agent_Review_Tests", agentConfig);
+  logger.task("Agent_Review_Tests", `${getTaskProviderName("Agent_Review_Tests", agentConfig)}/${getTaskModel("Agent_Review_Tests", agentConfig)}`);
 
   const testContent = testReader.readFile(testFilename);
   const review = await runAgentLoop(
@@ -141,10 +142,10 @@ export async function processIssue(
       runner,
       testOutputPath,
       mcalendarPath,
-      maxTokens: agentConfig.tasks.review_tests?.maxTokens,
-      temperature: agentConfig.tasks.review_tests?.temperature,
+      maxTokens: agentConfig.tasks.Agent_Review_Tests?.maxTokens,
+      temperature: agentConfig.tasks.Agent_Review_Tests?.temperature,
     },
-    SYSTEM_PROMPTS.review_tests,
+    SYSTEM_PROMPTS.Agent_Review_Tests,
     `Review this generated test for quality:\n\n\`\`\`typescript\n${testContent}\n\`\`\`\n\nIssue: ${issue.title}\nAnalysis: ${analysis}`
   );
 
@@ -167,20 +168,12 @@ export async function processIssue(
   logger.success(`PR #${pr.number} created → ${baseBranch}`);
 
   // Task 5: Summarize for GitHub comment
-  const summarizeProvider = getTaskProvider("summarize", agentConfig);
-  logger.task("summarize", `${getTaskProviderName("summarize", agentConfig)}/${getTaskModel("summarize", agentConfig)}`);
-
-  const comment = await runAgentLoop(
-    {
-      provider: summarizeProvider,
-      reader,
-      runner,
-      testOutputPath,
-      mcalendarPath,
-      maxTokens: agentConfig.tasks.summarize?.maxTokens,
-      temperature: agentConfig.tasks.summarize?.temperature,
-    },
-    SYSTEM_PROMPTS.summarize,
+  const comment = await summarizeResults(
+    agentConfig,
+    reader,
+    runner,
+    testOutputPath,
+    mcalendarPath,
     `Summarize these test results for a GitHub comment:\n\nIssue: #${issue.number} — ${issue.title}\nBranch: ${branchName}\nPR: #${pr.number}\nTest file: ${testFilename}\n\nTest Results:\n${formatTestReport(testResult)}\n\nReview: ${review}`
   );
 
