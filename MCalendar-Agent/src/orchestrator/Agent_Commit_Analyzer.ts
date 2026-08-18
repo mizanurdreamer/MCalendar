@@ -9,10 +9,10 @@ import { formatTestReport } from "../test_runner/reporter.js";
 import { GitBranch } from "../github/git_operations.js";
 import { runAgentLoop } from "../agent/Agent_Runner_Engine.js";
 import { generateTests } from "../agent/Agent_Tests_Generator.js";
-import { runTests } from "../test_runner/run_tests.js";
+import { runTests } from "../agent/Agent_Tests_Runner.js";
 import { generateTestReport } from "../agent/Agent_Tests_Report_Generator.js";
 import { reviewTests } from "../agent/Agent_Tests_Reviewer.js";
-import { autoCommit } from "../github/auto_commit.js";
+import { autoCommit } from "../agent/Agent_Auto_Commit.js";
 import { summarizeResults } from "../agent/Agent_Summarize.js";
 import { SYSTEM_PROMPTS } from "../prompts/index.js";
 import type { TaskResult } from "../utils/types.js";
@@ -142,16 +142,16 @@ ${diff.files.map((f) => `### ${f.filename}\n\`\`\`diff\n${f.patch ?? "(no patch)
     runner,
     testOutputPath,
     mcalendarPath,
-    `Summarize these test results for a GitHub comment:\n\nCommit: ${shortSha} — ${diff.message.split("\n")[0]}\nBranch: ${branchName}\nPR: #${commitResult.prNumber}\nTest file: ${testFilename}\n\nTest Results:\n${formatTestReport(testResult)}\n\nReport:\n${report}`
+    `Summarize these test results for a GitHub comment:\n\nCommit: ${shortSha} — ${diff.message.split("\n")[0]}\nBranch: ${branchName}\nTest file: ${testFilename}\n\nTest Results:\n${formatTestReport(testResult)}\n\nReport:\n${report}`
   );
 
   await githubClient.addComment(0, comment);
 
-  logger.success(`Commit ${shortSha} complete — PR #${commitResult.prNumber}, ${testResult.passed} passed, ${testResult.failed} failed`);
+  logger.success(`Commit ${shortSha} complete — pushed to ${branchName}, ${testResult.passed} passed, ${testResult.failed} failed`);
 
   return {
     success: testResult.success,
-    output: `PR #${commitResult.prNumber} created with ${testResult.passed} tests passed`,
+    output: `Pushed to ${branchName} with ${testResult.passed} tests passed`,
     filesWritten: [testFilename],
     testsPassed: testResult.passed,
     testsFailed: testResult.failed,

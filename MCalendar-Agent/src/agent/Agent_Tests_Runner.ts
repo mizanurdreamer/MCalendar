@@ -1,4 +1,4 @@
-import type { PlaywrightRunner, TestResult } from "./playwright.js";
+import type { PlaywrightRunner, TestResult } from "../test_runner/playwright.js";
 import { logger } from "../utils/logger.js";
 
 export async function runTests(

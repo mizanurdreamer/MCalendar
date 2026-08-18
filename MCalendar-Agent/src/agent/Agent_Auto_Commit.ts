@@ -1,5 +1,5 @@
-import type { GitHubClient } from "./client.js";
-import type { GitBranch } from "./git_operations.js";
+import type { GitHubClient } from "../github/client.js";
+import type { GitBranch } from "../github/git_operations.js";
 import { logger } from "../utils/logger.js";
 
 export interface AutoCommitResult {
@@ -24,18 +24,18 @@ export async function autoCommit(
   await git.push(branchName);
   logger.success("Pushed");
 
-  logger.info("Creating PR...");
-  const pr = await githubClient.createPR({
-    title: prTitle,
-    body: prBody,
-    head: branchName,
-    base: baseBranch,
-  });
+  // logger.info("Creating PR...");
+  // const pr = await githubClient.createPR({
+  //   title: prTitle,
+  //   body: prBody,
+  //   head: branchName,
+  //   base: baseBranch,
+  // });
 
-  logger.success(`PR #${pr.number} created → ${baseBranch}`);
+  // logger.success(`PR #${pr.number} created → ${baseBranch}`);
 
   return {
-    prNumber: pr.number,
-    prUrl: pr.html_url ?? "",
+    prNumber: 0,
+    prUrl: "",
   };
 }

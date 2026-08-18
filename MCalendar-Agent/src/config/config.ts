@@ -4,8 +4,8 @@ import dotenv from "dotenv";
 import type { AgentConfig } from "../providers/types.js";
 
 const DEFAULT_MODELS: Record<string, string> = {
-  anthropic: "claude-sonnet-4-20250514",
-  openai: "gpt-4.1",
+  anthropic: "claude-haiku-4-5",
+  openai: "gpt-4o",
   google: "gemini-2.5-flash",
   ollama: "llama3.2",
 };
