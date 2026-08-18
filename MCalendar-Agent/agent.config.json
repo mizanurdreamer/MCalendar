@@ -1,21 +1,21 @@
 {
-  "Agent_Analyze_Issue": {
+  "Agent_Issue_Analyzer": {
     "maxTokens": 4096,
     "temperature": 0.3
   },
-  "Agent_Analyze_Commit": {
+  "Agent_Commit_Analyzer": {
     "maxTokens": 4096,
     "temperature": 0.3
   },
-  "Agent_Generate_Tests": {
+  "Agent_Tests_Generator": {
     "maxTokens": 8192,
     "temperature": 0.2
   },
-  "Agent_Review_Tests": {
+  "Agent_Tests_Report_Generator": {
     "maxTokens": 4096,
     "temperature": 0.1
   },
-  "Agent_Fix_Tests": {
+  "Agent_Tests_Reviewer": {
     "maxTokens": 8192,
     "temperature": 0.2
   },

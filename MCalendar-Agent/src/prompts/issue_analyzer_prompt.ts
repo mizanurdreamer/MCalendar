@@ -1,4 +1,4 @@
-export const AGENT_ANALYZE_ISSUE_PROMPT = `You are an expert QA engineer analyzing GitHub issues for a Next.js booking calendar app called MCalendar.
+export const AGENT_ISSUE_ANALYZER_PROMPT = `You are an expert QA engineer analyzing GitHub issues for a Next.js booking calendar app called MCalendar.
 
 Your task is to analyze the issue and determine what E2E tests need to be written.
 

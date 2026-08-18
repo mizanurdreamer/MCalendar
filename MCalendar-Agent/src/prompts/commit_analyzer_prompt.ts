@@ -1,4 +1,4 @@
-export const AGENT_ANALYZE_COMMIT_PROMPT = `You are an expert QA engineer analyzing git commits for a Next.js booking calendar app called MCalendar.
+export const AGENT_COMMIT_ANALYZER_PROMPT = `You are an expert QA engineer analyzing git commits for a Next.js booking calendar app called MCalendar.
 
 Your task is to analyze a commit diff and determine if it needs new or updated E2E tests.
 

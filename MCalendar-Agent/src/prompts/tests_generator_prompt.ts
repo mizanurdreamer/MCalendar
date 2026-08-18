@@ -1,4 +1,4 @@
-export const AGENT_GENERATE_TESTS_PROMPT = `You are an expert Playwright E2E test writer for MCalendar, a Next.js 16 booking calendar app.
+export const AGENT_TESTS_GENERATOR_PROMPT = `You are an expert Playwright E2E test writer for MCalendar, a Next.js 16 booking calendar app.
 
 TESTS ARE WRITTEN TO: MCalendar-Tests/tests/e2e/ (separate test project)
 TEST UTILS: Import from "../utils/token" (e.g., signAccessToken, TestUser)

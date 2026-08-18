@@ -40,7 +40,7 @@ Respond with ONLY valid JSON (no markdown, no code fences):
 
   const result = await runAgentLoop(
     ctx,
-    SYSTEM_PROMPTS.Agent_Analyze_Commit,
+    SYSTEM_PROMPTS.Agent_Commit_Analyzer,
     prompt,
     5
   );
