@@ -2,9 +2,9 @@ import type { AgentConfig } from "../providers/types.js";
 import { GitHubClient } from "../github/client.js";
 import { processIssue, type OrchestratorConfig } from "../orchestrator/issue_orchestrator.js";
 import { processCommit, type CommitOrchestratorConfig } from "../orchestrator/commit_orchestrator.js";
-import { checkForNewCommits } from "./commit_analyzer_watcher.js";
-import { CommitStateManager } from "./Commit_State_Tracker.js";
-import { StateManager } from "./Issue_State_Tracker.js";
+import { checkForNewCommits } from "./commit_orchestrator_watcher.js";
+import { CommitStateManager } from "./commit_state_tracker.js";
+import { StateManager } from "./issue_state_tracker.js";
 import { logger } from "../utils/logger.js";
 
 export interface WatcherConfig {

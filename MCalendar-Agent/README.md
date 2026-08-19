@@ -34,9 +34,9 @@ src/
 │   └── reporter.ts                 # Result formatting
 ├── watcher/                        # Auto-detection
 │   ├── issue_orchestrator_watcher.ts  # Poll for new issues + commits
-│   ├── commit_analyzer_watcher.ts     # Detect new commits on branch
-│   ├── Issue_State_Tracker.ts      # Processed issue tracking
-│   └── Commit_State_Tracker.ts     # Last-seen SHA per branch
+│   ├── commit_orchestrator_watcher.ts     # Detect new commits on branch
+│   ├── issue_state_tracker.ts       # Processed issue tracking
+│   └── commit_state_tracker.ts      # Last-seen SHA per branch
 ├── prompts/                        # System prompts (per AI task)
 │   ├── index.ts                    # Barrel re-export
 │   ├── issue_analyzer_prompt.ts
