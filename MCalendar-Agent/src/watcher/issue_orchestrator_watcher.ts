@@ -10,16 +10,17 @@ import { logger } from "../utils/logger.js";
 export interface WatcherConfig {
   agentConfig: AgentConfig;
   githubClient: GitHubClient;
-  mcalendarPath: string;
+  codebasePath: string;
   testProjectPath: string;
   maxRetries: number;
   pollIntervalMin: number;
   stateDir: string;
   watchBranch?: string;
+  projectName: string;
 }
 
 export async function startWatcher(config: WatcherConfig): Promise<void> {
-  const { agentConfig, githubClient, mcalendarPath, testProjectPath, maxRetries, pollIntervalMin, stateDir, watchBranch } = config;
+  const { agentConfig, githubClient, codebasePath, testProjectPath, maxRetries, pollIntervalMin, stateDir, watchBranch, projectName } = config;
   const stateManager = new StateManager(stateDir);
   const commitState = new CommitStateManager(stateDir);
 
@@ -36,9 +37,10 @@ export async function startWatcher(config: WatcherConfig): Promise<void> {
   const orchestratorConfig: OrchestratorConfig = {
     agentConfig,
     githubClient,
-    mcalendarPath,
+    codebasePath,
     testProjectPath,
     maxRetries,
+    projectName,
   };
 
   let targetBranch = watchBranch ?? "";
@@ -82,10 +84,11 @@ export async function startWatcher(config: WatcherConfig): Promise<void> {
             const commitConfig: CommitOrchestratorConfig = {
               agentConfig,
               githubClient,
-              mcalendarPath,
+              codebasePath,
               testProjectPath,
               maxRetries,
               targetBranch,
+              projectName,
             };
             await processCommit(diff, commitConfig);
           } catch (err) {

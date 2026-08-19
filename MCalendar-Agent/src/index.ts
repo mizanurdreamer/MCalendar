@@ -39,9 +39,10 @@ program
       const result = await processIssue(issue, {
         agentConfig: config.agentConfig,
         githubClient: github,
-        mcalendarPath: config.mcalendarPath,
+        codebasePath: config.codebasePath,
         testProjectPath: config.testProjectPath,
         maxRetries: config.maxRetries,
+        projectName: config.projectName,
       });
 
       logger.success(`\n✅ Done — ${result.output}`);
@@ -71,12 +72,13 @@ program
       await startWatcher({
         agentConfig: config.agentConfig,
         githubClient: github,
-        mcalendarPath: config.mcalendarPath,
+        codebasePath: config.codebasePath,
         testProjectPath: config.testProjectPath,
         maxRetries: config.maxRetries,
         pollIntervalMin: pollInterval,
         stateDir: "state",
         watchBranch,
+        projectName: config.projectName,
       });
     } catch (err) {
       logger.error(`Error: ${err}`);
@@ -108,12 +110,13 @@ program
       await startWatcher({
         agentConfig: config.agentConfig,
         githubClient: github,
-        mcalendarPath: config.mcalendarPath,
+        codebasePath: config.codebasePath,
         testProjectPath: config.testProjectPath,
         maxRetries: config.maxRetries,
         pollIntervalMin: pollInterval,
         stateDir: "state",
         watchBranch,
+        projectName: config.projectName,
       });
     } catch (err) {
       logger.error(`Error: ${err}`);

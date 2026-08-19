@@ -12,7 +12,7 @@ export async function generateTestReport(
   reader: CodebaseReader,
   runner: PlaywrightRunner,
   testOutputPath: string,
-  mcalendarPath: string,
+  codebasePath: string,
   testResult: TestResult
 ): Promise<string> {
   const provider = getTaskProvider("agent_tests_report_generator", agentConfig);
@@ -24,7 +24,7 @@ export async function generateTestReport(
       reader,
       runner,
       testOutputPath,
-      mcalendarPath,
+      codebasePath,
       maxTokens: agentConfig["agent_tests_report_generator"]?.maxTokens,
       temperature: agentConfig["agent_tests_report_generator"]?.temperature,
     },

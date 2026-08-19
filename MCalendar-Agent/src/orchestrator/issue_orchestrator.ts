@@ -4,134 +4,72 @@ import type { GitHubIssue } from "../github/types.js";
 import { GitHubClient } from "../github/client.js";
 import { CodebaseReader } from "../codebase/reader.js";
 import { PlaywrightRunner } from "../test_runner/playwright.js";
-import { formatTestReport } from "../test_runner/reporter.js";
 import { GitBranch } from "../github/git_operations.js";
-import { buildIssueContext } from "../utils/issue_context_builder.js";
-import { analyzeIssue } from "../agent/agent_issue_analyzer.js";
-import { generateTests } from "../agent/agent_tests_generator.js";
-import { runTests } from "../test_runner/tests_runner.js";
-import { generateTestReport } from "../agent/agent_tests_report_generator.js";
-import { reviewTests } from "../agent/agent_tests_reviewer.js";
-import { summarizeResults } from "../agent/agent_summarize.js";
 import type { TaskResult } from "../utils/types.js";
-import { runTestsLoop } from "../utils/test_pipeline.js";
 import { logger } from "../utils/logger.js";
+import { createSharedContext } from "../engine/shared_context.js";
+import { runPipeline } from "../engine/pipeline_engine.js";
+import { getIssuePipeline } from "../engine/step_definitions.js";
 
 export interface OrchestratorConfig {
   agentConfig: AgentConfig;
   githubClient: GitHubClient;
-  mcalendarPath: string;
+  codebasePath: string;
   testProjectPath: string;
   maxRetries: number;
+  projectName: string;
 }
 
 export async function processIssue(
   issue: GitHubIssue,
   config: OrchestratorConfig
 ): Promise<TaskResult> {
-  const { agentConfig, githubClient, mcalendarPath, testProjectPath, maxRetries } = config;
-  const reader = new CodebaseReader(mcalendarPath);
+  const { agentConfig, githubClient, codebasePath, testProjectPath, maxRetries, projectName } = config;
+  const reader = new CodebaseReader(codebasePath);
   const testReader = new CodebaseReader(testProjectPath);
   const runner = new PlaywrightRunner(testProjectPath);
-  const git = new GitBranch(mcalendarPath);
+  const git = new GitBranch(codebasePath);
 
-  const testOutputPath = path.join(testProjectPath, "tests", "e2e");
+  const testOutputPath = path.join(testProjectPath, "tests");
 
   logger.info(`Fetching issue #${issue.number}: ${issue.title}`);
 
   const defaultBranch = await githubClient.getDefaultBranch();
-  //const baseBranch = determineBaseBranch(issue, defaultBranch);
-  // Added this code for Debug Purpose
-  const baseBranch = "main-agentic-ai"; // For now, always use the default branch
+  const baseBranch = "main-agentic-ai";
   const branchName = GitBranch.branchName(issue.number, issue.title);
 
-  logger.info(`Base branch: ${baseBranch}`);
-  logger.info(`Creating branch: ${branchName}`);
-
-  await git.createAndCheckout(branchName, baseBranch);
-
-  const issueContext = buildIssueContext(issue, reader);
-
-  // Step 1: Analyze issue
-  const analysis = await analyzeIssue(
+  const ctx = createSharedContext({
+    mode: "issue",
+    issue,
     agentConfig,
     reader,
+    testReader,
     runner,
+    git,
+    githubClient,
+    codebasePath,
+    testProjectPath,
     testOutputPath,
-    mcalendarPath,
-    `Analyze this issue and determine what E2E tests need to be written:\n\n${issueContext}`
-  );
-
-  logger.success("Analysis complete");
-
-  // Step 2: Generate tests
-  const testFilename = `issue-${issue.number}-${GitBranch.slugify(issue.title)}.spec.ts`;
-
-  await generateTests(
-    agentConfig,
-    reader,
-    runner,
-    testOutputPath,
-    mcalendarPath,
-    `Generate a Playwright E2E test file for this issue.\n\nFilename: ${testFilename}\n\nAnalysis:\n${analysis}\n\nIssue Context:\n${issueContext}\n\nIMPORTANT: Use the write_test_file tool to save the test as "${testFilename}".`
-  );
-
-  // Step 3: Run tests + Review/fix loop
-  const { testResult, retries } = await runTestsLoop({
+    projectName,
     maxRetries,
-    testFilename,
-    runTests: () => runTests(runner, testFilename),
-    reviewTests: (testContent, errorContext) =>
-      reviewTests(
-        agentConfig,
-        reader,
-        runner,
-        testOutputPath,
-        mcalendarPath,
-        testFilename,
-        testContent,
-        `Fix the failing test. Here are the errors:\n\n${errorContext}`
-      ),
-    readTestContent: () => testReader.readFile(testFilename),
+    baseBranch,
+    branchName,
   });
 
-  // Step 4: Generate report
-  const report = await generateTestReport(agentConfig, reader, runner, testOutputPath, mcalendarPath, testResult);
+  const result = await runPipeline(getIssuePipeline(), ctx);
 
-  // Step 5: Commit + Push
-  await git.commitAndPush(
-    `test: auto-generated E2E tests for issue #${issue.number}`,
-    branchName
-  );
-
-  // Step 6: Create PR
-  await git.createPR(githubClient, {
-    title: `test: E2E tests for issue #${issue.number}`,
-    body: `## Automated Test Generation\n\n**Issue:** #${issue.number} — ${issue.title}\n\n### Test Results\n${formatTestReport(testResult)}\n\n### Files Changed\n- \`tests/e2e/${testFilename}\` (new)\n\n### How to Run\n\`\`\`bash\nnpx playwright test tests/e2e/${testFilename}\n\`\`\`\n\n---\n*Generated by MCalendar Test Agent*`,
-    head: branchName,
-    base: baseBranch,
-  });
-
-  // Step 6: Summarize
-  const comment = await summarizeResults(
-    agentConfig,
-    reader,
-    runner,
-    testOutputPath,
-    mcalendarPath,
-    `Summarize these test results for a GitHub comment:\n\nIssue: #${issue.number} — ${issue.title}\nBranch: ${branchName}\nTest file: ${testFilename}\n\nTest Results:\n${formatTestReport(testResult)}\n\nReport:\n${report}`
-  );
-
-  await githubClient.addComment(issue.number, comment);
-
-  logger.success(`Issue #${issue.number} complete — pushed to ${branchName}, ${testResult.passed} passed, ${testResult.failed} failed`);
+  if (result.testResult) {
+    logger.success(
+      `Issue #${issue.number} complete — pushed to ${result.branchName}, ${result.testResult.passed} passed, ${result.testResult.failed} failed`
+    );
+  }
 
   return {
-    success: testResult.success,
-    output: `Pushed to ${branchName} with ${testResult.passed} tests passed`,
-    filesWritten: [testFilename],
-    testsPassed: testResult.passed,
-    testsFailed: testResult.failed,
-    retries,
+    success: result.status === "completed" && (result.testResult?.success ?? false),
+    output: `Pushed to ${result.branchName} with ${result.testResult?.passed ?? 0} tests passed`,
+    filesWritten: result.testFilename ? [result.testFilename] : [],
+    testsPassed: result.testResult?.passed ?? 0,
+    testsFailed: result.testResult?.failed ?? 0,
+    retries: result.retries,
   };
 }

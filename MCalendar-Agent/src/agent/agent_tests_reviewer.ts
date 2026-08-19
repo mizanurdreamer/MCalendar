@@ -11,7 +11,7 @@ export async function reviewTests(
   reader: CodebaseReader,
   runner: PlaywrightRunner,
   testOutputPath: string,
-  mcalendarPath: string,
+  codebasePath: string,
   testFilename: string,
   testContent: string,
   context: string
@@ -25,7 +25,7 @@ export async function reviewTests(
       reader,
       runner,
       testOutputPath,
-      mcalendarPath,
+      codebasePath,
       maxTokens: agentConfig["agent_tests_reviewer"]?.maxTokens,
       temperature: agentConfig["agent_tests_reviewer"]?.temperature,
     },

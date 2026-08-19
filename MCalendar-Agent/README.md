@@ -4,7 +4,7 @@ An autonomous AI agent that reads GitHub issues and branch commits, analyzes the
 
 ## Agent Overview
 
-The agent is a pipeline of specialized AI sub-agents. Each sub-agent has a single responsibility and runs independently with its own system prompt. The orchestrators (`issue_orchestrator`, `commit_orchestrator`) chain these sub-agents together into a full workflow.
+The agent is a pipeline of specialized AI sub-agents. Each sub-agent has a single responsibility and runs independently with its own system prompt. The **pipeline engine** (`engine/pipeline_engine.ts`) chains these sub-agents together, with each step returning a decision that controls what happens next (next, goto, retry, stop, done).
 
 Provider and model are configured via `.env` — all tasks use the same provider/model automatically.
 
@@ -12,18 +12,22 @@ Provider and model are configured via `.env` — all tasks use the same provider
 
 ```
 src/
-├── engine/                         # Core AI loop
-│   └── agent_runner_engine.ts      # ReAct loop (tool-use, conversation management)
-├── agent/                          # AI-powered sub-agents
+├── engine/                         # Pipeline engine + core AI loop
+│   ├── agent_runner_engine.ts      # ReAct loop (tool-use, conversation management)
+│   ├── shared_context.ts           # Shared context object passed between steps
+│   ├── pipeline_engine.ts          # Step runner with goto/retry/stop/done routing
+│   ├── step_adapters.ts            # Wraps agent functions into pipeline steps
+│   └── step_definitions.ts         # Defines issue/commit pipeline sequences
+├── agent/                          # AI-powered sub-agents (single responsibility)
 │   ├── agent_issue_analyzer.ts     # Analyze issue → determine test scenarios
 │   ├── agent_tests_generator.ts    # Generate Playwright test code
 │   ├── agent_tests_reviewer.ts     # Review + fix failing tests
 │   ├── agent_tests_report_generator.ts  # Format test results
 │   ├── agent_summarize.ts          # Format GitHub comment
 │   └── agent_commit_analyzer.ts    # Decide if commit needs tests
-├── orchestrator/                   # Pipeline orchestrators
-│   ├── issue_orchestrator.ts       # Full issue pipeline
-│   └── commit_orchestrator.ts      # Full commit pipeline
+├── orchestrator/                   # Thin setup shells (delegate to pipeline engine)
+│   ├── issue_orchestrator.ts       # Setup context → run issue pipeline
+│   └── commit_orchestrator.ts      # Setup context → run commit pipeline
 ├── github/                         # GitHub integration
 │   ├── client.ts                   # REST API (Octokit)
 │   ├── git_operations.ts           # Local git + commitAndPush + createPR
@@ -59,12 +63,11 @@ src/
 │   ├── index.ts                    # Barrel re-export
 │   └── config.ts                   # Env + agent.config.json loader
 ├── utils/                          # Shared utilities
-│   ├── logger.ts                   # Colored output
+│   ├── logger.ts                   # Winston logger (console + file)
+│   ├── repo_resolver.ts            # URL detection, git clone, name extraction
 │   ├── file.ts                     # File I/O
 │   ├── tools.ts                    # Agent tool definitions
-│   ├── types.ts                    # TaskName, TaskResult
-│   ├── test_pipeline.ts            # Run → fix → retry loop
-│   └── issue_context_builder.ts    # Parse issue acceptance criteria
+│   └── types.ts                    # TaskName, TaskResult
 └── index.ts                        # CLI entry point
 ```
 
@@ -73,6 +76,9 @@ src/
 | Agent | File | Purpose |
 |-------|------|---------|
 | `agent_runner_engine` | `src/engine/agent_runner_engine.ts` | Core ReAct loop — runs any sub-agent with tool calls (read files, write tests, run Playwright) and conversation management. |
+| `pipeline_engine` | `src/engine/pipeline_engine.ts` | Executes step sequences with goto/retry/stop/done routing based on step decisions. |
+| `issue_orchestrator` | `src/orchestrator/issue_orchestrator.ts` | Thin setup shell — creates context, runs issue pipeline, returns TaskResult. |
+| `commit_orchestrator` | `src/orchestrator/commit_orchestrator.ts` | Thin setup shell — creates context, runs commit pipeline, returns TaskResult. |
 | `agent_issue_analyzer` | `src/agent/agent_issue_analyzer.ts` | Reads a GitHub issue, explores the codebase, and determines what E2E test scenarios to write. |
 | `agent_tests_generator` | `src/agent/agent_tests_generator.ts` | Generates Playwright test code based on analysis. Uses tools to write test files. |
 | `agent_tests_reviewer` | `src/agent/agent_tests_reviewer.ts` | Reviews generated tests and fixes failures. Runs in a retry loop (up to 3x). |
@@ -86,10 +92,21 @@ src/
 |--------|------|---------|
 | `GitBranch` | `src/github/git_operations.ts` | Local git operations + commitAndPush + createPR. |
 | `tests_runner` | `src/test_runner/tests_runner.ts` | Execute Playwright tests and return results. |
-| `issue_orchestrator` | `src/orchestrator/issue_orchestrator.ts` | **Pipeline** — chains sub-agents for issue-driven test generation. |
-| `commit_orchestrator` | `src/orchestrator/commit_orchestrator.ts` | **Pipeline** — chains sub-agents for commit-driven test generation. |
+| `shared_context` | `src/engine/shared_context.ts` | Shared context object + decision types for pipeline steps. |
+| `step_adapters` | `src/engine/step_adapters.ts` | Wraps agent functions into pipeline steps (adaptIssueAnalyzer, adaptTestGenerator, etc.). |
+| `step_definitions` | `src/engine/step_definitions.ts` | Defines issue/commit pipeline step sequences. |
 
 ## How It Works
+
+Both modes use the **pipeline engine** (`src/engine/pipeline_engine.ts`). Each step reads/writes a shared context and returns a decision that controls flow:
+
+| Decision | Meaning |
+|----------|---------|
+| `next` | Proceed to the next step |
+| `goto` | Jump to a named step |
+| `retry` | Jump to a step + increment retry counter |
+| `stop` | Halt pipeline (e.g., "no tests needed") |
+| `done` | Successful completion |
 
 ### Issue Mode
 
@@ -97,22 +114,34 @@ src/
 GitHub Issue Created
         |
         v
-issue_orchestrator → agent_issue_analyzer    → understand what to test
+orchestrator → create shared context
         |
         v
-issue_orchestrator → agent_tests_generator   → write Playwright test code
+pipeline_engine → analyze_issue (agent_issue_analyzer)
+        |        → understand what to test
+        v
+pipeline_engine → setup_branch (git)
         |
         v
-Playwright runs tests
-        |
-        v  (if failures)
-issue_orchestrator → agent_tests_reviewer    → fix failing tests (up to 3x)
+pipeline_engine → generate_tests (agent_tests_generator)
+        |        → write Playwright test code
+        v
+pipeline_engine → run_tests (tests_runner)
+        |        → if failures, returns "retry" → jumps to review_and_fix
+        v
+pipeline_engine → generate_report (agent_tests_report_generator)
         |
         v
-Git commit + push
+pipeline_engine → commit_push (git)
         |
         v
-issue_orchestrator → agent_summarize         → format GitHub comment
+pipeline_engine → create_pr (git + GitHub)
+        |
+        v
+pipeline_engine → summarize (agent_summarize)
+        |        → post GitHub comment
+        v
+        done
 ```
 
 ### Commit Mode
@@ -121,22 +150,35 @@ issue_orchestrator → agent_summarize         → format GitHub comment
 Commit pushed to branch
         |
         v
-commit_orchestrator → agent_commit_triage    → decide if tests needed
-        |
-        v  (if needed)
-commit_orchestrator → agent_tests_generator  → write test code
+orchestrator → create shared context
         |
         v
-Playwright runs tests
-        |
-        v  (if failures)
-commit_orchestrator → agent_tests_reviewer   → fix failing tests (up to 3x)
+pipeline_engine → triage_commit (agent_commit_analyzer)
+        |        → decide if tests needed
+        |        → if not needed, returns "stop" → pipeline halts
+        v
+pipeline_engine → setup_branch (git)
         |
         v
-Git commit + push
+pipeline_engine → generate_tests (agent_tests_generator)
+        |        → write test code
+        v
+pipeline_engine → run_tests (tests_runner)
+        |        → if failures, returns "retry" → jumps to review_and_fix
+        v
+pipeline_engine → generate_report (agent_tests_report_generator)
         |
         v
-commit_orchestrator → agent_summarize        → format GitHub comment
+pipeline_engine → commit_push (git)
+        |
+        v
+pipeline_engine → create_pr (git + GitHub)
+        |
+        v
+pipeline_engine → summarize (agent_summarize)
+        |        → post GitHub comment
+        v
+        done
 ```
 
 ## Features
@@ -206,10 +248,10 @@ commit_orchestrator → agent_summarize        → format GitHub comment
 | `OPENAI_API_KEY` | If using OpenAI | OpenAI API key |
 | `GOOGLE_API_KEY` | If using Google | Google Gemini API key |
 | `GITHUB_TOKEN` | Yes | GitHub PAT with `repo` scope |
-| `REPO_OWNER` | Yes | GitHub repo owner |
-| `REPO_NAME` | Yes | GitHub repo name |
-| `PROJECT_PATH` | Yes | Absolute path to MCalendar source project (for reading code) |
-| `TEST_PROJECT_PATH` | Yes | Absolute path to MCalendar-Tests project (for writing/running tests) |
+| `REPO_OWNER` | If PROJECT_PATH is local | GitHub repo owner (auto-extracted if PROJECT_PATH is a URL) |
+| `REPO_NAME` | If PROJECT_PATH is local | GitHub repo name (auto-extracted if PROJECT_PATH is a URL) |
+| `PROJECT_PATH` | Yes | Local path or git URL to source project (name auto-extracted) |
+| `TEST_PROJECT_PATH` | Yes | Local path or git URL to test project |
 | `POLL_INTERVAL_MIN` | No | Polling interval in minutes (default: 1) |
 | `MAX_RETRIES` | No | Max test fix retries (default: 3) |
 | `AGENT_ENABLED` | No | Enable/disable agent (default: `true`). Set to `false` to stop all processing |
@@ -338,6 +380,18 @@ D:\Projects\MCalendar\
 
 The agent **reads** source code from `MCalendar/` but **writes and runs** tests in `MCalendar-Tests/`. This keeps test generation isolated from the main app.
 
+### URL Support
+
+`PROJECT_PATH` and `TEST_PROJECT_PATH` support both local paths and git URLs:
+
+| Input | Behavior |
+|-------|----------|
+| `D:\Projects\MCalendar\MCalendar` | Use local path directly |
+| `https://github.com/owner/repo` | Shallow clone to `.cache/repos/repo` |
+| `git@github.com:owner/repo.git` | Shallow clone to `.cache/repos/repo` |
+
+Project name is auto-extracted from the path/URL for use in prompts and PR descriptions.
+
 ### Running Tests Manually
 
 ```bash
@@ -347,6 +401,17 @@ npx playwright test tests/e2e/issue-5-*.spec.ts  # run specific test
 npx playwright test --headed                 # run with browser visible
 npx playwright test --debug                  # step through tests
 ```
+
+## Logging
+
+Logs are written to both console and files using Winston:
+
+| Log File | Content |
+|----------|---------|
+| `logs/agent.log` | All log levels (info, warn, error, debug) |
+| `logs/error.log` | Errors only |
+
+Log files rotate at 5MB with up to 5 files kept. Console output uses colored formatting.
 
 ## Troubleshooting
 

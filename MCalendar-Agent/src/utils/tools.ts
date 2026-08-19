@@ -7,7 +7,7 @@ import type { PlaywrightRunner } from "../test_runner/playwright.js";
 export function createAgentTools(
   reader: CodebaseReader,
   runner: PlaywrightRunner,
-  _mcalendarPath: string
+  _codebasePath: string
 ): ToolDefinition[] {
   return [
     {

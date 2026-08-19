@@ -11,7 +11,7 @@ export async function summarizeResults(
   reader: CodebaseReader,
   runner: PlaywrightRunner,
   testOutputPath: string,
-  mcalendarPath: string,
+  codebasePath: string,
   userMessage: string
 ): Promise<string> {
   const summarizeProvider = getTaskProvider("agent_summarize", agentConfig);
@@ -23,7 +23,7 @@ export async function summarizeResults(
       reader,
       runner,
       testOutputPath,
-      mcalendarPath,
+      codebasePath,
       maxTokens: agentConfig["agent_summarize"]?.maxTokens,
       temperature: agentConfig["agent_summarize"]?.temperature,
     },

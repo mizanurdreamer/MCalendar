@@ -3,7 +3,7 @@ import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers
 import type { CodebaseReader } from "../codebase/reader.js";
 import type { PlaywrightRunner } from "../test_runner/playwright.js";
 import { runAgentLoop } from "../engine/agent_runner_engine.js";
-import { SYSTEM_PROMPTS } from "../prompts/index.js";
+import { getSystemPrompts } from "../prompts/index.js";
 import { logger } from "../utils/logger.js";
 
 export async function analyzeCommit(
@@ -11,25 +11,26 @@ export async function analyzeCommit(
   reader: CodebaseReader,
   runner: PlaywrightRunner,
   testOutputPath: string,
-  mcalendarPath: string,
-  userMessage: string
+  codebasePath: string,
+  userMessage: string,
+  projectName: string
 ): Promise<string> {
   const provider = getTaskProvider("agent_commit_analyzer", agentConfig);
   logger.task("agent_commit_analyzer", `${getTaskProviderName("agent_commit_analyzer", agentConfig)}/${getTaskModel("agent_commit_analyzer", agentConfig)}`);
 
+  const prompts = getSystemPrompts(projectName);
   const result = await runAgentLoop(
     {
       provider,
       reader,
       runner,
       testOutputPath,
-      mcalendarPath,
+      codebasePath,
       maxTokens: agentConfig["agent_commit_analyzer"]?.maxTokens,
       temperature: agentConfig["agent_commit_analyzer"]?.temperature,
     },
-    SYSTEM_PROMPTS.agent_commit_analyzer,
-    userMessage,
-    5
+    prompts.agent_commit_analyzer,
+    userMessage
   );
 
   logger.success("Commit analysis complete");

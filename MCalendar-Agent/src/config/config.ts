@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import dotenv from "dotenv";
 import type { AgentConfig } from "../providers/types.js";
+import { resolveProjectPath } from "../utils/repo_resolver.js";
 
 const DEFAULT_MODELS: Record<string, string> = {
   anthropic: "claude-haiku-4-5",
@@ -24,8 +25,9 @@ export interface AppConfig {
   githubToken: string;
   repoOwner: string;
   repoName: string;
-  mcalendarPath: string;
+  codebasePath: string;
   testProjectPath: string;
+  projectName: string;
   pollIntervalMin: number;
   maxRetries: number;
   agentConfig: AgentConfig;
@@ -68,16 +70,30 @@ export function loadConfig(): AppConfig {
     };
   }
 
-  const required = {
-    GITHUB_TOKEN: process.env.GITHUB_TOKEN,
-    REPO_OWNER: process.env.REPO_OWNER,
-    REPO_NAME: process.env.REPO_NAME,
-    PROJECT_PATH: process.env.PROJECT_PATH,
-    TEST_PROJECT_PATH: process.env.TEST_PROJECT_PATH,
-  };
+  const githubToken = process.env.GITHUB_TOKEN;
+  const projectPath = process.env.PROJECT_PATH;
+  const testProjectPath = process.env.TEST_PROJECT_PATH;
 
-  for (const [key, value] of Object.entries(required)) {
-    if (!value) throw new Error(`Missing required env var: ${key}`);
+  if (!githubToken) throw new Error("Missing required env var: GITHUB_TOKEN");
+  if (!projectPath) throw new Error("Missing required env var: PROJECT_PATH");
+  if (!testProjectPath) throw new Error("Missing required env var: TEST_PROJECT_PATH");
+
+  const project = resolveProjectPath(projectPath);
+  const testProject = resolveProjectPath(testProjectPath);
+
+  // Derive repoOwner/repoName from PROJECT_PATH if URL, otherwise require env vars
+  let repoOwner: string;
+  let repoName: string;
+
+  if (project.ownerRepo) {
+    repoOwner = project.ownerRepo.owner;
+    repoName = project.ownerRepo.repo;
+  } else {
+    repoOwner = process.env.REPO_OWNER ?? "";
+    repoName = process.env.REPO_NAME ?? "";
+    if (!repoOwner || !repoName) {
+      throw new Error("REPO_OWNER and REPO_NAME are required when PROJECT_PATH is a local path");
+    }
   }
 
   return {
@@ -85,11 +101,12 @@ export function loadConfig(): AppConfig {
     anthropicApiKey: process.env.ANTHROPIC_API_KEY,
     openaiApiKey: process.env.OPENAI_API_KEY,
     googleApiKey: process.env.GOOGLE_API_KEY,
-    githubToken: required.GITHUB_TOKEN!,
-    repoOwner: required.REPO_OWNER!,
-    repoName: required.REPO_NAME!,
-    mcalendarPath: required.PROJECT_PATH!,
-    testProjectPath: required.TEST_PROJECT_PATH!,
+    githubToken,
+    repoOwner,
+    repoName,
+    codebasePath: project.resolvedPath,
+    testProjectPath: testProject.resolvedPath,
+    projectName: project.projectName,
     pollIntervalMin: parseInt(process.env.POLL_INTERVAL_MIN ?? "1", 10),
     maxRetries: parseInt(process.env.MAX_RETRIES ?? "3", 10),
     agentConfig,

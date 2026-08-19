@@ -10,10 +10,10 @@ export interface TestResult {
 }
 
 export class PlaywrightRunner {
-  private mcalendarPath: string;
+  private codebasePath: string;
 
-  constructor(mcalendarPath: string) {
-    this.mcalendarPath = mcalendarPath;
+  constructor(codebasePath: string) {
+    this.codebasePath = codebasePath;
   }
 
   run(filename?: string): TestResult {
@@ -22,7 +22,7 @@ export class PlaywrightRunner {
 
     try {
       const output = execSync(cmd, {
-        cwd: this.mcalendarPath,
+        cwd: this.codebasePath,
         encoding: "utf-8",
         timeout: 120_000,
         stdio: ["pipe", "pipe", "pipe"],

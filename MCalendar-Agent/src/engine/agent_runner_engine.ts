@@ -1,6 +1,5 @@
 import type { ProviderInterface, ChatMessage, ContentBlock } from "../providers/types.js";
 import type { CodebaseReader } from "../codebase/reader.js";
-import { SYSTEM_PROMPTS } from "../prompts/index.js";
 import { createAgentTools, executeTool } from "../utils/tools.js";
 import type { PlaywrightRunner } from "../test_runner/playwright.js";
 import { logger } from "../utils/logger.js";
@@ -10,7 +9,7 @@ export interface TaskContext {
   reader: CodebaseReader;
   runner: PlaywrightRunner;
   testOutputPath: string;
-  mcalendarPath: string;
+  codebasePath: string;
   maxTokens?: number;
   temperature?: number;
 }
@@ -21,7 +20,7 @@ export async function runAgentLoop(
   userMessage: string,
   maxIterations = 20
 ): Promise<string> {
-  const tools = createAgentTools(ctx.reader, ctx.runner, ctx.mcalendarPath);
+  const tools = createAgentTools(ctx.reader, ctx.runner, ctx.codebasePath);
   const messages: ChatMessage[] = [{ role: "user", content: userMessage }];
 
   for (let i = 0; i < maxIterations; i++) {

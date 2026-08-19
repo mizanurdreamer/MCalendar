@@ -2,5 +2,7 @@ node_modules/
 dist/
 .env
 state/processed.json
+.cache/
+logs/
 *.log
 .DS_Store

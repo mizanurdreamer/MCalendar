@@ -1,43 +1,89 @@
+import winston from "winston";
 import chalk from "chalk";
+import path from "node:path";
+
+const LOG_DIR = path.join(process.cwd(), "logs");
+
+const fileFormat = winston.format.combine(
+  winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
+  winston.format.json()
+);
+
+const consoleFormat = winston.format.combine(
+  winston.format.timestamp({ format: "HH:mm:ss" }),
+  winston.format.printf(({ timestamp, level, message }) => {
+    const ts = String(timestamp);
+    switch (level) {
+      case "info":
+        return `${chalk.cyan(`[${ts}]`)} ${message}`;
+      case "warn":
+        return `${chalk.yellow(`[${ts}]`)} ${message}`;
+      case "error":
+        return `${chalk.red(`[${ts}]`)} ${message}`;
+      default:
+        return `${chalk.gray(`[${ts}]`)} ${message}`;
+    }
+  })
+);
+
+const winstonLogger = winston.createLogger({
+  level: "debug",
+  transports: [
+    new winston.transports.Console({ format: consoleFormat }),
+    new winston.transports.File({
+      filename: path.join(LOG_DIR, "agent.log"),
+      format: fileFormat,
+      maxsize: 5 * 1024 * 1024,
+      maxFiles: 5,
+    }),
+    new winston.transports.File({
+      filename: path.join(LOG_DIR, "error.log"),
+      level: "error",
+      format: fileFormat,
+      maxsize: 5 * 1024 * 1024,
+      maxFiles: 3,
+    }),
+  ],
+});
 
 export const logger = {
   info(message: string) {
-    console.log(chalk.cyan(`[${timestamp()}]`), message);
+    winstonLogger.info(message);
   },
 
   success(message: string) {
-    console.log(chalk.green(`[${timestamp()}]`), message);
+    winstonLogger.info(`✅ ${message}`);
   },
 
   warn(message: string) {
-    console.log(chalk.yellow(`[${timestamp()}]`), message);
+    winstonLogger.warn(message);
   },
 
   error(message: string) {
-    console.log(chalk.red(`[${timestamp()}]`), message);
+    winstonLogger.error(message);
+  },
+
+  debug(message: string) {
+    winstonLogger.debug(message);
   },
 
   task(taskName: string, provider: string) {
-    console.log(chalk.magenta(`[${timestamp()}]`), `🧠 ${taskName} → ${provider}`);
+    winstonLogger.info(`🧠 ${taskName} → ${provider}`);
   },
 
   tool(toolName: string, arg?: string) {
     const detail = arg ? `(${arg})` : "";
-    console.log(chalk.gray(`[${timestamp()}]`), `  📖 ${toolName} ${detail}`);
+    winstonLogger.debug(`📖 ${toolName} ${detail}`);
   },
 
   banner(lines: string[]) {
     const maxLen = Math.max(...lines.map((l) => l.length));
     const border = "═".repeat(maxLen + 4);
-    console.log(chalk.cyan(`╔${border}╗`));
-    for (const line of lines) {
-      console.log(chalk.cyan(`║`), chalk.white(` ${line.padEnd(maxLen)} `), chalk.cyan(`║`));
-    }
-    console.log(chalk.cyan(`╚${border}╝`));
-    console.log();
+    const box = [
+      `╔${border}╗`,
+      ...lines.map((l) => `║ ${l.padEnd(maxLen)} ║`),
+      `╚${border}╝`,
+    ].join("\n");
+    winstonLogger.info(`\n${box}\n`);
   },
 };
-
-function timestamp(): string {
-  return new Date().toISOString().slice(11, 19);
-}
