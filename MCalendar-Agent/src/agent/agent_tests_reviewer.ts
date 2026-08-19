@@ -14,7 +14,8 @@ export async function reviewTests(
   codebasePath: string,
   testFilename: string,
   testContent: string,
-  context: string
+  context: string,
+  maxIterations?: number
 ): Promise<string> {
   const provider = getTaskProvider("agent_tests_reviewer", agentConfig);
   logger.task("agent_tests_reviewer", `${getTaskProviderName("agent_tests_reviewer", agentConfig)}/${getTaskModel("agent_tests_reviewer", agentConfig)}`);
@@ -30,7 +31,8 @@ export async function reviewTests(
       temperature: agentConfig["agent_tests_reviewer"]?.temperature,
     },
     SYSTEM_PROMPTS.agent_tests_reviewer,
-    `Review and fix this test if needed:\n\nFilename: ${testFilename}\n\nTest file:\n\`\`\`typescript\n${testContent}\n\`\`\`\n\nContext:\n${context}`
+    `Review and fix this test if needed:\n\nFilename: ${testFilename}\n\nTest file:\n\`\`\`typescript\n${testContent}\n\`\`\`\n\nContext:\n${context}`,
+    maxIterations
   );
 
   logger.success("Review complete");

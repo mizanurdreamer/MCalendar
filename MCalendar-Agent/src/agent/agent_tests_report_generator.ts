@@ -13,7 +13,8 @@ export async function generateTestReport(
   runner: PlaywrightRunner,
   testOutputPath: string,
   codebasePath: string,
-  testResult: TestResult
+  testResult: TestResult,
+  maxIterations?: number
 ): Promise<string> {
   const provider = getTaskProvider("agent_tests_report_generator", agentConfig);
   logger.task("agent_tests_report_generator", `${getTaskProviderName("agent_tests_report_generator", agentConfig)}/${getTaskModel("agent_tests_report_generator", agentConfig)}`);
@@ -29,7 +30,8 @@ export async function generateTestReport(
       temperature: agentConfig["agent_tests_report_generator"]?.temperature,
     },
     SYSTEM_PROMPTS.agent_tests_report_generator,
-    `Format these Playwright test results into a structured report:\n\nTotal: ${testResult.total}\nPassed: ${testResult.passed}\nFailed: ${testResult.failed}\nStatus: ${testResult.success ? "All passed" : "Some failed"}\n\nErrors:\n${testResult.errors.join("\n\n")}`
+    `Format these Playwright test results into a structured report:\n\nTotal: ${testResult.total}\nPassed: ${testResult.passed}\nFailed: ${testResult.failed}\nStatus: ${testResult.success ? "All passed" : "Some failed"}\n\nErrors:\n${testResult.errors.join("\n\n")}`,
+    maxIterations
   );
 
   logger.success("Report generated");

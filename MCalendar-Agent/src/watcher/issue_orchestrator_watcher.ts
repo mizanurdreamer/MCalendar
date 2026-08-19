@@ -13,6 +13,7 @@ export interface WatcherConfig {
   codebasePath: string;
   testProjectPath: string;
   maxRetries: number;
+  maxIterations: number;
   pollIntervalMin: number;
   stateDir: string;
   watchBranch?: string;
@@ -20,7 +21,7 @@ export interface WatcherConfig {
 }
 
 export async function startWatcher(config: WatcherConfig): Promise<void> {
-  const { agentConfig, githubClient, codebasePath, testProjectPath, maxRetries, pollIntervalMin, stateDir, watchBranch, projectName } = config;
+  const { agentConfig, githubClient, codebasePath, testProjectPath, maxRetries, maxIterations, pollIntervalMin, stateDir, watchBranch, projectName } = config;
   const stateManager = new StateManager(stateDir);
   const commitState = new CommitStateManager(stateDir);
 
@@ -40,6 +41,7 @@ export async function startWatcher(config: WatcherConfig): Promise<void> {
     codebasePath,
     testProjectPath,
     maxRetries,
+    maxIterations,
     projectName,
   };
 
@@ -87,6 +89,7 @@ export async function startWatcher(config: WatcherConfig): Promise<void> {
               codebasePath,
               testProjectPath,
               maxRetries,
+              maxIterations,
               targetBranch,
               projectName,
             };

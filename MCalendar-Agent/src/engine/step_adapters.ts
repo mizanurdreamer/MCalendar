@@ -61,7 +61,8 @@ Respond with ONLY valid JSON.`;
     const output = await analyzeIssue(
       ctx.agentConfig, ctx.reader, ctx.runner,
       ctx.testOutputPath, ctx.codebasePath, userMessage,
-      ctx.projectName
+      ctx.projectName,
+      ctx.maxIterations
     );
 
     const analysis = parseIssueAnalysis(output);
@@ -115,7 +116,8 @@ Respond with ONLY valid JSON (no markdown, no code fences):
     const output = await analyzeCommit(
       ctx.agentConfig, ctx.reader, ctx.runner,
       ctx.testOutputPath, ctx.codebasePath, userMessage,
-      ctx.projectName
+      ctx.projectName,
+      ctx.maxIterations
     );
 
     let analysis: CommitAnalysis;
@@ -230,7 +232,8 @@ ${diff.files.map((f) => `### ${f.filename}\n\`\`\`diff\n${f.patch ?? "(no patch)
     await generateTests(
       ctx.agentConfig, ctx.reader, ctx.runner,
       ctx.testOutputPath, ctx.codebasePath, userMessage,
-      ctx.projectName
+      ctx.projectName,
+      ctx.maxIterations
     );
 
     record(ctx, "generate_tests", "agent_tests_generator", `Generated ${testFilename}`, "next");
@@ -281,7 +284,8 @@ export function adaptReviewAndFix(): StepFunction {
       ctx.testOutputPath, ctx.codebasePath,
       ctx.testFilename,
       testContent,
-      `Fix the failing test. Here are the errors:\n\n${errorContext}`
+      `Fix the failing test. Here are the errors:\n\n${errorContext}`,
+      ctx.maxIterations
     );
 
     record(ctx, "review_fix", "agent_tests_reviewer", `Fixed ${ctx.testFilename}`, "goto:run_tests");
@@ -297,7 +301,8 @@ export function adaptReportGenerator(): StepFunction {
 
     const output = await generateTestReport(
       ctx.agentConfig, ctx.reader, ctx.runner,
-      ctx.testOutputPath, ctx.codebasePath, ctx.testResult
+      ctx.testOutputPath, ctx.codebasePath, ctx.testResult,
+      ctx.maxIterations
     );
 
     ctx.report = output;
@@ -373,7 +378,8 @@ export function adaptSummarize(): StepFunction {
 
     const output = await summarizeResults(
       ctx.agentConfig, ctx.reader, ctx.runner,
-      ctx.testOutputPath, ctx.codebasePath, userMessage
+      ctx.testOutputPath, ctx.codebasePath, userMessage,
+      ctx.maxIterations
     );
 
     ctx.summary = output;

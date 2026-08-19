@@ -17,6 +17,7 @@ export interface OrchestratorConfig {
   codebasePath: string;
   testProjectPath: string;
   maxRetries: number;
+  maxIterations: number;
   projectName: string;
 }
 
@@ -24,7 +25,7 @@ export async function processIssue(
   issue: GitHubIssue,
   config: OrchestratorConfig
 ): Promise<TaskResult> {
-  const { agentConfig, githubClient, codebasePath, testProjectPath, maxRetries, projectName } = config;
+  const { agentConfig, githubClient, codebasePath, testProjectPath, maxRetries, maxIterations, projectName } = config;
   const reader = new CodebaseReader(codebasePath);
   const testReader = new CodebaseReader(testProjectPath);
   const runner = new PlaywrightRunner(testProjectPath);
@@ -52,6 +53,7 @@ export async function processIssue(
     testOutputPath,
     projectName,
     maxRetries,
+    maxIterations,
     baseBranch,
     branchName,
   });

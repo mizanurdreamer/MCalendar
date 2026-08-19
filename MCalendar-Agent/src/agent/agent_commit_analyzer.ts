@@ -13,7 +13,8 @@ export async function analyzeCommit(
   testOutputPath: string,
   codebasePath: string,
   userMessage: string,
-  projectName: string
+  projectName: string,
+  maxIterations?: number
 ): Promise<string> {
   const provider = getTaskProvider("agent_commit_analyzer", agentConfig);
   logger.task("agent_commit_analyzer", `${getTaskProviderName("agent_commit_analyzer", agentConfig)}/${getTaskModel("agent_commit_analyzer", agentConfig)}`);
@@ -30,7 +31,8 @@ export async function analyzeCommit(
       temperature: agentConfig["agent_commit_analyzer"]?.temperature,
     },
     prompts.agent_commit_analyzer,
-    userMessage
+    userMessage,
+    maxIterations
   );
 
   logger.success("Commit analysis complete");

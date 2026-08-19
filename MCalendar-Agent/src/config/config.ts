@@ -30,6 +30,7 @@ export interface AppConfig {
   projectName: string;
   pollIntervalMin: number;
   maxRetries: number;
+  maxIterations: number;
   agentConfig: AgentConfig;
   agentEnabled: boolean;
   watchBranch?: string;
@@ -109,6 +110,7 @@ export function loadConfig(): AppConfig {
     projectName: project.projectName,
     pollIntervalMin: parseInt(process.env.POLL_INTERVAL_MIN ?? "1", 10),
     maxRetries: parseInt(process.env.MAX_RETRIES ?? "3", 10),
+    maxIterations: parseInt(process.env.MAX_ITERATIONS ?? "20", 10),
     agentConfig,
     agentEnabled: (process.env.AGENT_ENABLED ?? "true").toLowerCase() === "true",
     watchBranch: process.env.WATCH_BRANCH,

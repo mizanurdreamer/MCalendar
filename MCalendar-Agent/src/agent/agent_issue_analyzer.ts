@@ -13,7 +13,8 @@ export async function analyzeIssue(
   testOutputPath: string,
   codebasePath: string,
   userMessage: string,
-  projectName: string
+  projectName: string,
+  maxIterations?: number
 ): Promise<string> {
   const provider = getTaskProvider("agent_issue_analyzer", agentConfig);
   logger.task("agent_issue_analyzer", `${getTaskProviderName("agent_issue_analyzer", agentConfig)}/${getTaskModel("agent_issue_analyzer", agentConfig)}`);
@@ -30,7 +31,8 @@ export async function analyzeIssue(
       temperature: agentConfig["agent_issue_analyzer"]?.temperature,
     },
     prompts.agent_issue_analyzer,
-    userMessage
+    userMessage,
+    maxIterations
   );
 
   logger.success("Issue analysis complete");

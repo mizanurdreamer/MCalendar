@@ -13,7 +13,8 @@ export async function generateTests(
   testOutputPath: string,
   codebasePath: string,
   userMessage: string,
-  projectName: string
+  projectName: string,
+  maxIterations?: number
 ): Promise<string> {
   const provider = getTaskProvider("agent_tests_generator", agentConfig);
   logger.task("agent_tests_generator", `${getTaskProviderName("agent_tests_generator", agentConfig)}/${getTaskModel("agent_tests_generator", agentConfig)}`);
@@ -30,7 +31,8 @@ export async function generateTests(
       temperature: agentConfig["agent_tests_generator"]?.temperature,
     },
     prompts.agent_tests_generator,
-    userMessage
+    userMessage,
+    maxIterations
   );
 
   logger.success("Tests generated");

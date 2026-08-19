@@ -1,8 +1,12 @@
 import winston from "winston";
 import chalk from "chalk";
 import path from "node:path";
+import fs from "node:fs";
 
 const LOG_DIR = path.join(process.cwd(), "logs");
+fs.mkdirSync(LOG_DIR, { recursive: true });
+
+const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
 
 const fileFormat = winston.format.combine(
   winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
@@ -10,7 +14,7 @@ const fileFormat = winston.format.combine(
 );
 
 const consoleFormat = winston.format.combine(
-  winston.format.timestamp({ format: "HH:mm:ss" }),
+  winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
   winston.format.printf(({ timestamp, level, message }) => {
     const ts = String(timestamp);
     switch (level) {
@@ -31,17 +35,13 @@ const winstonLogger = winston.createLogger({
   transports: [
     new winston.transports.Console({ format: consoleFormat }),
     new winston.transports.File({
-      filename: path.join(LOG_DIR, "agent.log"),
+      filename: path.join(LOG_DIR, `agent-${timestamp}.log`),
       format: fileFormat,
-      maxsize: 5 * 1024 * 1024,
-      maxFiles: 5,
     }),
     new winston.transports.File({
-      filename: path.join(LOG_DIR, "error.log"),
+      filename: path.join(LOG_DIR, `error-${timestamp}.log`),
       level: "error",
       format: fileFormat,
-      maxsize: 5 * 1024 * 1024,
-      maxFiles: 3,
     }),
   ],
 });

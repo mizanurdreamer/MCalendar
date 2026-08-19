@@ -17,6 +17,7 @@ export interface CommitOrchestratorConfig {
   codebasePath: string;
   testProjectPath: string;
   maxRetries: number;
+  maxIterations: number;
   targetBranch: string;
   projectName: string;
 }
@@ -25,7 +26,7 @@ export async function processCommit(
   diff: CommitDiff,
   config: CommitOrchestratorConfig
 ): Promise<TaskResult & { skipped?: boolean; analysis?: { needsTests: boolean; reason: string; scope: string | null } }> {
-  const { agentConfig, githubClient, codebasePath, testProjectPath, maxRetries, targetBranch, projectName } = config;
+  const { agentConfig, githubClient, codebasePath, testProjectPath, maxRetries, maxIterations, targetBranch, projectName } = config;
   const reader = new CodebaseReader(codebasePath);
   const testReader = new CodebaseReader(testProjectPath);
   const runner = new PlaywrightRunner(testProjectPath);
@@ -50,6 +51,7 @@ export async function processCommit(
     testOutputPath,
     projectName,
     maxRetries,
+    maxIterations,
     baseBranch: targetBranch,
     branchName,
   });

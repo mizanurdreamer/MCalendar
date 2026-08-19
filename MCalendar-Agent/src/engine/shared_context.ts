@@ -70,6 +70,7 @@ export interface SharedContext {
   projectName: string;
 
   maxRetries: number;
+  maxIterations: number;
   retries: number;
   status: "running" | "completed" | "failed" | "skipped";
 
@@ -102,6 +103,7 @@ export function createSharedContext(input: {
   testOutputPath: string;
   projectName: string;
   maxRetries: number;
+  maxIterations: number;
   baseBranch: string;
   branchName: string;
 }): SharedContext {
@@ -120,6 +122,7 @@ export function createSharedContext(input: {
     testOutputPath: input.testOutputPath,
     projectName: input.projectName,
     maxRetries: input.maxRetries,
+    maxIterations: input.maxIterations,
     retries: 0,
     status: "running",
     baseBranch: input.baseBranch,

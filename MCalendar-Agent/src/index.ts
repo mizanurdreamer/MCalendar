@@ -42,6 +42,7 @@ program
         codebasePath: config.codebasePath,
         testProjectPath: config.testProjectPath,
         maxRetries: config.maxRetries,
+        maxIterations: config.maxIterations,
         projectName: config.projectName,
       });
 
@@ -75,6 +76,7 @@ program
         codebasePath: config.codebasePath,
         testProjectPath: config.testProjectPath,
         maxRetries: config.maxRetries,
+        maxIterations: config.maxIterations,
         pollIntervalMin: pollInterval,
         stateDir: "state",
         watchBranch,
@@ -113,6 +115,7 @@ program
         codebasePath: config.codebasePath,
         testProjectPath: config.testProjectPath,
         maxRetries: config.maxRetries,
+        maxIterations: config.maxIterations,
         pollIntervalMin: pollInterval,
         stateDir: "state",
         watchBranch,

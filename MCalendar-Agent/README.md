@@ -254,6 +254,7 @@ pipeline_engine → summarize (agent_summarize)
 | `TEST_PROJECT_PATH` | Yes | Local path or git URL to test project |
 | `POLL_INTERVAL_MIN` | No | Polling interval in minutes (default: 1) |
 | `MAX_RETRIES` | No | Max test fix retries (default: 3) |
+| `MAX_ITERATIONS` | No | Max agent loop iterations per step (default: 20) |
 | `AGENT_ENABLED` | No | Enable/disable agent (default: `true`). Set to `false` to stop all processing |
 | `WATCH_BRANCH` | No | Branch to watch for commits (alternative to `--branch` flag) |
 

@@ -12,7 +12,8 @@ export async function summarizeResults(
   runner: PlaywrightRunner,
   testOutputPath: string,
   codebasePath: string,
-  userMessage: string
+  userMessage: string,
+  maxIterations?: number
 ): Promise<string> {
   const summarizeProvider = getTaskProvider("agent_summarize", agentConfig);
   logger.task("agent_summarize", `${getTaskProviderName("agent_summarize", agentConfig)}/${getTaskModel("agent_summarize", agentConfig)}`);
@@ -28,6 +29,7 @@ export async function summarizeResults(
       temperature: agentConfig["agent_summarize"]?.temperature,
     },
     SYSTEM_PROMPTS.agent_summarize,
-    userMessage
+    userMessage,
+    maxIterations
   );
 }
