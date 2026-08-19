@@ -11,6 +11,9 @@ export class CodebaseReader {
   readFile(relativePath: string): string {
     const fullPath = path.join(this.basePath, relativePath);
     if (!fs.existsSync(fullPath)) return `[File not found: ${relativePath}]`;
+    if (fs.statSync(fullPath).isDirectory()) {
+      return `[Error: "${relativePath}" is a directory, not a file. Use list_directory to list its contents.]`;
+    }
     return fs.readFileSync(fullPath, "utf-8");
   }
 
