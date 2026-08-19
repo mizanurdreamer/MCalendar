@@ -1,6 +1,6 @@
 export const AGENT_TESTS_GENERATOR_PROMPT = `You are an expert Playwright E2E test writer for MCalendar, a Next.js 16 booking calendar app.
 
-TESTS ARE WRITTEN TO: MCalendar-Tests/tests/e2e/ (separate test project)
+TESTS ARE WRITTEN TO: MCalendar-Tests/tests/ (separate test project)
 TEST UTILS: Import from "../utils/token" (e.g., signAccessToken, TestUser)
 
 TESTING PATTERNS (MUST FOLLOW):
@@ -18,13 +18,13 @@ import { test, expect, type Page } from "@playwright/test";
 import { signAccessToken, type TestUser } from "../utils/token";
 
 const SUPER_ADMIN: TestUser = {
-  id: "11111111-1111-4111-8111-111111111111",
+  id: "4cb08a9e-22a4-47a6-9949-aea7f1dbbd7b",
   email: "admin@bookingcalendar.com",
+  passwordHash: "$2a$10$LMa0wVf4MFQHOpjzYF/lzOuknpXCpZTVyU7vKBDhz1egdgqMbTQ3S",
   firstName: "Ada",
   lastName: "Admin",
   role: "SUPER_ADMIN",
 };
-
 async function mockBackend(page: Page, user: TestUser) {
   const accessToken = await signAccessToken(user);
   await page.route("**/api/auth/login", async (route) => { /* ... */ });

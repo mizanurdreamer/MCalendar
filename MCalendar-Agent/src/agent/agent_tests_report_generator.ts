@@ -3,7 +3,7 @@ import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers
 import type { CodebaseReader } from "../codebase/reader.js";
 import type { PlaywrightRunner } from "../test_runner/playwright.js";
 import type { TestResult } from "../test_runner/playwright.js";
-import { runAgentLoop } from "./Agent_Runner_Engine.js";
+import { runAgentLoop } from "../engine/agent_runner_engine.js";
 import { SYSTEM_PROMPTS } from "../prompts/index.js";
 import { logger } from "../utils/logger.js";
 
@@ -15,8 +15,8 @@ export async function generateTestReport(
   mcalendarPath: string,
   testResult: TestResult
 ): Promise<string> {
-  const provider = getTaskProvider("Agent_Tests_Report_Generator", agentConfig);
-  logger.task("Agent_Tests_Report_Generator", `${getTaskProviderName("Agent_Tests_Report_Generator", agentConfig)}/${getTaskModel("Agent_Tests_Report_Generator", agentConfig)}`);
+  const provider = getTaskProvider("agent_tests_report_generator", agentConfig);
+  logger.task("agent_tests_report_generator", `${getTaskProviderName("agent_tests_report_generator", agentConfig)}/${getTaskModel("agent_tests_report_generator", agentConfig)}`);
 
   const result = await runAgentLoop(
     {
@@ -25,10 +25,10 @@ export async function generateTestReport(
       runner,
       testOutputPath,
       mcalendarPath,
-      maxTokens: agentConfig["Agent_Tests_Report_Generator"]?.maxTokens,
-      temperature: agentConfig["Agent_Tests_Report_Generator"]?.temperature,
+      maxTokens: agentConfig["agent_tests_report_generator"]?.maxTokens,
+      temperature: agentConfig["agent_tests_report_generator"]?.temperature,
     },
-    SYSTEM_PROMPTS.Agent_Tests_Report_Generator,
+    SYSTEM_PROMPTS.agent_tests_report_generator,
     `Format these Playwright test results into a structured report:\n\nTotal: ${testResult.total}\nPassed: ${testResult.passed}\nFailed: ${testResult.failed}\nStatus: ${testResult.success ? "All passed" : "Some failed"}\n\nErrors:\n${testResult.errors.join("\n\n")}`
   );
 

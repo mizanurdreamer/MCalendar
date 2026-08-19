@@ -1,10 +1,10 @@
 export type TaskName =
-  | "Agent_Issue_Analyzer"
-  | "Agent_Commit_Analyzer"
-  | "Agent_Tests_Generator"
-  | "Agent_Tests_Report_Generator"
-  | "Agent_Tests_Reviewer"
-  | "Agent_Summarize";
+  | "agent_issue_analyzer"
+  | "agent_commit_analyzer"
+  | "agent_tests_generator"
+  | "agent_tests_report_generator"
+  | "agent_tests_reviewer"
+  | "agent_summarize";
 
 export interface TaskResult {
   success: boolean;
@@ -16,10 +16,10 @@ export interface TaskResult {
 }
 
 export const ALL_TASKS: TaskName[] = [
-  "Agent_Issue_Analyzer",
-  "Agent_Commit_Analyzer",
-  "Agent_Tests_Generator",
-  "Agent_Tests_Report_Generator",
-  "Agent_Tests_Reviewer",
-  "Agent_Summarize",
+  "agent_issue_analyzer",
+  "agent_commit_analyzer",
+  "agent_tests_generator",
+  "agent_tests_report_generator",
+  "agent_tests_reviewer",
+  "agent_summarize",
 ];

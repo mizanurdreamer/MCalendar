@@ -22,6 +22,6 @@ export async function signAccessToken(user: TestUser): Promise<string> {
   } as Record<string, unknown>)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("15m")
+    .setExpirationTime("60m")
     .sign(ACCESS_SECRET);
 }

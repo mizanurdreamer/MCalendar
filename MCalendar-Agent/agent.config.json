@@ -1,25 +1,25 @@
 {
-  "Agent_Issue_Analyzer": {
+  "agent_issue_analyzer": {
     "maxTokens": 4096,
     "temperature": 0.3
   },
-  "Agent_Commit_Analyzer": {
+  "agent_commit_analyzer": {
     "maxTokens": 4096,
     "temperature": 0.3
   },
-  "Agent_Tests_Generator": {
+  "agent_tests_generator": {
     "maxTokens": 8192,
     "temperature": 0.2
   },
-  "Agent_Tests_Report_Generator": {
+  "agent_tests_report_generator": {
     "maxTokens": 4096,
     "temperature": 0.1
   },
-  "Agent_Tests_Reviewer": {
+  "agent_tests_reviewer": {
     "maxTokens": 8192,
     "temperature": 0.2
   },
-  "Agent_Summarize": {
+  "agent_summarize": {
     "maxTokens": 2048,
     "temperature": 0.3
   }

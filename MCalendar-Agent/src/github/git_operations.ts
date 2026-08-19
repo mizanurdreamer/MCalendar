@@ -1,5 +1,7 @@
 import simpleGit from "simple-git";
-import path from "node:path";
+import type { GitHubClient } from "./client.js";
+import type { GitHubPR } from "./types.js";
+import { logger } from "../utils/logger.js";
 
 export class GitBranch {
   private git: ReturnType<typeof simpleGit>;
@@ -32,6 +34,24 @@ export class GitBranch {
 
   async push(branchName: string): Promise<void> {
     await this.git.push("origin", branchName, ["--set-upstream"]);
+  }
+
+  async commitAndPush(commitMessage: string, branchName: string): Promise<void> {
+    logger.task("Git", `committing + pushing ${branchName}`);
+    await this.commit(commitMessage);
+    logger.success("Committed");
+    await this.push(branchName);
+    logger.success("Pushed");
+  }
+
+  async createPR(
+    githubClient: GitHubClient,
+    params: { title: string; body: string; head: string; base: string }
+  ): Promise<GitHubPR> {
+    logger.task("Git", `creating PR ${params.head} → ${params.base}`);
+    const pr = await githubClient.createPR(params);
+    logger.success(`PR #${pr.number} created → ${params.base}`);
+    return pr;
   }
 
   static slugify(text: string): string {
