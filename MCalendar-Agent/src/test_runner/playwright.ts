@@ -43,19 +43,22 @@ export class PlaywrightRunner {
       let failed = 0;
       const errors: string[] = [];
 
-      const walk = (spec: Record<string, unknown>) => {
-        const tests = (spec.tests ?? []) as Record<string, unknown>[];
-        for (const test of tests) {
-          const result = (test.results ?? []) as Record<string, unknown>[];
-          if (result.length > 0 && (result[0] as Record<string, unknown>).status === "passed") {
-            passed++;
-          } else {
-            failed++;
-            const errorObj = (result[0] as Record<string, unknown>)?.error as Record<string, unknown> | undefined;
-            if (errorObj?.message) errors.push(errorObj.message as string);
+      const walk = (suite: Record<string, unknown>) => {
+        const specs = (suite.specs ?? []) as Record<string, unknown>[];
+        for (const spec of specs) {
+          const tests = (spec.tests ?? []) as Record<string, unknown>[];
+          for (const test of tests) {
+            const result = (test.results ?? []) as Record<string, unknown>[];
+            if (result.length > 0 && (result[0] as Record<string, unknown>).status === "passed") {
+              passed++;
+            } else {
+                failed++;
+                const errorObj = (result[0] as Record<string, unknown>)?.error as Record<string, unknown> | undefined;
+                if (errorObj?.message) errors.push(errorObj.message as string);
+            }
           }
         }
-        const innerSuites = (spec.suites ?? []) as Record<string, unknown>[];
+        const innerSuites = (suite.suites ?? []) as Record<string, unknown>[];
         for (const s of innerSuites) walk(s);
       };
 

@@ -459,7 +459,7 @@ Project name is auto-extracted from the path/URL for use in prompts and PR descr
 ```bash
 cd MCalendar-Tests
 npx playwright test                          # run all tests
-npx playwright test tests/issue-5-*.spec.ts  # run specific test
+npx playwright test E2Etests/tests/issue-2-login-check.spec  # run specific test
 npx playwright test --headed                 # run with browser visible
 npx playwright test --debug                  # step through tests
 ```
