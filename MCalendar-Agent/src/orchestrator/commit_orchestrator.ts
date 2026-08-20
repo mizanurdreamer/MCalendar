@@ -10,6 +10,8 @@ import { logger } from "../utils/logger.js";
 import { createSharedContext } from "../engine/shared_context.js";
 import { runPipeline } from "../engine/pipeline_engine.js";
 import { getCommitPipeline } from "../engine/step_definitions.js";
+import { setDiagnosticConfig } from "../utils/diagnostic_tools.js";
+import { setDatabaseUrl } from "../utils/database_tools.js";
 
 export interface CommitOrchestratorConfig {
   agentConfig: AgentConfig;
@@ -18,19 +20,26 @@ export interface CommitOrchestratorConfig {
   testProjectPath: string;
   maxRetries: number;
   maxIterations: number;
+  maxPipelineSteps: number;
   targetBranch: string;
   projectName: string;
+  databaseUrl?: string;
+  apiBaseUrl?: string;
+  commitAutoApprove?: boolean;
 }
 
 export async function processCommit(
   diff: CommitDiff,
   config: CommitOrchestratorConfig
 ): Promise<TaskResult & { skipped?: boolean; analysis?: { needsTests: boolean; reason: string; scope: string | null } }> {
-  const { agentConfig, githubClient, codebasePath, testProjectPath, maxRetries, maxIterations, targetBranch, projectName } = config;
+  const { agentConfig, githubClient, codebasePath, testProjectPath, maxRetries, maxIterations, maxPipelineSteps, targetBranch, projectName } = config;
   const reader = new CodebaseReader(codebasePath);
   const testReader = new CodebaseReader(testProjectPath);
   const runner = new PlaywrightRunner(testProjectPath);
-  const testOutputPath = path.join(testProjectPath, "tests", "e2e");
+  const testOutputPath = path.join(testProjectPath, "tests");
+
+  setDiagnosticConfig({ databaseUrl: config.databaseUrl, apiBaseUrl: config.apiBaseUrl });
+  setDatabaseUrl(config.databaseUrl ?? "");
 
   const shortSha = diff.sha.slice(0, 7);
   logger.info(`Processing commit ${shortSha}: ${diff.message.split("\n")[0]}`);
@@ -52,8 +61,10 @@ export async function processCommit(
     projectName,
     maxRetries,
     maxIterations,
+    maxPipelineSteps,
     baseBranch: targetBranch,
     branchName,
+    commitAutoApprove: config.commitAutoApprove ?? true,
   });
 
   const result = await runPipeline(getCommitPipeline(), ctx);
@@ -84,5 +95,6 @@ export async function processCommit(
     testsPassed: result.testResult?.passed ?? 0,
     testsFailed: result.testResult?.failed ?? 0,
     retries: result.retries,
+    retryHistory: result.retryHistory,
   };
 }

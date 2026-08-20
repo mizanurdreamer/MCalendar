@@ -253,8 +253,9 @@ pipeline_engine → summarize (agent_summarize)
 | `PROJECT_PATH` | Yes | Local path or git URL to source project (name auto-extracted) |
 | `TEST_PROJECT_PATH` | Yes | Local path or git URL to test project |
 | `POLL_INTERVAL_MIN` | No | Polling interval in minutes (default: 1) |
-| `MAX_RETRIES` | No | Max test fix retries (default: 3) |
-| `MAX_ITERATIONS` | No | Max agent loop iterations per step (default: 20) |
+| `AGENT_MAX_RETRIES` | No | Max test fix retries (default: 3) |
+| `AGENT_MAX_ITERATIONS` | No | Max agent loop iterations per step (default: 20) |
+| `MAX_PIPELINE_STEPS` | No | Max pipeline steps before abort (default: 50) |
 | `AGENT_ENABLED` | No | Enable/disable agent (default: `true`). Set to `false` to stop all processing |
 | `WATCH_BRANCH` | No | Branch to watch for commits (alternative to `--branch` flag) |
 
@@ -307,6 +308,66 @@ Per-task tuning for `maxTokens` and `temperature`. Provider and model come from 
   }
 }
 ```
+
+## Agent Tools (29 tools)
+
+All agents have access to these tools. The AI decides which tools to use based on context.
+
+### Core Tools (4)
+
+| Tool | Description |
+|------|-------------|
+| `read_file` | Read source code files |
+| `list_directory` | List directory contents |
+| `write_test_file` | Write Playwright test files |
+| `run_playwright_test` | Run Playwright tests |
+
+### Diagnostic Tools (12)
+
+| Tool | Description |
+|------|-------------|
+| `run_command` | Execute shell commands |
+| `query_database` | Execute SQL queries (PostgreSQL) |
+| `call_api` | Make HTTP requests to APIs |
+| `read_server_logs` | Read local log files from `logs/` |
+| `docker_command` | Execute Docker commands |
+| `git_log` | View recent git commits |
+| `git_diff` | Show code changes between commits |
+| `npm_command` | Run npm scripts (test, build, lint) |
+| `check_process` | Check if a process is running |
+| `check_port` | Check if a port is in use |
+| `env_check` | Read environment variables |
+| `run_migration` | Run database migrations |
+
+### Database Tools (3)
+
+| Tool | Description |
+|------|-------------|
+| `database_schema` | List tables and columns |
+| `database_insert` | Insert test data |
+| `database_cleanup` | Delete test data |
+
+### Developer Tools (10)
+
+| Tool | Description |
+|------|-------------|
+| `lint_code` | Run linter on code |
+| `check_types` | Run TypeScript type checking |
+| `test_coverage` | Run tests with coverage |
+| `screenshot` | Take browser screenshot |
+| `check_deps` | Check package.json dependencies |
+| `install_deps` | Install npm packages |
+| `stack_trace` | Parse and analyze stack traces |
+| `compare_files` | Compare two files |
+| `find_usage` | Find where code is used |
+| `find_definition` | Find where code is defined |
+
+### Tool Configuration
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DATABASE_URL` | If using database tools | PostgreSQL connection string |
+| `API_BASE_URL` | If using API tools | Base URL for HTTP requests |
 
 ## CLI Commands
 
@@ -376,7 +437,7 @@ D:\Projects\MCalendar\
   └── MCalendar-Tests/        (test project — agent WRITES tests here)
                               ├── playwright.config.ts
                               ├── utils/token.ts
-                              └── tests/e2e/
+                              └── tests/
 ```
 
 The agent **reads** source code from `MCalendar/` but **writes and runs** tests in `MCalendar-Tests/`. This keeps test generation isolated from the main app.
@@ -398,7 +459,7 @@ Project name is auto-extracted from the path/URL for use in prompts and PR descr
 ```bash
 cd MCalendar-Tests
 npx playwright test                          # run all tests
-npx playwright test tests/e2e/issue-5-*.spec.ts  # run specific test
+npx playwright test tests/issue-5-*.spec.ts  # run specific test
 npx playwright test --headed                 # run with browser visible
 npx playwright test --debug                  # step through tests
 ```
@@ -426,7 +487,7 @@ Ensure `.env` has the API key for your chosen provider.
 The agent needs git to create branches and commits. Ensure MCalendar is a git repo.
 
 ### "Playwright tests fail"
-Tests mock API responses, so no database is needed. If tests still fail, the agent will retry up to `MAX_RETRIES` times.
+Tests mock API responses, so no database is needed. If tests still fail, the agent will retry up to `AGENT_MAX_RETRIES` times.
 
 ### "Provider not found"
 Ensure the provider is uncommented in `src/providers/registry.ts` and the npm package is installed.

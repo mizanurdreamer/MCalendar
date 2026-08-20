@@ -14,14 +14,18 @@ export interface WatcherConfig {
   testProjectPath: string;
   maxRetries: number;
   maxIterations: number;
+  maxPipelineSteps: number;
   pollIntervalMin: number;
   stateDir: string;
   watchBranch?: string;
   projectName: string;
+  databaseUrl?: string;
+  apiBaseUrl?: string;
+  commitAutoApprove?: boolean;
 }
 
 export async function startWatcher(config: WatcherConfig): Promise<void> {
-  const { agentConfig, githubClient, codebasePath, testProjectPath, maxRetries, maxIterations, pollIntervalMin, stateDir, watchBranch, projectName } = config;
+  const { agentConfig, githubClient, codebasePath, testProjectPath, maxRetries, maxIterations, maxPipelineSteps, pollIntervalMin, stateDir, watchBranch, projectName } = config;
   const stateManager = new StateManager(stateDir);
   const commitState = new CommitStateManager(stateDir);
 
@@ -42,7 +46,11 @@ export async function startWatcher(config: WatcherConfig): Promise<void> {
     testProjectPath,
     maxRetries,
     maxIterations,
+    maxPipelineSteps,
     projectName,
+    databaseUrl: config.databaseUrl,
+    apiBaseUrl: config.apiBaseUrl,
+    commitAutoApprove: config.commitAutoApprove,
   };
 
   let targetBranch = watchBranch ?? "";
@@ -62,6 +70,7 @@ export async function startWatcher(config: WatcherConfig): Promise<void> {
             testsPassed: result.testsPassed,
             testsFailed: result.testsFailed,
             retries: result.retries,
+            retryHistory: result.retryHistory,
           });
         } catch (err) {
           logger.error(`Failed to process issue #${issue.number}: ${err}`);
@@ -90,12 +99,23 @@ export async function startWatcher(config: WatcherConfig): Promise<void> {
               testProjectPath,
               maxRetries,
               maxIterations,
+              maxPipelineSteps,
               targetBranch,
               projectName,
+              databaseUrl: config.databaseUrl,
+              apiBaseUrl: config.apiBaseUrl,
+              commitAutoApprove: config.commitAutoApprove,
             };
-            await processCommit(diff, commitConfig);
+            const result = await processCommit(diff, commitConfig);
+            commitState.updateAfterProcessing(diff.sha, {
+              status: result.success ? "completed" : "failed",
+              retryHistory: result.retryHistory,
+            });
           } catch (err) {
             logger.error(`Failed to process commit ${diff.sha.slice(0, 7)}: ${err}`);
+            commitState.updateAfterProcessing(diff.sha, {
+              status: "failed",
+            });
           }
         }
 

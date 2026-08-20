@@ -17,7 +17,7 @@ export class PlaywrightRunner {
   }
 
   run(filename?: string): TestResult {
-    const testPath = filename ? `tests/e2e/${filename}` : "tests/e2e";
+    const testPath = filename ? `tests/${filename}` : "tests/";
     const cmd = `npx playwright test ${testPath} --reporter=json`;
 
     try {

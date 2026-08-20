@@ -28,7 +28,7 @@ export class GitBranch {
   }
 
   async commit(message: string): Promise<void> {
-    await this.git.add(".");
+    await this.git.add("tests/");
     await this.git.commit(message);
   }
 

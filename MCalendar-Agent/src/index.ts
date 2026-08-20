@@ -24,7 +24,7 @@ program
         logger.info("Agent is disabled (AGENT_ENABLED=false). Exiting.");
         return;
       }
-      const github = new GitHubClient(config.githubToken, config.repoOwner, config.repoName);
+      const github = new GitHubClient(config.githubToken, config.repoOwner, config.repoName, config.githubMaxRetries);
 
       const issueNumber = parseInt(numberStr, 10);
       if (isNaN(issueNumber)) throw new Error(`Invalid issue number: ${numberStr}`);
@@ -43,10 +43,63 @@ program
         testProjectPath: config.testProjectPath,
         maxRetries: config.maxRetries,
         maxIterations: config.maxIterations,
+        maxPipelineSteps: config.maxPipelineSteps,
         projectName: config.projectName,
+        databaseUrl: config.databaseUrl,
+        apiBaseUrl: config.apiBaseUrl,
+        commitAutoApprove: config.commitAutoApprove,
       });
 
       logger.success(`\n✅ Done — ${result.output}`);
+    } catch (err) {
+      logger.error(`Error: ${err}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("commit")
+  .description("Process a specific commit SHA")
+  .argument("<sha>", "Commit SHA to process")
+  .option("-b, --branch <branch>", "Target branch to merge into")
+  .action(async (sha: string, opts: { branch?: string }) => {
+    try {
+      const config = loadConfig();
+      if (!config.agentEnabled) {
+        logger.info("Agent is disabled (AGENT_ENABLED=false). Exiting.");
+        return;
+      }
+      const github = new GitHubClient(config.githubToken, config.repoOwner, config.repoName, config.githubMaxRetries);
+
+      const targetBranch = opts.branch ?? config.watchBranch ?? await github.getDefaultBranch();
+
+      logger.banner([
+        "🤖 MCalendar Multi-AI Test Agent",
+        `Processing commit ${sha.slice(0, 7)}`,
+      ]);
+
+      const diff = await github.getCommitDiff(sha);
+
+      const result = await processCommit(diff, {
+        agentConfig: config.agentConfig,
+        githubClient: github,
+        codebasePath: config.codebasePath,
+        testProjectPath: config.testProjectPath,
+        maxRetries: config.maxRetries,
+        maxIterations: config.maxIterations,
+        maxPipelineSteps: config.maxPipelineSteps,
+        targetBranch,
+        projectName: config.projectName,
+        databaseUrl: config.databaseUrl,
+        apiBaseUrl: config.apiBaseUrl,
+        commitAutoApprove: config.commitAutoApprove,
+      });
+
+      if (result.skipped) {
+        logger.info(`Skipped: ${result.analysis?.reason}`);
+      } else {
+        logger.success(`\n✅ Done — ${result.output}`);
+      }
     } catch (err) {
       logger.error(`Error: ${err}`);
       process.exit(1);
@@ -68,7 +121,7 @@ program
       const pollInterval = opts.pollInterval ? parseInt(opts.pollInterval, 10) : config.pollIntervalMin;
       const watchBranch = opts.branch ?? config.watchBranch;
 
-      const github = new GitHubClient(config.githubToken, config.repoOwner, config.repoName);
+      const github = new GitHubClient(config.githubToken, config.repoOwner, config.repoName, config.githubMaxRetries);
 
       await startWatcher({
         agentConfig: config.agentConfig,
@@ -77,10 +130,14 @@ program
         testProjectPath: config.testProjectPath,
         maxRetries: config.maxRetries,
         maxIterations: config.maxIterations,
+        maxPipelineSteps: config.maxPipelineSteps,
         pollIntervalMin: pollInterval,
         stateDir: "state",
         watchBranch,
         projectName: config.projectName,
+        databaseUrl: config.databaseUrl,
+        apiBaseUrl: config.apiBaseUrl,
+        commitAutoApprove: config.commitAutoApprove,
       });
     } catch (err) {
       logger.error(`Error: ${err}`);
@@ -102,7 +159,7 @@ program
       }
       const pollInterval = opts.pollInterval ? parseInt(opts.pollInterval, 10) : config.pollIntervalMin;
 
-      const github = new GitHubClient(config.githubToken, config.repoOwner, config.repoName);
+      const github = new GitHubClient(config.githubToken, config.repoOwner, config.repoName, config.githubMaxRetries);
 
       const watchBranch = branchArg ?? config.watchBranch;
       if (!watchBranch) {
@@ -116,10 +173,14 @@ program
         testProjectPath: config.testProjectPath,
         maxRetries: config.maxRetries,
         maxIterations: config.maxIterations,
+        maxPipelineSteps: config.maxPipelineSteps,
         pollIntervalMin: pollInterval,
         stateDir: "state",
         watchBranch,
         projectName: config.projectName,
+        databaseUrl: config.databaseUrl,
+        apiBaseUrl: config.apiBaseUrl,
+        commitAutoApprove: config.commitAutoApprove,
       });
     } catch (err) {
       logger.error(`Error: ${err}`);
@@ -133,7 +194,7 @@ program
   .action(async () => {
     try {
       const config = loadConfig();
-      const github = new GitHubClient(config.githubToken, config.repoOwner, config.repoName);
+      const github = new GitHubClient(config.githubToken, config.repoOwner, config.repoName, config.githubMaxRetries);
 
       const issues = await github.listOpenIssues();
 

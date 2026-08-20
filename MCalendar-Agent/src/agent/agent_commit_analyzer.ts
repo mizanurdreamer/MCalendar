@@ -3,7 +3,8 @@ import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers
 import type { CodebaseReader } from "../codebase/reader.js";
 import type { PlaywrightRunner } from "../test_runner/playwright.js";
 import { runAgentLoop } from "../engine/agent_runner_engine.js";
-import { getSystemPrompts } from "../prompts/index.js";
+import type { SharedContext } from "../engine/shared_context.js";
+import { buildPrompt } from "../prompts/index.js";
 import { logger } from "../utils/logger.js";
 
 export async function analyzeCommit(
@@ -14,12 +15,18 @@ export async function analyzeCommit(
   codebasePath: string,
   userMessage: string,
   projectName: string,
-  maxIterations?: number
+  maxIterations?: number,
+  context?: SharedContext
 ): Promise<string> {
   const provider = getTaskProvider("agent_commit_analyzer", agentConfig);
   logger.task("agent_commit_analyzer", `${getTaskProviderName("agent_commit_analyzer", agentConfig)}/${getTaskModel("agent_commit_analyzer", agentConfig)}`);
 
-  const prompts = getSystemPrompts(projectName);
+  const systemPrompt = buildPrompt({
+    agentType: "commit_analyzer",
+    projectName,
+    context,
+  });
+
   const result = await runAgentLoop(
     {
       provider,
@@ -29,10 +36,12 @@ export async function analyzeCommit(
       codebasePath,
       maxTokens: agentConfig["agent_commit_analyzer"]?.maxTokens,
       temperature: agentConfig["agent_commit_analyzer"]?.temperature,
+      maxRetries: context?.maxRetries,
     },
-    prompts.agent_commit_analyzer,
+    systemPrompt,
     userMessage,
-    maxIterations
+    maxIterations,
+    "agent_commit_analyzer"
   );
 
   logger.success("Commit analysis complete");

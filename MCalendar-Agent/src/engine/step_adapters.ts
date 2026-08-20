@@ -2,13 +2,15 @@ import type { SharedContext, StepFunction, CommitAnalysis, IssueAnalysis } from 
 import { analyzeIssue } from "../agent/agent_issue_analyzer.js";
 import { analyzeCommit } from "../agent/agent_commit_analyzer.js";
 import { generateTests } from "../agent/agent_tests_generator.js";
-import { reviewTests } from "../agent/agent_tests_reviewer.js";
+import { analyzeTestError, reviewTests } from "../agent/agent_tests_reviewer.js";
 import { generateTestReport } from "../agent/agent_tests_report_generator.js";
 import { summarizeResults } from "../agent/agent_summarize.js";
 import { runTests } from "../test_runner/tests_runner.js";
 import { formatTestReport } from "../test_runner/reporter.js";
 import { GitBranch } from "../github/git_operations.js";
 import { logger } from "../utils/logger.js";
+import fs from "node:fs";
+import path from "node:path";
 
 function record(ctx: SharedContext, name: string, agent: string | undefined, output: string, decision: string) {
   ctx.stepHistory.push({
@@ -53,7 +55,7 @@ LABELS: ${issue.labels.join(", ") || "none"}
 CREATED: ${issue.created_at}
 
 DESCRIPTION:
-${issue.body}
+${issue.body ?? "(no description)"}
 
 Read the project source code using your tools to understand the codebase before analyzing.
 Respond with ONLY valid JSON.`;
@@ -62,7 +64,8 @@ Respond with ONLY valid JSON.`;
       ctx.agentConfig, ctx.reader, ctx.runner,
       ctx.testOutputPath, ctx.codebasePath, userMessage,
       ctx.projectName,
-      ctx.maxIterations
+      ctx.maxIterations,
+      ctx
     );
 
     const analysis = parseIssueAnalysis(output);
@@ -72,6 +75,12 @@ Respond with ONLY valid JSON.`;
       logger.info(`Issue #${issue.number}: ${analysis.summary}`);
       record(ctx, "analyze_issue", "agent_issue_analyzer", analysis.summary, "stop");
       return { action: "stop", reason: `Analysis: ${analysis.summary}` };
+    }
+
+    if (analysis.test_scenarios.length === 0) {
+      logger.warn(`Issue #${issue.number}: Analysis returned no test scenarios`);
+      record(ctx, "analyze_issue", "agent_issue_analyzer", "No test scenarios identified", "stop");
+      return { action: "stop", reason: "Analysis returned no test scenarios" };
     }
 
     logger.info(`Issue #${issue.number}: ${analysis.test_scenarios.length} test scenarios identified`);
@@ -92,9 +101,6 @@ export function adaptCommitAnalyzer(): StepFunction {
     const fileList = diff.files
       .map((f) => `  ${f.filename} (${f.status}, +${f.additions}/-${f.deletions})`)
       .join("\n");
-    const diffContent = diff.files
-      .map((f) => `--- ${f.filename}\n${f.patch ?? "(binary or no patch)"}`)
-      .join("\n\n");
 
     const userMessage = `Analyze this commit to determine if it needs new or updated E2E tests.
 
@@ -106,18 +112,15 @@ TOTAL: +${diff.totalAdditions}/-${diff.totalDeletions} lines across ${diff.files
 FILES CHANGED:
 ${fileList}
 
-DIFF:
-${diffContent}
-
 Read the project source code using your tools to understand the codebase before analyzing.
-Respond with ONLY valid JSON (no markdown, no code fences):
-{ "needsTests": true/false, "reason": "brief explanation", "scope": "optional test scope or null" }`;
+The full diff is provided in your system context above.`;
 
     const output = await analyzeCommit(
       ctx.agentConfig, ctx.reader, ctx.runner,
       ctx.testOutputPath, ctx.codebasePath, userMessage,
       ctx.projectName,
-      ctx.maxIterations
+      ctx.maxIterations,
+      ctx
     );
 
     let analysis: CommitAnalysis;
@@ -141,6 +144,55 @@ Respond with ONLY valid JSON (no markdown, no code fences):
     }
 
     record(ctx, "triage_commit", "agent_commit_analyzer", output, "next");
+    return { action: "next" };
+  };
+}
+
+export function adaptPlanning(): StepFunction {
+  return async (ctx) => {
+    if (!ctx.issueAnalysis && !ctx.commitAnalysis) {
+      record(ctx, "plan", undefined, "Skipped (no analysis)", "next");
+      return { action: "next" };
+    }
+
+    const analysis = ctx.issueAnalysis ?? ctx.commitAnalysis;
+    const input = ctx.issue
+      ? `ISSUE #${ctx.issue.number}: ${ctx.issue.title}\nDESCRIPTION:\n${ctx.issue.body ?? "(no description)"}\n\nANALYSIS:\n${JSON.stringify(analysis, null, 2)}`
+      : ctx.commitDiff
+        ? `COMMIT: ${ctx.commitDiff.sha.slice(0, 7)} — ${ctx.commitDiff.message}\nANALYSIS:\n${JSON.stringify(analysis, null, 2)}`
+        : "No analysis available";
+
+    const prompt = `You are a test planning agent. Given the following analysis, produce a structured test plan.
+
+${input}
+
+Return a JSON object with this shape:
+{
+  "plan_summary": "one sentence summary",
+  "test_areas": ["area1", "area2"],
+  "key_assertions": ["assertion1", "assertion2"],
+  "risk_areas": ["risk1", "risk2"],
+  "estimated_test_count": 3
+}`;
+
+    const { getTaskProvider, getTaskProviderName, getTaskModel } = await import("../providers/registry.js");
+    const provider = getTaskProvider("agent_issue_analyzer", ctx.agentConfig);
+    logger.task("test_planner", `${getTaskProviderName("agent_issue_analyzer", ctx.agentConfig)}/${getTaskModel("agent_issue_analyzer", ctx.agentConfig)}`);
+
+    const response = await provider.chat({
+      system: "You are a focused test planning agent. Output only valid JSON.",
+      messages: [{ role: "user", content: prompt }],
+      maxTokens: 1024,
+      temperature: 0.3,
+    });
+
+    const textBlocks = response.content.filter((b): b is { type: "text"; text: string } => b.type === "text");
+    const planOutput = textBlocks.map((b) => b.text).join("\n");
+    logger.prompt("test_planner", "You are a focused test planning agent. Output only valid JSON.", prompt, planOutput);
+
+    ctx.planResult = planOutput;
+    record(ctx, "plan", "test_planner", planOutput.slice(0, 200), "next");
+    logger.info(`Plan: ${planOutput.slice(0, 120)}...`);
     return { action: "next" };
   };
 }
@@ -233,7 +285,8 @@ ${diff.files.map((f) => `### ${f.filename}\n\`\`\`diff\n${f.patch ?? "(no patch)
       ctx.agentConfig, ctx.reader, ctx.runner,
       ctx.testOutputPath, ctx.codebasePath, userMessage,
       ctx.projectName,
-      ctx.maxIterations
+      ctx.maxIterations,
+      ctx
     );
 
     record(ctx, "generate_tests", "agent_tests_generator", `Generated ${testFilename}`, "next");
@@ -245,6 +298,11 @@ export function adaptRunTests(): StepFunction {
   return async (ctx) => {
     if (!ctx.testFilename) {
       return { action: "stop", reason: "No test filename set" };
+    }
+
+    const testFile = path.join(ctx.testOutputPath, ctx.testFilename);
+    if (!fs.existsSync(testFile)) {
+      return { action: "stop", reason: `Test file not found: ${ctx.testFilename}` };
     }
 
     const result = await runTests(ctx.runner, ctx.testFilename);
@@ -264,8 +322,8 @@ export function adaptRunTests(): StepFunction {
       return { action: "retry", step: "review_and_fix", reason: result.errors.join("\n") };
     }
 
-    record(ctx, "run_tests", undefined, `${result.passed}/${result.total} passed (retries exhausted)`, "next");
-    return { action: "next" };
+    record(ctx, "run_tests", undefined, `${result.passed}/${result.total} passed (retries exhausted)`, "stop");
+    return { action: "stop", reason: `Tests failed after ${ctx.maxRetries} retries: ${result.errors.join(", ")}` };
   };
 }
 
@@ -275,20 +333,47 @@ export function adaptReviewAndFix(): StepFunction {
       return { action: "stop", reason: "Missing test filename or test result" };
     }
 
+    if (ctx.testResult.success) {
+      return { action: "next" };
+    }
+
     const testContent = ctx.testReader.readFile(ctx.testFilename);
     ctx.testContent = testContent;
     const errorContext = ctx.testResult.errors.join("\n\n");
 
+    // Step 1: Analyze the error first (don't re-read files)
+    const analysis = await analyzeTestError(
+      ctx.agentConfig, ctx.reader, ctx.runner,
+      ctx.testOutputPath, ctx.codebasePath,
+      ctx.testFilename,
+      testContent,
+      ctx.testResult.errors,
+      ctx.retryHistory,
+      ctx.projectName,
+      ctx.maxIterations,
+      ctx
+    );
+
+    // Track this retry attempt
+    ctx.retryHistory.push({
+      attempt: ctx.retries,
+      errors: ctx.testResult.errors,
+      analysis,
+    });
+
+    // Step 2: Fix the test based on analysis
     await reviewTests(
       ctx.agentConfig, ctx.reader, ctx.runner,
       ctx.testOutputPath, ctx.codebasePath,
       ctx.testFilename,
       testContent,
-      `Fix the failing test. Here are the errors:\n\n${errorContext}`,
-      ctx.maxIterations
+      `Fix the test based on this analysis:\n\n${analysis}`,
+      ctx.projectName,
+      ctx.maxIterations,
+      ctx
     );
 
-    record(ctx, "review_fix", "agent_tests_reviewer", `Fixed ${ctx.testFilename}`, "goto:run_tests");
+    record(ctx, "review_fix", "agent_tests_reviewer", `Fixed ${ctx.testFilename} (attempt ${ctx.retries})`, "goto:run_tests");
     return { action: "goto", step: "run_tests" };
   };
 }
@@ -302,7 +387,9 @@ export function adaptReportGenerator(): StepFunction {
     const output = await generateTestReport(
       ctx.agentConfig, ctx.reader, ctx.runner,
       ctx.testOutputPath, ctx.codebasePath, ctx.testResult,
-      ctx.maxIterations
+      ctx.projectName,
+      ctx.maxIterations,
+      ctx.maxRetries
     );
 
     ctx.report = output;
@@ -313,6 +400,12 @@ export function adaptReportGenerator(): StepFunction {
 
 export function adaptCommitAndPush(): StepFunction {
   return async (ctx) => {
+    if (!ctx.commitAutoApprove) {
+      logger.info("COMMIT_AUTO_APPROVE=false — skipping push");
+      record(ctx, "commit_push", undefined, "Skipped (commit auto-approve disabled)", "stop");
+      return { action: "stop", reason: "COMMIT_AUTO_APPROVE=false — push skipped" };
+    }
+
     let commitMessage: string;
     if (ctx.mode === "issue" && ctx.issue) {
       commitMessage = `test: auto-generated E2E tests for issue #${ctx.issue.number}`;
@@ -339,24 +432,29 @@ export function adaptCreatePR(): StepFunction {
 
     if (ctx.mode === "issue" && ctx.issue) {
       title = `test: E2E tests for issue #${ctx.issue.number}`;
-      body = `## Automated Test Generation\n\n**Issue:** #${ctx.issue.number} — ${ctx.issue.title}\n\n### Test Results\n${ctx.testResult ? formatTestReport(ctx.testResult) : "(no results)"}\n\n### Files Changed\n- \`tests/e2e/${ctx.testFilename}\` (new)\n\n### How to Run\n\`\`\`bash\nnpx playwright test tests/e2e/${ctx.testFilename}\n\`\`\`\n\n---\n*Generated by ${ctx.projectName} Test Agent*`;
+      body = `## Automated Test Generation\n\n**Issue:** #${ctx.issue.number} — ${ctx.issue.title}\n\n### Test Results\n${ctx.testResult ? formatTestReport(ctx.testResult) : "(no results)"}\n\n### Files Changed\n- \`tests/${ctx.testFilename}\` (new)\n\n### How to Run\n\`\`\`bash\nnpx playwright test tests/${ctx.testFilename}\n\`\`\`\n\n---\n*Generated by ${ctx.projectName} Test Agent*`;
     } else if (ctx.mode === "commit" && ctx.commitDiff) {
       const shortSha = ctx.commitDiff.sha.slice(0, 7);
       const changedFilesContext = ctx.commitDiff.files
         .map((f) => `- ${f.filename} (${f.status}, +${f.additions}/-${f.deletions})`)
         .join("\n");
       title = `test: E2E tests for commit ${shortSha}`;
-      body = `## Automated Test Generation\n\n**Commit:** ${shortSha} — ${ctx.commitDiff.message.split("\n")[0]}\n**Author:** ${ctx.commitDiff.author}\n\n### Analysis\n${ctx.commitAnalysis?.reason ?? "N/A"}\n\n### Test Results\n${ctx.testResult ? formatTestReport(ctx.testResult) : "(no results)"}\n\n### Files Changed in Commit\n${changedFilesContext}\n\n### Test File Added\n- \`tests/e2e/${ctx.testFilename}\`\n\n### How to Run\n\`\`\`bash\nnpx playwright test tests/e2e/${ctx.testFilename}\n\`\`\`\n\n---\n*Generated by ${ctx.projectName} Test Agent*`;
+      body = `## Automated Test Generation\n\n**Commit:** ${shortSha} — ${ctx.commitDiff.message.split("\n")[0]}\n**Author:** ${ctx.commitDiff.author}\n\n### Analysis\n${ctx.commitAnalysis?.reason ?? "N/A"}\n\n### Test Results\n${ctx.testResult ? formatTestReport(ctx.testResult) : "(no results)"}\n\n### Files Changed in Commit\n${changedFilesContext}\n\n### Test File Added\n- \`tests/${ctx.testFilename}\`\n\n### How to Run\n\`\`\`bash\nnpx playwright test tests/${ctx.testFilename}\n\`\`\`\n\n---\n*Generated by ${ctx.projectName} Test Agent*`;
     } else {
       return { action: "next" };
     }
 
-    await ctx.githubClient.createPR({
+    const pr = await ctx.githubClient.createPR({
       title,
       body,
       head: ctx.branchName!,
       base: ctx.baseBranch!,
+      draft: !ctx.commitAutoApprove,
     });
+
+    if (pr.html_url) {
+      ctx.prUrl = pr.html_url;
+    }
 
     record(ctx, "create_pr", undefined, `PR created for ${ctx.branchName}`, "next");
     return { action: "next" };
@@ -379,13 +477,17 @@ export function adaptSummarize(): StepFunction {
     const output = await summarizeResults(
       ctx.agentConfig, ctx.reader, ctx.runner,
       ctx.testOutputPath, ctx.codebasePath, userMessage,
-      ctx.maxIterations
+      ctx.projectName,
+      ctx.maxIterations,
+      ctx.maxRetries
     );
 
     ctx.summary = output;
 
     if (ctx.githubClient && ctx.issue) {
       await ctx.githubClient.addComment(ctx.issue.number, output);
+    } else if (ctx.githubClient && ctx.mode === "commit" && ctx.prUrl) {
+      await ctx.githubClient.addPRComment(ctx.prUrl, output);
     }
 
     record(ctx, "summarize", "agent_summarize", output, "done");

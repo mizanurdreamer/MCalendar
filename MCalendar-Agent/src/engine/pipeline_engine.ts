@@ -1,8 +1,6 @@
 import type { SharedContext, StepDefinition } from "./shared_context.js";
 import { logger } from "../utils/logger.js";
 
-const MAX_PIPELINE_STEPS = 50;
-
 export async function runPipeline(
   steps: StepDefinition[],
   ctx: SharedContext
@@ -10,8 +8,8 @@ export async function runPipeline(
   let i = 0;
 
   while (i < steps.length && ctx.status === "running") {
-    if (ctx.stepHistory.length >= MAX_PIPELINE_STEPS) {
-      logger.error(`Pipeline exceeded ${MAX_PIPELINE_STEPS} steps — aborting`);
+    if (ctx.stepHistory.length >= ctx.maxPipelineSteps) {
+      logger.error(`Pipeline exceeded ${ctx.maxPipelineSteps} steps — aborting`);
       ctx.status = "failed";
       break;
     }

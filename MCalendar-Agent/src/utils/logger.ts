@@ -6,7 +6,18 @@ import fs from "node:fs";
 const LOG_DIR = path.join(process.cwd(), "logs");
 fs.mkdirSync(LOG_DIR, { recursive: true });
 
-const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+function formatTimestamp(date: Date): string {
+  const y = date.getFullYear();
+  const mo = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  let h = date.getHours();
+  const ampm = h >= 12 ? "PM" : "AM";
+  h = h % 12 || 12;
+  const mi = String(date.getMinutes()).padStart(2, "0");
+  const s = String(date.getSeconds()).padStart(2, "0");
+  return `${y}-${mo}-${d}-${h}-${mi}-${s}-${ampm}`;
+}
+const timestamp = formatTimestamp(new Date());
 
 const fileFormat = winston.format.combine(
   winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
@@ -43,6 +54,10 @@ const winstonLogger = winston.createLogger({
       level: "error",
       format: fileFormat,
     }),
+    new winston.transports.File({
+      filename: path.join(LOG_DIR, `prompts-${timestamp}.log`),
+      format: fileFormat,
+    }),
   ],
 });
 
@@ -74,6 +89,15 @@ export const logger = {
   tool(toolName: string, arg?: string) {
     const detail = arg ? `(${arg})` : "";
     winstonLogger.debug(`📖 ${toolName} ${detail}`);
+  },
+
+  prompt(agentName: string, systemPrompt: string, userMessage: string, response?: string) {
+    winstonLogger.info(`[PROMPT] ${agentName}`, {
+      agent: agentName,
+      systemPrompt,
+      userMessage,
+      response: response ?? "(pending)",
+    });
   },
 
   banner(lines: string[]) {

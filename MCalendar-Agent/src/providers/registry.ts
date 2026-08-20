@@ -7,7 +7,8 @@ import { AnthropicProvider } from "./anthropic.js";
 const providerInstances = new Map<string, ProviderInterface>();
 
 export function createProvider(name: string, apiKey: string, model?: string): ProviderInterface {
-  const existing = providerInstances.get(name);
+  const cacheKey = `${name}:${model ?? "default"}`;
+  const existing = providerInstances.get(cacheKey);
   if (existing) return existing;
 
   let provider: ProviderInterface;
@@ -56,7 +57,7 @@ export function createProvider(name: string, apiKey: string, model?: string): Pr
       );
   }
 
-  providerInstances.set(name, provider);
+  providerInstances.set(cacheKey, provider);
   return provider;
 }
 

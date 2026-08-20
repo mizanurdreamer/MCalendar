@@ -30,6 +30,13 @@ export interface GitHubPR {
   state: string;
 }
 
+export interface GitHubReview {
+  id: number;
+  state: string;
+  body?: string;
+  submitted_at: string;
+}
+
 export interface GitHubBranch {
   name: string;
   ref: string;

@@ -16,6 +16,7 @@ export interface HistoryEntry {
   testsPassed?: number;
   testsFailed?: number;
   retries?: number;
+  retryHistory?: { attempt: number; errors: string[]; analysis?: string }[];
   processedAt: string;
 }
 
@@ -58,6 +59,7 @@ export class StateManager {
       testsPassed?: number;
       testsFailed?: number;
       retries?: number;
+      retryHistory?: { attempt: number; errors: string[]; analysis?: string }[];
     }
   ): void {
     const state = this.load();

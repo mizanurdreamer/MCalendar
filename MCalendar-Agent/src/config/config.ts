@@ -31,9 +31,18 @@ export interface AppConfig {
   pollIntervalMin: number;
   maxRetries: number;
   maxIterations: number;
+  maxPipelineSteps: number;
+  githubMaxRetries: number;
   agentConfig: AgentConfig;
   agentEnabled: boolean;
+  commitAutoApprove: boolean;
   watchBranch?: string;
+  databaseUrl?: string;
+  apiBaseUrl?: string;
+  superAdminEmail?: string;
+  superAdminPassword?: string;
+  mcpEnabled: boolean;
+  mcpBrowser: string;
 }
 
 export function loadConfig(): AppConfig {
@@ -109,10 +118,19 @@ export function loadConfig(): AppConfig {
     testProjectPath: testProject.resolvedPath,
     projectName: project.projectName,
     pollIntervalMin: parseInt(process.env.POLL_INTERVAL_MIN ?? "1", 10),
-    maxRetries: parseInt(process.env.MAX_RETRIES ?? "3", 10),
-    maxIterations: parseInt(process.env.MAX_ITERATIONS ?? "20", 10),
+    maxRetries: parseInt(process.env.AGENT_MAX_RETRIES ?? "3", 10),
+    maxIterations: parseInt(process.env.AGENT_MAX_ITERATIONS ?? "20", 10),
+    maxPipelineSteps: parseInt(process.env.MAX_PIPELINE_STEPS ?? "50", 10),
+    githubMaxRetries: parseInt(process.env.GITHUB_MAX_RETRIES ?? "3", 10),
     agentConfig,
     agentEnabled: (process.env.AGENT_ENABLED ?? "true").toLowerCase() === "true",
+    commitAutoApprove: (process.env.COMMIT_AUTO_APPROVE ?? "true").toLowerCase() === "true",
     watchBranch: process.env.WATCH_BRANCH,
+    databaseUrl: process.env.DATABASE_URL,
+    apiBaseUrl: process.env.API_BASE_URL,
+    superAdminEmail: process.env.SUPER_ADMIN_EMAIL,
+    superAdminPassword: process.env.SUPER_ADMIN_PASSWORD,
+    mcpEnabled: (process.env.MCP_ENABLED ?? "true").toLowerCase() === "true",
+    mcpBrowser: process.env.MCP_BROWSER ?? "chromium",
   };
 }

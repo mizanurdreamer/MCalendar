@@ -1,8 +1,7 @@
 import { Octokit } from "@octokit/rest";
-import type { GitHubIssue, GitHubPR, GitHubCommit, CommitFile, CommitDiff } from "./types.js";
+import type { GitHubIssue, GitHubPR, GitHubReview, GitHubCommit, CommitFile, CommitDiff } from "./types.js";
 import { logger } from "../utils/logger.js";
 
-const MAX_RETRIES = 3;
 const RETRYABLE_CODES = ["ECONNRESET", "ETIMEDOUT", "ENOTFOUND", "EAI_AGAIN"];
 const RETRYABLE_STATUS_CODES = [502, 503, 504, 429];
 
@@ -21,21 +20,23 @@ export class GitHubClient {
   private octokit: Octokit;
   private owner: string;
   private repo: string;
+  private maxRetries: number;
 
-  constructor(token: string, owner: string, repo: string) {
+  constructor(token: string, owner: string, repo: string, maxRetries = 3) {
     this.octokit = new Octokit({ auth: token });
     this.owner = owner;
     this.repo = repo;
+    this.maxRetries = maxRetries;
   }
 
   private async withRetry<T>(label: string, fn: () => Promise<T>): Promise<T> {
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
       try {
         return await fn();
       } catch (err) {
-        if (attempt < MAX_RETRIES && isRetryable(err)) {
+        if (attempt < this.maxRetries && isRetryable(err)) {
           const delay = Math.pow(2, attempt - 1) * 1000;
-          logger.warn(`⚠️ ${label} failed (attempt ${attempt}/${MAX_RETRIES}): ${(err as Error).message}`);
+          logger.warn(`⚠️ ${label} failed (attempt ${attempt}/${this.maxRetries}): ${(err as Error).message}`);
           logger.info(`   Retrying in ${delay / 1000}s...`);
           await new Promise((r) => setTimeout(r, delay));
           continue;
@@ -43,7 +44,7 @@ export class GitHubClient {
         throw err;
       }
     }
-    throw new Error(`${label} failed after ${MAX_RETRIES} retries`);
+    throw new Error(`${label} failed after ${this.maxRetries} retries`);
   }
 
   async getIssue(number: number): Promise<GitHubIssue> {
@@ -87,17 +88,32 @@ export class GitHubClient {
     });
   }
 
+  async addPRComment(prUrl: string, body: string): Promise<void> {
+    const prNumber = parseInt(prUrl.split("/").pop() ?? "0", 10);
+    if (!prNumber) return;
+    return this.withRetry(`addPRComment(#${prNumber})`, async () => {
+      await this.octokit.issues.createComment({
+        owner: this.owner,
+        repo: this.repo,
+        issue_number: prNumber,
+        body,
+      });
+    });
+  }
+
   async createPR(params: {
     title: string;
     body: string;
     head: string;
     base: string;
+    draft?: boolean;
   }): Promise<GitHubPR> {
     return this.withRetry(`createPR(${params.head}→${params.base})`, async () => {
       const { data } = await this.octokit.pulls.create({
         owner: this.owner,
         repo: this.repo,
         ...params,
+        draft: params.draft ?? false,
       });
       return data as unknown as GitHubPR;
     });
@@ -153,6 +169,35 @@ export class GitHubClient {
         totalAdditions: files.reduce((sum, f) => sum + f.additions, 0),
         totalDeletions: files.reduce((sum, f) => sum + f.deletions, 0),
       };
+    });
+  }
+
+  async createReview(params: {
+    pull_number: number;
+    event: "APPROVE" | "COMMENT" | "REQUEST_CHANGES";
+    body?: string;
+  }): Promise<GitHubReview> {
+    return this.withRetry(`createReview(PR #${params.pull_number})`, async () => {
+      const { data } = await this.octokit.pulls.createReview({
+        owner: this.owner,
+        repo: this.repo,
+        ...params,
+      });
+      return data as unknown as GitHubReview;
+    });
+  }
+
+  async mergePR(params: {
+    pull_number: number;
+    merge_method?: "merge" | "squash" | "rebase";
+  }): Promise<void> {
+    return this.withRetry(`mergePR(PR #${params.pull_number})`, async () => {
+      await this.octokit.pulls.merge({
+        owner: this.owner,
+        repo: this.repo,
+        ...params,
+        merge_method: params.merge_method ?? "squash",
+      });
     });
   }
 }

@@ -3,10 +3,17 @@ import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers
 import type { CodebaseReader } from "../codebase/reader.js";
 import type { PlaywrightRunner } from "../test_runner/playwright.js";
 import { runAgentLoop } from "../engine/agent_runner_engine.js";
-import { SYSTEM_PROMPTS } from "../prompts/index.js";
+import type { SharedContext } from "../engine/shared_context.js";
+import { buildPrompt } from "../prompts/index.js";
 import { logger } from "../utils/logger.js";
 
-export async function reviewTests(
+export interface RetryAttempt {
+  attempt: number;
+  errors: string[];
+  analysis?: string;
+}
+
+export async function analyzeTestError(
   agentConfig: AgentConfig,
   reader: CodebaseReader,
   runner: PlaywrightRunner,
@@ -14,11 +21,44 @@ export async function reviewTests(
   codebasePath: string,
   testFilename: string,
   testContent: string,
-  context: string,
-  maxIterations?: number
+  errors: string[],
+  retryHistory: RetryAttempt[],
+  projectName: string,
+  maxIterations?: number,
+  context?: SharedContext
 ): Promise<string> {
   const provider = getTaskProvider("agent_tests_reviewer", agentConfig);
-  logger.task("agent_tests_reviewer", `${getTaskProviderName("agent_tests_reviewer", agentConfig)}/${getTaskModel("agent_tests_reviewer", agentConfig)}`);
+  logger.task("agent_tests_reviewer", `analyzing error (attempt ${retryHistory.length + 1})`);
+
+  const historyContext = retryHistory.length > 0
+    ? `\n\nPREVIOUS ATTEMPTS:\n${retryHistory.map((h, i) =>
+      `- Attempt ${h.attempt}: ${h.analysis ?? "No analysis"}\n  Errors: ${h.errors.join(", ")}`
+    ).join("\n")}`
+    : "";
+
+  const userMessage = `Analyze this test failure and explain WHY it's failing and WHAT needs to be fixed.
+
+Filename: ${testFilename}
+
+Test file:
+\`\`\`typescript
+${testContent}
+\`\`\`
+
+Errors:
+${errors.join("\n\n")}
+${historyContext}
+
+Respond with a CONCISE analysis:
+1. Root cause (what exactly is wrong)
+2. What to change (specific fix instructions)
+3. Do NOT re-read files - use the information above.`;
+
+  const systemPrompt = buildPrompt({
+    agentType: "tests_reviewer",
+    projectName,
+    context,
+  });
 
   const result = await runAgentLoop(
     {
@@ -29,10 +69,59 @@ export async function reviewTests(
       codebasePath,
       maxTokens: agentConfig["agent_tests_reviewer"]?.maxTokens,
       temperature: agentConfig["agent_tests_reviewer"]?.temperature,
+      maxRetries: context?.maxRetries,
     },
-    SYSTEM_PROMPTS.agent_tests_reviewer,
-    `Review and fix this test if needed:\n\nFilename: ${testFilename}\n\nTest file:\n\`\`\`typescript\n${testContent}\n\`\`\`\n\nContext:\n${context}`,
-    maxIterations
+    systemPrompt,
+    userMessage,
+    maxIterations,
+    "agent_tests_reviewer"
+  );
+
+  logger.success("Error analysis complete");
+  return result;
+}
+
+export async function reviewTests(
+  agentConfig: AgentConfig,
+  reader: CodebaseReader,
+  runner: PlaywrightRunner,
+  testOutputPath: string,
+  codebasePath: string,
+  testFilename: string,
+  testContent: string,
+  context: string,
+  projectName: string,
+  maxIterations?: number,
+  sharedContext?: SharedContext
+): Promise<string> {
+  const provider = getTaskProvider("agent_tests_reviewer", agentConfig);
+  logger.task("agent_tests_reviewer", `${getTaskProviderName("agent_tests_reviewer", agentConfig)}/${getTaskModel("agent_tests_reviewer", agentConfig)}`);
+
+  const systemPrompt = buildPrompt({
+    agentType: "tests_reviewer",
+    projectName,
+    context: sharedContext,
+  });
+
+  const result = await runAgentLoop(
+    {
+      provider,
+      reader,
+      runner,
+      testOutputPath,
+      codebasePath,
+      maxTokens: agentConfig["agent_tests_reviewer"]?.maxTokens,
+      temperature: agentConfig["agent_tests_reviewer"]?.temperature,
+      maxRetries: sharedContext?.maxRetries,
+    },
+    systemPrompt,
+    `Fix this test based on the analysis below. Do NOT re-read files you already understand.
+
+${context}
+
+Use the write_test_file tool to save the fixed test.`,
+    maxIterations,
+    "agent_tests_reviewer"
   );
 
   logger.success("Review complete");

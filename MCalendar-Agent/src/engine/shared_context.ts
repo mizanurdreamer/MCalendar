@@ -71,6 +71,8 @@ export interface SharedContext {
 
   maxRetries: number;
   maxIterations: number;
+  maxPipelineSteps: number;
+  commitAutoApprove: boolean;
   retries: number;
   status: "running" | "completed" | "failed" | "skipped";
 
@@ -81,11 +83,20 @@ export interface SharedContext {
   testResult?: TestResult;
   report?: string;
   summary?: string;
+  prUrl?: string;
+  planResult?: string;
 
   branchName?: string;
   baseBranch?: string;
 
+  retryHistory: RetryAttempt[];
   stepHistory: StepRecord[];
+}
+
+export interface RetryAttempt {
+  attempt: number;
+  errors: string[];
+  analysis?: string;
 }
 
 export function createSharedContext(input: {
@@ -104,6 +115,8 @@ export function createSharedContext(input: {
   projectName: string;
   maxRetries: number;
   maxIterations: number;
+  maxPipelineSteps: number;
+  commitAutoApprove?: boolean;
   baseBranch: string;
   branchName: string;
 }): SharedContext {
@@ -123,10 +136,13 @@ export function createSharedContext(input: {
     projectName: input.projectName,
     maxRetries: input.maxRetries,
     maxIterations: input.maxIterations,
+    maxPipelineSteps: input.maxPipelineSteps,
+    commitAutoApprove: input.commitAutoApprove ?? true,
     retries: 0,
     status: "running",
     baseBranch: input.baseBranch,
     branchName: input.branchName,
+    retryHistory: [],
     stepHistory: [],
   };
 }

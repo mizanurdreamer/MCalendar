@@ -10,6 +10,8 @@ import { logger } from "../utils/logger.js";
 import { createSharedContext } from "../engine/shared_context.js";
 import { runPipeline } from "../engine/pipeline_engine.js";
 import { getIssuePipeline } from "../engine/step_definitions.js";
+import { setDiagnosticConfig } from "../utils/diagnostic_tools.js";
+import { setDatabaseUrl } from "../utils/database_tools.js";
 
 export interface OrchestratorConfig {
   agentConfig: AgentConfig;
@@ -18,14 +20,18 @@ export interface OrchestratorConfig {
   testProjectPath: string;
   maxRetries: number;
   maxIterations: number;
+  maxPipelineSteps: number;
   projectName: string;
+  databaseUrl?: string;
+  apiBaseUrl?: string;
+  commitAutoApprove?: boolean;
 }
 
 export async function processIssue(
   issue: GitHubIssue,
   config: OrchestratorConfig
 ): Promise<TaskResult> {
-  const { agentConfig, githubClient, codebasePath, testProjectPath, maxRetries, maxIterations, projectName } = config;
+  const { agentConfig, githubClient, codebasePath, testProjectPath, maxRetries, maxIterations, maxPipelineSteps, projectName } = config;
   const reader = new CodebaseReader(codebasePath);
   const testReader = new CodebaseReader(testProjectPath);
   const runner = new PlaywrightRunner(testProjectPath);
@@ -33,10 +39,14 @@ export async function processIssue(
 
   const testOutputPath = path.join(testProjectPath, "tests");
 
+  setDiagnosticConfig({ databaseUrl: config.databaseUrl, apiBaseUrl: config.apiBaseUrl });
+  setDatabaseUrl(config.databaseUrl ?? "");
+
   logger.info(`Fetching issue #${issue.number}: ${issue.title}`);
 
   const defaultBranch = await githubClient.getDefaultBranch();
-  const baseBranch = "main-agentic-ai";
+  //const baseBranch = defaultBranch;
+  const baseBranch = "main-agentic-ai"
   const branchName = GitBranch.branchName(issue.number, issue.title);
 
   const ctx = createSharedContext({
@@ -54,8 +64,10 @@ export async function processIssue(
     projectName,
     maxRetries,
     maxIterations,
+    maxPipelineSteps,
     baseBranch,
     branchName,
+    commitAutoApprove: config.commitAutoApprove ?? true,
   });
 
   const result = await runPipeline(getIssuePipeline(), ctx);
@@ -73,5 +85,6 @@ export async function processIssue(
     testsPassed: result.testResult?.passed ?? 0,
     testsFailed: result.testResult?.failed ?? 0,
     retries: result.retries,
+    retryHistory: result.retryHistory,
   };
 }

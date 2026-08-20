@@ -2,9 +2,8 @@ import type { AgentConfig } from "../providers/types.js";
 import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers/registry.js";
 import type { CodebaseReader } from "../codebase/reader.js";
 import type { PlaywrightRunner } from "../test_runner/playwright.js";
-import type { TestResult } from "../test_runner/playwright.js";
 import { runAgentLoop } from "../engine/agent_runner_engine.js";
-import { SYSTEM_PROMPTS } from "../prompts/index.js";
+import { buildPrompt } from "../prompts/index.js";
 import { logger } from "../utils/logger.js";
 
 export async function generateTestReport(
@@ -13,11 +12,20 @@ export async function generateTestReport(
   runner: PlaywrightRunner,
   testOutputPath: string,
   codebasePath: string,
-  testResult: TestResult,
-  maxIterations?: number
+  testResult: { total: number; passed: number; failed: number; success: boolean; errors: string[] },
+  projectName: string,
+  maxIterations?: number,
+  maxRetries?: number
 ): Promise<string> {
   const provider = getTaskProvider("agent_tests_report_generator", agentConfig);
   logger.task("agent_tests_report_generator", `${getTaskProviderName("agent_tests_report_generator", agentConfig)}/${getTaskModel("agent_tests_report_generator", agentConfig)}`);
+
+  const systemPrompt = buildPrompt({
+    agentType: "report_generator",
+    projectName,
+  });
+
+  const userMessage = `Generate a test report for the following results:\n\nTotal: ${testResult.total}\nPassed: ${testResult.passed}\nFailed: ${testResult.failed}\nSuccess: ${testResult.success}\n\nErrors:\n${testResult.errors.join("\n") || "(none)"}`;
 
   const result = await runAgentLoop(
     {
@@ -28,10 +36,12 @@ export async function generateTestReport(
       codebasePath,
       maxTokens: agentConfig["agent_tests_report_generator"]?.maxTokens,
       temperature: agentConfig["agent_tests_report_generator"]?.temperature,
+      maxRetries,
     },
-    SYSTEM_PROMPTS.agent_tests_report_generator,
-    `Format these Playwright test results into a structured report:\n\nTotal: ${testResult.total}\nPassed: ${testResult.passed}\nFailed: ${testResult.failed}\nStatus: ${testResult.success ? "All passed" : "Some failed"}\n\nErrors:\n${testResult.errors.join("\n\n")}`,
-    maxIterations
+    systemPrompt,
+    userMessage,
+    maxIterations,
+    "agent_tests_report_generator"
   );
 
   logger.success("Report generated");
