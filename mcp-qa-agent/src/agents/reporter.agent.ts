@@ -42,7 +42,7 @@ ${execResult.output.trim().substring(0, 3000)}
     });
     console.log(`✅ Report published successfully to GitHub Issue #${issueNumber}`);
   } else {
-    const reportFilename = `test-report-${shortSha}.md`;
+    const reportFilename = `${repo}/test-reports/test-report-${shortSha}.md`;
     fs.writeFileSync(reportFilename, finalReport);
     console.log(`\n📁 Report saved locally to: ${reportFilename}`);
   }

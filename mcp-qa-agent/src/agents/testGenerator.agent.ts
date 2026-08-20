@@ -6,9 +6,11 @@ import { cleanCodeOutput } from '../utils/parsers.js';
 export async function runTestGenerator(
   generatedMarkdown: string,
   commitDiffText: string,
-  shortSha: string
+  shortSha: string,
+  repo: string
 ): Promise<string> {
   console.log('\n🤖 [Agent 3: Test Generator] Writing Playwright tests...');
+   console.log(repo + " repo");
 
   const response = await anthropic.messages.create({
     model: DEFAULT_MODEL,
@@ -38,7 +40,7 @@ Output ONLY raw executable TypeScript code. No markdown code blocks.
   const testsDir = path.join(process.cwd(), 'tests');
   if (!fs.existsSync(testsDir)) fs.mkdirSync(testsDir, { recursive: true });
 
-  const relativePath = `tests/commit-${shortSha}.spec.ts`;
+  const relativePath = `${repo}/tests/commit-${shortSha}.spec.ts`;
   fs.writeFileSync(path.join(process.cwd(), relativePath), cleanCode);
   
   console.log(`✅ Saved test suite to: ${relativePath}`);

@@ -9,7 +9,7 @@ import { runReporter } from './agents/reporter.agent.js';
 async function main(owner: string, repo: string, commitSha: string, issueNumber?: number) {
   const ghClient = await createMCPClient();
   console.log('✅ Connected to GitHub MCP Server');
-
+  console.log(repo + " repo");
   try {
     const { tools } = await ghClient.listTools();
     const formattedTools = formatMCPToolsForClaude(tools);
@@ -19,8 +19,9 @@ async function main(owner: string, repo: string, commitSha: string, issueNumber?
     // Orchestrate Multi-Agent Pipeline
     const diffText = await runCommitAnalyzer(owner, repo, commitSha, formattedTools, ghClient);
     const criteriaMarkdown = await runCriteriaGenerator(diffText);
-    const testPath = await runTestGenerator(criteriaMarkdown, diffText, shortSha);
-    const execResult = await runTestExecutor(testPath);
+    const testPath = await runTestGenerator(criteriaMarkdown, diffText, shortSha,repo);
+    //const testPath ="/Mcalendar/tests/commit-1430c7a.spec.ts"
+    const execResult = await runTestExecutor(testPath,repo);
     await runReporter(owner, repo, issueNumber, shortSha, criteriaMarkdown, testPath, execResult, ghClient);
 
   } catch (error) {

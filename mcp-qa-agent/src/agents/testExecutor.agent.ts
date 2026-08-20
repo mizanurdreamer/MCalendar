@@ -8,11 +8,15 @@ export interface ExecutionResult {
   output: string;
 }
 
-export async function runTestExecutor(relativeTestPath: string): Promise<ExecutionResult> {
+export async function runTestExecutor(relativeTestPath: string, repo: string): Promise<ExecutionResult> {
   console.log('\n🤖 [Agent 4: Test Executor] Executing test suite...');
+  const customOutputDir = repo+"/test-results";
+  console.log(relativeTestPath + " rp "+ repo);
+  // Pass --output flag to write artifacts to a specific path
+  const command = `npx playwright test "${relativeTestPath}" --output="${customOutputDir}"`;
 
   try {
-    const { stdout, stderr } = await execPromise(`npx playwright test "${relativeTestPath}"`);
+    const { stdout, stderr } = await execPromise(command);
     console.log('✅ Test Execution Passed!');
     return { success: true, output: stdout || stderr };
   } catch (err: any) {

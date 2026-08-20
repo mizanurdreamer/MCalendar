@@ -4,3 +4,5 @@ dist/
 state/processed.json
 *.log
 .DS_Store
+MCalendar/test-reports/*
+MCalendar/test-results
