@@ -1,4 +1,5 @@
 import { execSync } from "node:child_process";
+import { logger } from "../utils/logger.js";
 
 export interface TestResult {
   success: boolean;
@@ -27,10 +28,13 @@ export class PlaywrightRunner {
         timeout: 120_000,
         stdio: ["pipe", "pipe", "pipe"],
       });
+      logger.info(`[playwright] Test completed successfully`);
       return this.parseOutput(output, true);
     } catch (err: unknown) {
       const error = err as { stdout?: string; stderr?: string; message?: string };
       const output = error.stdout ?? error.stderr ?? error.message ?? "";
+      logger.error(`[playwright] Test failed (exit code non-zero)`);
+      if (output) logger.error(`[playwright] Output: ${output.slice(0, 500)}`);
       return this.parseOutput(output, false);
     }
   }
@@ -43,24 +47,32 @@ export class PlaywrightRunner {
       let failed = 0;
       const errors: string[] = [];
 
-      const walk = (spec: Record<string, unknown>) => {
-        const tests = (spec.tests ?? []) as Record<string, unknown>[];
-        for (const test of tests) {
-          const result = (test.results ?? []) as Record<string, unknown>[];
-          if (result.length > 0 && (result[0] as Record<string, unknown>).status === "passed") {
-            passed++;
-          } else {
-            failed++;
-            const errorObj = (result[0] as Record<string, unknown>)?.error as Record<string, unknown> | undefined;
-            if (errorObj?.message) errors.push(errorObj.message as string);
+      const walk = (suite: Record<string, unknown>) => {
+        const specs = (suite.specs ?? []) as Record<string, unknown>[];
+        for (const spec of specs) {
+          const tests = (spec.tests ?? []) as Record<string, unknown>[];
+          for (const test of tests) {
+            const result = (test.results ?? []) as Record<string, unknown>[];
+            if (result.length > 0 && (result[0] as Record<string, unknown>).status === "passed") {
+              passed++;
+            } else {
+              failed++;
+              const errorObj = (result[0] as Record<string, unknown>)?.error as Record<string, unknown> | undefined;
+              if (errorObj?.message) {
+                const msg = errorObj.message as string;
+                errors.push(msg);
+                logger.error(`[playwright] Test error: ${msg.slice(0, 300)}`);
+              }
+            }
           }
         }
-        const innerSuites = (spec.suites ?? []) as Record<string, unknown>[];
+        const innerSuites = (suite.suites ?? []) as Record<string, unknown>[];
         for (const s of innerSuites) walk(s);
       };
 
       for (const suite of suites) walk(suite);
 
+      logger.info(`[playwright] Parsed: ${passed} passed, ${failed} failed, ${errors.length} errors`);
       return {
         success: failed === 0,
         total: passed + failed,
@@ -70,6 +82,7 @@ export class PlaywrightRunner {
         errors,
       };
     } catch {
+      logger.error(`[playwright] JSON parse failed — using raw output as error`);
       return {
         success: rawSuccess,
         total: 0,

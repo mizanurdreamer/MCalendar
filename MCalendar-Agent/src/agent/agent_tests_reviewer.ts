@@ -6,6 +6,7 @@ import { runAgentLoop } from "../engine/agent_runner_engine.js";
 import type { SharedContext } from "../engine/shared_context.js";
 import { buildPrompt } from "../prompts/index.js";
 import { logger } from "../utils/logger.js";
+import { AGENT_NAMES } from "../utils/agent_names.js";
 
 export interface RetryAttempt {
   attempt: number;
@@ -27,8 +28,9 @@ export async function analyzeTestError(
   maxIterations?: number,
   context?: SharedContext
 ): Promise<string> {
-  const provider = getTaskProvider("agent_tests_reviewer", agentConfig);
-  logger.task("agent_tests_reviewer", `analyzing error (attempt ${retryHistory.length + 1})`);
+  const agentName = AGENT_NAMES.TESTS_REVIEWER;
+  const provider = getTaskProvider(agentName, agentConfig);
+  logger.task(agentName, `analyzing error (attempt ${retryHistory.length + 1})`);
 
   const historyContext = retryHistory.length > 0
     ? `\n\nPREVIOUS ATTEMPTS:\n${retryHistory.map((h, i) =>
@@ -67,17 +69,18 @@ Respond with a CONCISE analysis:
       runner,
       testOutputPath,
       codebasePath,
-      maxTokens: agentConfig["agent_tests_reviewer"]?.maxTokens,
-      temperature: agentConfig["agent_tests_reviewer"]?.temperature,
+      maxTokens: agentConfig[agentName]?.maxTokens,
+      temperature: agentConfig[agentName]?.temperature,
       maxRetries: context?.maxRetries,
     },
     systemPrompt,
     userMessage,
     maxIterations,
-    "agent_tests_reviewer"
+    agentName
   );
 
   logger.success("Error analysis complete");
+  logger.info(`Analysis: ${result.slice(0, 300)}`);
   return result;
 }
 
@@ -89,19 +92,38 @@ export async function reviewTests(
   codebasePath: string,
   testFilename: string,
   testContent: string,
+  errors: string[],
   context: string,
   projectName: string,
   maxIterations?: number,
   sharedContext?: SharedContext
 ): Promise<string> {
-  const provider = getTaskProvider("agent_tests_reviewer", agentConfig);
-  logger.task("agent_tests_reviewer", `${getTaskProviderName("agent_tests_reviewer", agentConfig)}/${getTaskModel("agent_tests_reviewer", agentConfig)}`);
+  const agentName = AGENT_NAMES.TESTS_REVIEWER;
+  const provider = getTaskProvider(agentName, agentConfig);
+  logger.task(agentName, `${getTaskProviderName(agentName, agentConfig)}/${getTaskModel(agentName, agentConfig)}`);
 
   const systemPrompt = buildPrompt({
     agentType: "tests_reviewer",
     projectName,
     context: sharedContext,
   });
+
+  const userMessage = `Fix this test. Do NOT re-read files you already understand.
+
+Filename: ${testFilename}
+
+Test file:
+\`\`\`typescript
+${testContent}
+\`\`\`
+
+Errors:
+${errors.join("\n\n")}
+
+Analysis:
+${context}
+
+Use the write_test_file tool to save the fixed test.`;
 
   const result = await runAgentLoop(
     {
@@ -110,20 +132,17 @@ export async function reviewTests(
       runner,
       testOutputPath,
       codebasePath,
-      maxTokens: agentConfig["agent_tests_reviewer"]?.maxTokens,
-      temperature: agentConfig["agent_tests_reviewer"]?.temperature,
+      maxTokens: agentConfig[agentName]?.maxTokens,
+      temperature: agentConfig[agentName]?.temperature,
       maxRetries: sharedContext?.maxRetries,
     },
     systemPrompt,
-    `Fix this test based on the analysis below. Do NOT re-read files you already understand.
-
-${context}
-
-Use the write_test_file tool to save the fixed test.`,
+    userMessage,
     maxIterations,
-    "agent_tests_reviewer"
+    agentName
   );
 
   logger.success("Review complete");
+  logger.info(`Fix result: ${result.slice(0, 300)}`);
   return result;
 }

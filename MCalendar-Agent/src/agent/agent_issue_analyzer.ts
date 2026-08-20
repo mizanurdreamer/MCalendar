@@ -6,6 +6,7 @@ import { runAgentLoop } from "../engine/agent_runner_engine.js";
 import type { SharedContext } from "../engine/shared_context.js";
 import { buildPrompt } from "../prompts/index.js";
 import { logger } from "../utils/logger.js";
+import { AGENT_NAMES } from "../utils/agent_names.js";
 
 export async function analyzeIssue(
   agentConfig: AgentConfig,
@@ -18,8 +19,9 @@ export async function analyzeIssue(
   maxIterations?: number,
   context?: SharedContext
 ): Promise<string> {
-  const provider = getTaskProvider("agent_issue_analyzer", agentConfig);
-  logger.task("agent_issue_analyzer", `${getTaskProviderName("agent_issue_analyzer", agentConfig)}/${getTaskModel("agent_issue_analyzer", agentConfig)}`);
+  const agentName = AGENT_NAMES.ISSUE_ANALYZER;
+  const provider = getTaskProvider(agentName, agentConfig);
+  logger.task(agentName, `${getTaskProviderName(agentName, agentConfig)}/${getTaskModel(agentName, agentConfig)}`);
 
   const systemPrompt = buildPrompt({
     agentType: "issue_analyzer",
@@ -34,14 +36,14 @@ export async function analyzeIssue(
       runner,
       testOutputPath,
       codebasePath,
-      maxTokens: agentConfig["agent_issue_analyzer"]?.maxTokens,
-      temperature: agentConfig["agent_issue_analyzer"]?.temperature,
+      maxTokens: agentConfig[agentName]?.maxTokens,
+      temperature: agentConfig[agentName]?.temperature,
       maxRetries: context?.maxRetries,
     },
     systemPrompt,
     userMessage,
     maxIterations,
-    "agent_issue_analyzer"
+    agentName
   );
 
   logger.success("Issue analysis complete");

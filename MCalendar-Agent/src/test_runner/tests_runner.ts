@@ -9,9 +9,17 @@ export async function runTests(
 
   const result = runner.run(testFilename);
 
-  logger[result.success ? "success" : "error"](
-    `${result.passed}/${result.total} tests ${result.success ? "passed" : "failed"}`
-  );
+  if (result.success) {
+    logger.success(`${result.passed}/${result.total} tests passed`);
+  } else {
+    logger.error(`${result.passed}/${result.total} tests failed`);
+    if (result.errors.length > 0) {
+      for (const err of result.errors) {
+        logger.error(`Tests_Runner error: ${err.slice(0, 500)}`);
+      }
+    }
+    logger.debug(`Full output: ${result.output.slice(0, 500)}`);
+  }
 
   return result;
 }

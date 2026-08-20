@@ -4,6 +4,7 @@ import { createAgentTools, executeTool } from "../utils/tools.js";
 import type { PlaywrightRunner } from "../test_runner/playwright.js";
 import { logger } from "../utils/logger.js";
 import { initMcpClient, shutdownMcpClient } from "../mcp/client.js";
+import { AGENT_NAMES } from "../utils/agent_names.js";
 
 export interface TaskContext {
   provider: ProviderInterface;
@@ -37,7 +38,9 @@ export async function runAgentLoop(
       logger.warn(`MCP init failed (continuing without browser tools): ${err}`);
     }
   }
-
+  // if(agentName === AGENT_NAMES.ISSUE_ANALYZER || agentName === AGENT_NAMES.TESTS_GENERATOR ){
+  //   logger.info(`bypassing Agent : ${agentName} with maxIterations=${maxIterations} and maxRetries=${ctx.maxRetries ?? 3}`);
+  // }
   const tools = createAgentTools(ctx.reader, ctx.runner, ctx.codebasePath);
   const messages: ChatMessage[] = [{ role: "user", content: userMessage }];
   logger.prompt(agentName, systemPrompt, userMessage);

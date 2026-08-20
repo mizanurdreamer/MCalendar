@@ -9,6 +9,7 @@ import { runTests } from "../test_runner/tests_runner.js";
 import { formatTestReport } from "../test_runner/reporter.js";
 import { GitBranch } from "../github/git_operations.js";
 import { logger } from "../utils/logger.js";
+import { AGENT_NAMES } from "../utils/agent_names.js";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -73,18 +74,18 @@ Respond with ONLY valid JSON.`;
 
     if (!analysis.needs_tests) {
       logger.info(`Issue #${issue.number}: ${analysis.summary}`);
-      record(ctx, "analyze_issue", "agent_issue_analyzer", analysis.summary, "stop");
+      record(ctx, "analyze_issue", AGENT_NAMES.ISSUE_ANALYZER, analysis.summary, "stop");
       return { action: "stop", reason: `Analysis: ${analysis.summary}` };
     }
 
     if (analysis.test_scenarios.length === 0) {
       logger.warn(`Issue #${issue.number}: Analysis returned no test scenarios`);
-      record(ctx, "analyze_issue", "agent_issue_analyzer", "No test scenarios identified", "stop");
+      record(ctx, "analyze_issue", AGENT_NAMES.ISSUE_ANALYZER, "No test scenarios identified", "stop");
       return { action: "stop", reason: "Analysis returned no test scenarios" };
     }
 
     logger.info(`Issue #${issue.number}: ${analysis.test_scenarios.length} test scenarios identified`);
-    record(ctx, "analyze_issue", "agent_issue_analyzer", analysis.summary, "next");
+    record(ctx, "analyze_issue", AGENT_NAMES.ISSUE_ANALYZER, analysis.summary, "next");
     return { action: "next" };
   };
 }
@@ -139,11 +140,11 @@ The full diff is provided in your system context above.`;
 
     if (!analysis.needsTests) {
       logger.info(`Skipping commit ${shortSha}: ${analysis.reason}`);
-      record(ctx, "triage_commit", "agent_commit_analyzer", output, "stop");
+      record(ctx, "triage_commit", AGENT_NAMES.COMMIT_ANALYZER, output, "stop");
       return { action: "stop", reason: `Commit triage: ${analysis.reason}` };
     }
 
-    record(ctx, "triage_commit", "agent_commit_analyzer", output, "next");
+    record(ctx, "triage_commit", AGENT_NAMES.COMMIT_ANALYZER, output, "next");
     return { action: "next" };
   };
 }
@@ -176,8 +177,8 @@ Return a JSON object with this shape:
 }`;
 
     const { getTaskProvider, getTaskProviderName, getTaskModel } = await import("../providers/registry.js");
-    const provider = getTaskProvider("agent_issue_analyzer", ctx.agentConfig);
-    logger.task("test_planner", `${getTaskProviderName("agent_issue_analyzer", ctx.agentConfig)}/${getTaskModel("agent_issue_analyzer", ctx.agentConfig)}`);
+    const provider = getTaskProvider(AGENT_NAMES.ISSUE_ANALYZER, ctx.agentConfig);
+    logger.task("test_planner", `${getTaskProviderName(AGENT_NAMES.ISSUE_ANALYZER, ctx.agentConfig)}/${getTaskModel(AGENT_NAMES.ISSUE_ANALYZER, ctx.agentConfig)}`);
 
     const response = await provider.chat({
       system: "You are a focused test planning agent. Output only valid JSON.",
@@ -289,7 +290,7 @@ ${diff.files.map((f) => `### ${f.filename}\n\`\`\`diff\n${f.patch ?? "(no patch)
       ctx
     );
 
-    record(ctx, "generate_tests", "agent_tests_generator", `Generated ${testFilename}`, "next");
+    record(ctx, "generate_tests", AGENT_NAMES.TESTS_GENERATOR, `Generated ${testFilename}`, "next");
     return { action: "next" };
   };
 }
@@ -297,24 +298,33 @@ ${diff.files.map((f) => `### ${f.filename}\n\`\`\`diff\n${f.patch ?? "(no patch)
 export function adaptRunTests(): StepFunction {
   return async (ctx) => {
     if (!ctx.testFilename) {
+      logger.warn("[run_tests] No test filename set");
       return { action: "stop", reason: "No test filename set" };
     }
 
     const testFile = path.join(ctx.testOutputPath, ctx.testFilename);
     if (!fs.existsSync(testFile)) {
+      logger.warn(`[run_tests] Test file not found: ${testFile}`);
       return { action: "stop", reason: `Test file not found: ${ctx.testFilename}` };
     }
 
+    logger.info(`[run_tests] Running test: ${ctx.testFilename}`);
     const result = await runTests(ctx.runner, ctx.testFilename);
     ctx.testResult = result;
 
-    logger[result.success ? "success" : "error"](
-      `${result.passed}/${result.total} tests ${result.success ? "passed" : "failed"}`
-    );
-
     if (result.success) {
+      logger.success(`[run_tests] ${result.passed}/${result.total} tests passed`);
       record(ctx, "run_tests", undefined, `${result.passed}/${result.total} passed`, "next");
       return { action: "next" };
+    }
+
+    logger.error(`[run_tests] ${result.passed}/${result.total} tests failed`);
+    if (result.errors.length > 0) {
+      for (const err of result.errors) {
+        logger.error(`[run_tests] Error: ${err.slice(0, 500)}`);
+      }
+    } else {
+      logger.warn("[run_tests] Tests failed but no error messages captured");
     }
 
     if (ctx.retries < ctx.maxRetries && result.errors.length > 0) {
@@ -322,6 +332,7 @@ export function adaptRunTests(): StepFunction {
       return { action: "retry", step: "review_and_fix", reason: result.errors.join("\n") };
     }
 
+    logger.error(`[run_tests] Max retries (${ctx.maxRetries}) exhausted — tests still failing`);
     record(ctx, "run_tests", undefined, `${result.passed}/${result.total} passed (retries exhausted)`, "stop");
     return { action: "stop", reason: `Tests failed after ${ctx.maxRetries} retries: ${result.errors.join(", ")}` };
   };
@@ -337,9 +348,11 @@ export function adaptReviewAndFix(): StepFunction {
       return { action: "next" };
     }
 
+    logger.info(`[review] Starting review_and_fix for ${ctx.testFilename} (attempt ${ctx.retries + 1}/${ctx.maxRetries})`);
+    logger.info(`[review] Errors: ${ctx.testResult.errors.length}`);
+
     const testContent = ctx.testReader.readFile(ctx.testFilename);
     ctx.testContent = testContent;
-    const errorContext = ctx.testResult.errors.join("\n\n");
 
     // Step 1: Analyze the error first (don't re-read files)
     const analysis = await analyzeTestError(
@@ -361,19 +374,23 @@ export function adaptReviewAndFix(): StepFunction {
       analysis,
     });
 
+    logger.info(`[review] Retry history updated: attempt ${ctx.retries}`);
+
     // Step 2: Fix the test based on analysis
     await reviewTests(
       ctx.agentConfig, ctx.reader, ctx.runner,
       ctx.testOutputPath, ctx.codebasePath,
       ctx.testFilename,
       testContent,
+      ctx.testResult.errors,
       `Fix the test based on this analysis:\n\n${analysis}`,
       ctx.projectName,
       ctx.maxIterations,
       ctx
     );
 
-    record(ctx, "review_fix", "agent_tests_reviewer", `Fixed ${ctx.testFilename} (attempt ${ctx.retries})`, "goto:run_tests");
+    logger.info(`[review] Fix applied, re-running tests`);
+    record(ctx, "review_fix", AGENT_NAMES.TESTS_REVIEWER, `Fixed ${ctx.testFilename} (attempt ${ctx.retries})`, "goto:run_tests");
     return { action: "goto", step: "run_tests" };
   };
 }
@@ -393,7 +410,7 @@ export function adaptReportGenerator(): StepFunction {
     );
 
     ctx.report = output;
-    record(ctx, "generate_report", "agent_tests_report_generator", output, "next");
+    record(ctx, "generate_report", AGENT_NAMES.TESTS_REPORT_GENERATOR, output, "next");
     return { action: "next" };
   };
 }
@@ -490,7 +507,7 @@ export function adaptSummarize(): StepFunction {
       await ctx.githubClient.addPRComment(ctx.prUrl, output);
     }
 
-    record(ctx, "summarize", "agent_summarize", output, "done");
+    record(ctx, "summarize", AGENT_NAMES.SUMMARIZE, output, "done");
     return { action: "done" };
   };
 }

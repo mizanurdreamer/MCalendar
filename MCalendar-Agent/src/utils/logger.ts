@@ -54,10 +54,6 @@ const winstonLogger = winston.createLogger({
       level: "error",
       format: fileFormat,
     }),
-    new winston.transports.File({
-      filename: path.join(LOG_DIR, `prompts-${timestamp}.log`),
-      format: fileFormat,
-    }),
   ],
 });
 

@@ -6,6 +6,7 @@ import { runAgentLoop } from "../engine/agent_runner_engine.js";
 import type { SharedContext } from "../engine/shared_context.js";
 import { buildPrompt } from "../prompts/index.js";
 import { logger } from "../utils/logger.js";
+import { AGENT_NAMES } from "../utils/agent_names.js";
 
 export async function generateTests(
   agentConfig: AgentConfig,
@@ -18,8 +19,9 @@ export async function generateTests(
   maxIterations?: number,
   context?: SharedContext
 ): Promise<string> {
-  const provider = getTaskProvider("agent_tests_generator", agentConfig);
-  logger.task("agent_tests_generator", `${getTaskProviderName("agent_tests_generator", agentConfig)}/${getTaskModel("agent_tests_generator", agentConfig)}`);
+  const agentName = AGENT_NAMES.TESTS_GENERATOR;
+  const provider = getTaskProvider(agentName, agentConfig);
+  logger.task(agentName, `${getTaskProviderName(agentName, agentConfig)}/${getTaskModel(agentName, agentConfig)}`);
 
   const systemPrompt = buildPrompt({
     agentType: "tests_generator",
@@ -34,14 +36,14 @@ export async function generateTests(
       runner,
       testOutputPath,
       codebasePath,
-      maxTokens: agentConfig["agent_tests_generator"]?.maxTokens,
-      temperature: agentConfig["agent_tests_generator"]?.temperature,
+      maxTokens: agentConfig[agentName]?.maxTokens,
+      temperature: agentConfig[agentName]?.temperature,
       maxRetries: context?.maxRetries,
     },
     systemPrompt,
     userMessage,
     maxIterations,
-    "agent_tests_generator"
+    agentName
   );
 
   logger.success("Tests generated");
