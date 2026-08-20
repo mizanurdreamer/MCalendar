@@ -10,6 +10,8 @@ export async function runReporter(
   execResult: { success: boolean; output: string },
   ghClient: any
 ) {
+console.log('\n🤖 [Agent 5: Test Reporter] Test Report generating...');
+ 
   const statusEmoji = execResult.success ? '🟢 PASSED' : '🔴 FAILED / NEEDS ATTENTION';
 
   const finalReport = `
