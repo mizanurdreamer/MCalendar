@@ -25,7 +25,7 @@ export class PlaywrightRunner {
       const output = execSync(cmd, {
         cwd: this.codebasePath,
         encoding: "utf-8",
-        timeout: 120_000,
+        timeout: 300_000,
         stdio: ["pipe", "pipe", "pipe"],
       });
       logger.info(`[playwright] Test completed successfully`);
