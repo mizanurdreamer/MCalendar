@@ -4,6 +4,8 @@ import { GitHubClient } from "./github/client.js";
 import { processIssue } from "./orchestrator/issue_orchestrator.js";
 import { processCommit } from "./orchestrator/commit_orchestrator.js";
 import { startWatcher } from "./watcher/issue_orchestrator_watcher.js";
+import { StateManager } from "./watcher/issue_state_tracker.js";
+import { CommitStateManager } from "./watcher/commit_state_tracker.js";
 import { logger } from "./utils/logger.js";
 
 const program = new Command();
@@ -131,6 +133,7 @@ program
         maxRetries: config.maxRetries,
         maxIterations: config.maxIterations,
         maxPipelineSteps: config.maxPipelineSteps,
+        runMaxRetries: config.runMaxRetries,
         pollIntervalMin: pollInterval,
         stateDir: "state",
         watchBranch,
@@ -174,6 +177,7 @@ program
         maxRetries: config.maxRetries,
         maxIterations: config.maxIterations,
         maxPipelineSteps: config.maxPipelineSteps,
+        runMaxRetries: config.runMaxRetries,
         pollIntervalMin: pollInterval,
         stateDir: "state",
         watchBranch,
@@ -216,6 +220,147 @@ program
       logger.error(`Error: ${err}`);
       process.exit(1);
     }
+  });
+
+const retryCmd = program
+  .command("retry")
+  .description("Inspect or reprocess failed runs");
+
+retryCmd
+  .command("list")
+  .description("List pending retries from state files")
+  .action(async () => {
+    const stateManager = new StateManager("state");
+    const commitState = new CommitStateManager("state");
+    const issues = stateManager.getDueIssueRetries();
+    const commits = commitState.getDueCommitRetries();
+
+    logger.banner(["🔁 Pending Retries"]);
+
+    if (issues.length === 0 && commits.length === 0) {
+      logger.info("No pending retries.");
+      return;
+    }
+
+    for (const r of issues) {
+      console.log(`  issue  #${r.number}  "${r.title}"  attempts=${r.attempts}  error: ${r.lastError}`);
+    }
+    for (const r of commits) {
+      console.log(`  commit ${r.sha.slice(0, 7)}  "${r.message}"  attempts=${r.attempts}  error: ${r.lastError}`);
+    }
+    console.log();
+  });
+
+retryCmd
+  .command("issue")
+  .description("Reprocess a failed issue immediately")
+  .argument("<number>", "Issue number to reprocess")
+  .action(async (numberStr: string) => {
+    try {
+      const config = loadConfig();
+      if (!config.agentEnabled) {
+        logger.info("Agent is disabled (AGENT_ENABLED=false). Exiting.");
+        return;
+      }
+      const github = new GitHubClient(config.githubToken, config.repoOwner, config.repoName, config.githubMaxRetries);
+      const stateManager = new StateManager("state");
+
+      const issueNumber = parseInt(numberStr, 10);
+      if (isNaN(issueNumber)) throw new Error(`Invalid issue number: ${numberStr}`);
+
+      const issue = await github.getIssue(issueNumber);
+
+      logger.banner([
+        "🤖 MCalendar Multi-AI Test Agent",
+        `Retrying issue #${issue.number}: ${issue.title}`,
+      ]);
+
+      const result = await processIssue(issue, {
+        agentConfig: config.agentConfig,
+        githubClient: github,
+        codebasePath: config.codebasePath,
+        testProjectPath: config.testProjectPath,
+        maxRetries: config.maxRetries,
+        maxIterations: config.maxIterations,
+        maxPipelineSteps: config.maxPipelineSteps,
+        projectName: config.projectName,
+        databaseUrl: config.databaseUrl,
+        apiBaseUrl: config.apiBaseUrl,
+        commitAutoApprove: config.commitAutoApprove,
+      });
+
+      if (result.success) {
+        stateManager.resolveIssueRetry(issueNumber);
+        logger.success(`\n✅ Done — ${result.output}`);
+      } else {
+        logger.warn(`\n❌ Still failing — left in retry queue (if queued): ${result.output}`);
+      }
+    } catch (err) {
+      logger.error(`Error: ${err}`);
+      process.exit(1);
+    }
+  });
+
+retryCmd
+  .command("commit")
+  .description("Reprocess a failed commit immediately")
+  .argument("<sha>", "Commit SHA to reprocess")
+  .option("-b, --branch <branch>", "Target branch to merge into")
+  .action(async (sha: string, opts: { branch?: string }) => {
+    try {
+      const config = loadConfig();
+      if (!config.agentEnabled) {
+        logger.info("Agent is disabled (AGENT_ENABLED=false). Exiting.");
+        return;
+      }
+      const github = new GitHubClient(config.githubToken, config.repoOwner, config.repoName, config.githubMaxRetries);
+      const commitState = new CommitStateManager("state");
+
+      const targetBranch = opts.branch ?? config.watchBranch ?? await github.getDefaultBranch();
+
+      logger.banner([
+        "🤖 MCalendar Multi-AI Test Agent",
+        `Retrying commit ${sha.slice(0, 7)}`,
+      ]);
+
+      const diff = await github.getCommitDiff(sha);
+
+      const result = await processCommit(diff, {
+        agentConfig: config.agentConfig,
+        githubClient: github,
+        codebasePath: config.codebasePath,
+        testProjectPath: config.testProjectPath,
+        maxRetries: config.maxRetries,
+        maxIterations: config.maxIterations,
+        maxPipelineSteps: config.maxPipelineSteps,
+        targetBranch,
+        projectName: config.projectName,
+        databaseUrl: config.databaseUrl,
+        apiBaseUrl: config.apiBaseUrl,
+        commitAutoApprove: config.commitAutoApprove,
+      });
+
+      if (result.success) {
+        commitState.resolveCommitRetry(sha);
+        logger.success(`\n✅ Done — ${result.output}`);
+      } else {
+        logger.warn(`\n❌ Still failing — left in retry queue (if queued): ${result.output}`);
+      }
+    } catch (err) {
+      logger.error(`Error: ${err}`);
+      process.exit(1);
+    }
+  });
+
+retryCmd
+  .command("clear")
+  .description("Clear all pending retries")
+  .action(() => {
+    const stateManager = new StateManager("state");
+    const commitState = new CommitStateManager("state");
+    const issuesCleared = stateManager.clearIssueRetries();
+    const commitsCleared = commitState.clearCommitRetries();
+    logger.success(`Cleared ${issuesCleared} issue retry(ies) and ${commitsCleared} commit retry(ies).`);
   });
 
 program.parse();

@@ -190,6 +190,7 @@ pipeline_engine → summarize (agent_summarize)
 - **Model auto-selection** — set `MODEL=auto` to use the best model for your provider, or specify a custom model
 - **Auto-create branches, commits, and PRs** for generated tests
 - **Retry loop** for fixing failing tests (configurable max retries)
+- **Auto-retry failed runs** — crashed pipelines or runs ending with failing tests are requeued and retried on the next poll (`RUN_MAX_RETRIES`, default 1); inspect via `npm start -- retry list`
 - **Post results as GitHub comments** with test summaries
 - **Three modes**: Issue (manual), Watch (auto-detect issues + commits), Watch-branch (commits only)
 
@@ -256,6 +257,7 @@ pipeline_engine → summarize (agent_summarize)
 | `AGENT_MAX_RETRIES` | No | Max test fix retries (default: 3) |
 | `AGENT_MAX_ITERATIONS` | No | Max agent loop iterations per step (default: 20) |
 | `MAX_PIPELINE_STEPS` | No | Max pipeline steps before abort (default: 50) |
+| `RUN_MAX_RETRIES` | No | Auto-retries of failed runs (crash or failing tests) by the watcher (default: 1; `0` disables) |
 | `AGENT_ENABLED` | No | Enable/disable agent (default: `true`). Set to `false` to stop all processing |
 | `WATCH_BRANCH` | No | Branch to watch for commits (alternative to `--branch` flag) |
 
@@ -379,6 +381,10 @@ All agents have access to these tools. The AI decides which tools to use based o
 | `npm start -- watch-branch <branch>` | Watch only for commits on a branch |
 | `npm start -- watch-branch <branch> --poll-interval 5` | Watch commits with 5 min interval |
 | `npm start -- list` | List open GitHub issues |
+| `npm start -- retry list` | List pending failed-run retries |
+| `npm start -- retry issue <number>` | Reprocess a failed issue immediately |
+| `npm start -- retry commit <sha>` | Reprocess a failed commit immediately |
+| `npm start -- retry clear` | Clear all pending retries |
 
 ## Switching Providers
 

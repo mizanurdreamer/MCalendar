@@ -1,10 +1,19 @@
 import { readJson, writeJson } from "../utils/file.js";
 import path from "node:path";
 
+export interface PendingIssueRetry {
+  number: number;
+  title: string;
+  attempts: number;
+  lastError: string;
+  queuedAt: string;
+}
+
 export interface ProcessedState {
   lastProcessedIssueNumber: number;
   lastProcessedAt: string | null;
   history: HistoryEntry[];
+  retries?: PendingIssueRetry[];
 }
 
 export interface HistoryEntry {
@@ -72,5 +81,59 @@ export class StateManager {
       ...result,
     });
     this.save(state);
+  }
+
+  enqueueIssueRetry(issueNumber: number, title: string, error: string): void {
+    const state = this.load();
+    state.retries ??= [];
+    if (state.retries.some((r) => r.number === issueNumber)) return;
+    state.retries.push({
+      number: issueNumber,
+      title,
+      attempts: 1,
+      lastError: error.slice(0, 500),
+      queuedAt: new Date().toISOString(),
+    });
+    this.save(state);
+  }
+
+  getDueIssueRetries(): PendingIssueRetry[] {
+    return this.load().retries ?? [];
+  }
+
+  resolveIssueRetry(issueNumber: number): void {
+    const state = this.load();
+    if (!state.retries?.length) return;
+    state.retries = state.retries.filter((r) => r.number !== issueNumber);
+    this.save(state);
+  }
+
+  markIssueRetryFailed(issueNumber: number, error: string, maxRetries: number): boolean {
+    const state = this.load();
+    if (!state.retries) return false;
+    const entry = state.retries.find((r) => r.number === issueNumber);
+    if (!entry) return false;
+
+    entry.attempts += 1;
+    entry.lastError = error.slice(0, 500);
+
+    if (entry.attempts > maxRetries) {
+      state.retries = state.retries.filter((r) => r.number !== issueNumber);
+      this.save(state);
+      return false;
+    }
+
+    this.save(state);
+    return true;
+  }
+
+  clearIssueRetries(): number {
+    const state = this.load();
+    const count = state.retries?.length ?? 0;
+    if (count > 0) {
+      state.retries = [];
+      this.save(state);
+    }
+    return count;
   }
 }

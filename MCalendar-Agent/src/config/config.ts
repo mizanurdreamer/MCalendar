@@ -32,6 +32,7 @@ export interface AppConfig {
   maxRetries: number;
   maxIterations: number;
   maxPipelineSteps: number;
+  runMaxRetries: number;
   githubMaxRetries: number;
   agentConfig: AgentConfig;
   agentEnabled: boolean;
@@ -121,6 +122,7 @@ export function loadConfig(): AppConfig {
     maxRetries: parseInt(process.env.AGENT_MAX_RETRIES ?? "3", 10),
     maxIterations: parseInt(process.env.AGENT_MAX_ITERATIONS ?? "20", 10),
     maxPipelineSteps: parseInt(process.env.MAX_PIPELINE_STEPS ?? "50", 10),
+    runMaxRetries: parseInt(process.env.RUN_MAX_RETRIES ?? "1", 10),
     githubMaxRetries: parseInt(process.env.GITHUB_MAX_RETRIES ?? "3", 10),
     agentConfig,
     agentEnabled: (process.env.AGENT_ENABLED ?? "true").toLowerCase() === "true",

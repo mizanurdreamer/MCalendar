@@ -7,8 +7,17 @@ interface BranchState {
   retryHistory?: { attempt: number; errors: string[]; analysis?: string }[];
 }
 
+export interface PendingCommitRetry {
+  sha: string;
+  message: string;
+  attempts: number;
+  lastError: string;
+  queuedAt: string;
+}
+
 interface CommitStateFile {
   branches: Record<string, BranchState>;
+  pendingCommitRetries?: PendingCommitRetry[];
 }
 
 const DEFAULT_STATE: CommitStateFile = { branches: {} };
@@ -58,5 +67,59 @@ export class CommitStateManager {
         return;
       }
     }
+  }
+
+  enqueueCommitRetry(sha: string, message: string, error: string): void {
+    const state = this.load();
+    state.pendingCommitRetries ??= [];
+    if (state.pendingCommitRetries.some((r) => r.sha === sha)) return;
+    state.pendingCommitRetries.push({
+      sha,
+      message: message.split("\n")[0].slice(0, 200),
+      attempts: 1,
+      lastError: error.slice(0, 500),
+      queuedAt: new Date().toISOString(),
+    });
+    this.save(state);
+  }
+
+  getDueCommitRetries(): PendingCommitRetry[] {
+    return this.load().pendingCommitRetries ?? [];
+  }
+
+  resolveCommitRetry(sha: string): void {
+    const state = this.load();
+    if (!state.pendingCommitRetries?.length) return;
+    state.pendingCommitRetries = state.pendingCommitRetries.filter((r) => r.sha !== sha);
+    this.save(state);
+  }
+
+  markCommitRetryFailed(sha: string, error: string, maxRetries: number): boolean {
+    const state = this.load();
+    if (!state.pendingCommitRetries) return false;
+    const entry = state.pendingCommitRetries.find((r) => r.sha === sha);
+    if (!entry) return false;
+
+    entry.attempts += 1;
+    entry.lastError = error.slice(0, 500);
+
+    if (entry.attempts > maxRetries) {
+      state.pendingCommitRetries = state.pendingCommitRetries.filter((r) => r.sha !== sha);
+      this.save(state);
+      return false;
+    }
+
+    this.save(state);
+    return true;
+  }
+
+  clearCommitRetries(): number {
+    const state = this.load();
+    const count = state.pendingCommitRetries?.length ?? 0;
+    if (count > 0) {
+      state.pendingCommitRetries = [];
+      this.save(state);
+    }
+    return count;
   }
 }
