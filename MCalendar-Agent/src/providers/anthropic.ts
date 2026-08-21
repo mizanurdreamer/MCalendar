@@ -6,15 +6,37 @@ import type {
   ContentBlock,
   ToolDefinition,
 } from "./types.js";
+import { logger } from "../utils/logger.js";
+
+const FALLBACK_MODEL = "claude-sonnet-4-20250514";
 
 export class AnthropicProvider implements ProviderInterface {
   name = "anthropic";
   private client: Anthropic;
   private defaultModel: string;
+  private resolvedAutoModel?: string;
 
-  constructor(apiKey: string, model = "claude-sonnet-4-20250514") {
+  constructor(apiKey: string, model = FALLBACK_MODEL) {
     this.client = new Anthropic({ apiKey });
     this.defaultModel = model;
+  }
+
+  private async resolveAutoModel(): Promise<string> {
+    if (this.resolvedAutoModel) return this.resolvedAutoModel;
+    try {
+      const page = await this.client.models.list();
+      const first = page.data[0]?.id;
+      if (first) {
+        this.resolvedAutoModel = first;
+        logger.info(`[anthropic] MODEL=auto → "${first}" (first model from API)`);
+        return first;
+      }
+      logger.warn(`[anthropic] MODEL=auto → no models returned by API, falling back to "${FALLBACK_MODEL}"`);
+    } catch (err) {
+      logger.warn(`[anthropic] MODEL=auto discovery failed, falling back to "${FALLBACK_MODEL}": ${err instanceof Error ? err.message : String(err)}`);
+    }
+    this.resolvedAutoModel = FALLBACK_MODEL;
+    return this.resolvedAutoModel;
   }
 
   async chat({
@@ -24,6 +46,10 @@ export class AnthropicProvider implements ProviderInterface {
     maxTokens = 4096,
     temperature = 0.3,
   }: ChatParams): Promise<ChatResponse> {
+    const effectiveModel =
+      this.defaultModel === "auto"
+        ? await this.resolveAutoModel()
+        : this.defaultModel;
     const anthropicTools = tools?.map(this.convertTool);
 
     const apiMessages: Anthropic.MessageParam[] = messages.map((m) => ({
@@ -51,7 +77,7 @@ export class AnthropicProvider implements ProviderInterface {
     }));
 
     const response = await this.client.messages.create({
-      model: this.defaultModel,
+      model: effectiveModel,
       max_tokens: maxTokens,
       system,
       tools: anthropicTools,

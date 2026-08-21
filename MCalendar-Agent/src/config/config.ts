@@ -55,8 +55,8 @@ export function loadConfig(): AppConfig {
     throw new Error(`Unknown PROVIDER: "${provider}". Available: ${Object.keys(DEFAULT_MODELS).join(", ")}`);
   }
 
-  const envModel = process.env.MODEL;
-  const resolvedModel = (envModel && envModel !== "auto") ? envModel : DEFAULT_MODELS[provider];
+  const envModel = process.env.MODEL?.trim();
+  const resolvedModel = (!envModel || envModel.toLowerCase() === "auto") ? "auto" : envModel;
 
   const apiKeyEnv = PROVIDER_API_KEY_ENV[provider];
   if (apiKeyEnv && !process.env[apiKeyEnv]) {

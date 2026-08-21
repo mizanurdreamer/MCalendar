@@ -6,7 +6,7 @@ An autonomous AI agent that reads GitHub issues and branch commits, analyzes the
 
 The agent is a pipeline of specialized AI sub-agents. Each sub-agent has a single responsibility and runs independently with its own system prompt. The **pipeline engine** (`engine/pipeline_engine.ts`) chains these sub-agents together, with each step returning a decision that controls what happens next (next, goto, retry, stop, done).
 
-Provider and model are configured via `.env` — all tasks use the same provider/model automatically.
+Provider and model are configured via `.env` — all tasks use the same provider/model automatically. With `MODEL=auto` (default), the provider discovers its available models from its own API at runtime and uses the first one.
 
 ### Architecture
 
@@ -51,11 +51,11 @@ src/
 │   └── summarize_prompt.ts
 ├── providers/                      # AI provider abstraction
 │   ├── types.ts                    # ProviderInterface, TaskConfig
-│   ├── registry.ts                 # Provider factory
-│   ├── anthropic.ts                # Claude (active)
-│   ├── openai.ts                   # OpenAI (commented)
-│   ├── google.ts                   # Gemini (commented)
-│   └── ollama.ts                   # Local models (commented)
+│   ├── registry.ts                 # Provider factory (all providers enabled)
+│   ├── anthropic.ts                # Claude
+│   ├── openai.ts                   # OpenAI
+│   ├── google.ts                   # Gemini
+│   └── ollama.ts                   # Local models
 ├── codebase/                       # Project analysis
 │   ├── reader.ts                   # Read MCalendar files
 │   └── structure.ts                # Build project map
@@ -187,7 +187,7 @@ pipeline_engine → summarize (agent_summarize)
 - **Auto-detect new commits** on a branch — triages diffs to decide if tests are needed
 - **Generate Playwright E2E tests** using AI (Claude, OpenAI, Gemini, Ollama)
 - **One-line provider switch** — change `PROVIDER` in `.env`, all tasks use it automatically
-- **Model auto-selection** — set `MODEL=auto` to use the best model for your provider, or specify a custom model
+- **Model auto-selection** — set `MODEL=auto` and the provider discovers available models from its API (first one wins), or specify an exact model for all tasks; new model releases need no code changes
 - **Auto-create branches, commits, and PRs** for generated tests
 - **Retry loop** for fixing failing tests (configurable max retries)
 - **Auto-retry failed runs** — crashed pipelines or runs ending with failing tests are requeued and retried on the next poll (`RUN_MAX_RETRIES`, default 1); inspect via `npm start -- retry list`
@@ -244,7 +244,7 @@ pipeline_engine → summarize (agent_summarize)
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `PROVIDER` | Yes | AI provider: `anthropic`, `openai`, `google`, or `ollama` |
-| `MODEL` | No | Model name or `auto` (default: `auto` — uses best model for provider) |
+| `MODEL` | No | Model name or `auto` (default: `auto` — provider discovers available models from its API and uses the first one) |
 | `ANTHROPIC_API_KEY` | If using Anthropic | Anthropic API key |
 | `OPENAI_API_KEY` | If using OpenAI | OpenAI API key |
 | `GOOGLE_API_KEY` | If using Google | Google Gemini API key |
@@ -265,18 +265,22 @@ pipeline_engine → summarize (agent_summarize)
 
 | `MODEL` value | Behavior |
 |---------------|----------|
-| `auto` (default) | Uses the best default model for your provider |
-| `claude-opus-4-6` | Overrides to specific model for all tasks |
+| `auto` (default) | Provider queries its API for available models and uses the **first one** returned |
+| `claude-opus-4-6` | This exact model is used for ALL tasks |
 | *(empty)* | Same as `auto` |
 
-Default models per provider:
+With `MODEL=auto`, the model is discovered dynamically from the provider's own API (`models.list()` / `/api/tags`) on first use and cached for the process — so newly released models are picked up automatically with zero code or config changes. The resolved model is logged at startup of the first task, e.g. `[anthropic] MODEL=auto → "claude-opus-4-6" (first model from API)`.
 
-| Provider | Default Model |
-|----------|---------------|
+If discovery fails (bad key, network error), each provider falls back to a safe default:
+
+| Provider | Fallback Model |
+|----------|----------------|
 | `anthropic` | `claude-sonnet-4-20250514` |
-| `openai` | `gpt-4.1` |
+| `openai` | `gpt-5.4` |
 | `google` | `gemini-2.5-flash` |
 | `ollama` | `llama3.2` |
+
+See `.env.example` for a reference list of known model names per provider.
 
 ### agent.config.json
 
@@ -405,22 +409,23 @@ GOOGLE_API_KEY=AIza...
 PROVIDER=anthropic
 MODEL=auto
 ANTHROPIC_API_KEY=sk-ant-...
+
+# Switch to Ollama (local, no API key)
+PROVIDER=ollama
+MODEL=auto
+# OLLAMA_BASE_URL=http://localhost:11434/v1
 ```
 
-To enable OpenAI, Google, or Ollama providers:
-
-1. Uncomment the provider file in `src/providers/` (e.g., `openai.ts`)
-2. Uncomment the matching `case` block in `src/providers/registry.ts`
-3. Set `PROVIDER` and API key in `.env`
+All four providers are enabled by default — no code changes needed.
 
 ## Supported Providers
 
-| Provider | Package | Default Model | Status |
-|----------|---------|---------------|--------|
+| Provider | Package | Fallback Model | Status |
+|----------|---------|----------------|--------|
 | **Anthropic** | `@anthropic-ai/sdk` | `claude-sonnet-4-20250514` | Active |
-| **OpenAI** | `openai` | `gpt-4.1` | Uncomment to enable |
-| **Google Gemini** | `@google/genai` | `gemini-2.5-flash` | Uncomment to enable |
-| **Ollama** | `openai` (compat) | `llama3.2` | Uncomment to enable |
+| **OpenAI** | `openai` | `gpt-5.4` | Active |
+| **Google Gemini** | `@google/genai` | `gemini-2.5-flash` | Active |
+| **Ollama** | `openai` (compat) | `llama3.2` | Active |
 
 ## Acceptance Criteria
 
