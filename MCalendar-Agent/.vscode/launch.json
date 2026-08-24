@@ -46,6 +46,23 @@
       "skipFiles": ["<node_internals>/**"],
       "console": "integratedTerminal",
       "sourceMaps": true
+    },
+    {
+      "type": "node",
+      "request": "attach",
+      "name": "Debug: server (:3002 breakpoints)",
+      "port": 9229,
+      "restart": true,
+      "skipFiles": ["<node_internals>/**"],
+      "preLaunchTask": "agent: server debug (:3002)"
+    },
+    {
+      "type": "chrome",
+      "request": "attach",
+      "name": "Debug: UI (:3001 attach open browser)",
+      "port": 9222,
+      "webRoot": "${workspaceFolder}/ui",
+      "preLaunchTask": "agent: vite dev (:3001)"
     }
   ],
   "inputs": [

@@ -1,0 +1,74 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "app: next dev (:3000)",
+      "type": "shell",
+      "command": "npm run dev",
+      "cwd": "${workspaceFolder}\\MCalendar",
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": {
+        "owner": "app-next-dev",
+        "pattern": {
+          "regexp": "^$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^.",
+          "endsPattern": "[Rr]eady in|Local:|EADDRINUSE|[Ee]rror"
+        }
+      }
+    },
+    {
+      "label": "agent: server debug (:3002)",
+      "type": "shell",
+      "command": "npm run dev:server:debug",
+      "cwd": "${workspaceFolder}\\MCalendar-Agent",
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": {
+        "owner": "agent-server-debug",
+        "pattern": {
+          "regexp": "^$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^.",
+          "endsPattern": "Listening on|EADDRINUSE|Error"
+        }
+      }
+    },
+    {
+      "label": "agent: vite dev (:3001)",
+      "type": "shell",
+      "command": "npm run dev:ui",
+      "cwd": "${workspaceFolder}\\MCalendar-Agent",
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": {
+        "owner": "agent-vite-dev",
+        "pattern": {
+          "regexp": "^$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^.",
+          "endsPattern": "ready in|Local:|EADDRINUSE|error"
+        }
+      }
+    }
+  ]
+}

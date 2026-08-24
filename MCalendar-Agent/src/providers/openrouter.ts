@@ -8,16 +8,21 @@ import type {
 } from "./types.js";
 import { logger } from "../utils/logger.js";
 
-const FALLBACK_MODEL = "gpt-5.4";
+const BASE_URL = "https://openrouter.ai/api/v1";
+const FALLBACK_MODEL = "meta-llama/llama-3.1-8b-instruct:free";
 
-export class OpenAIProvider implements ProviderInterface {
-  name = "openai";
+interface OpenRouterModelPricing {
+  pricing?: { prompt?: string; completion?: string };
+}
+
+export class OpenRouterProvider implements ProviderInterface {
+  name = "openrouter";
   private client: OpenAI;
   private defaultModel: string;
   private resolvedAutoModel?: string;
 
   constructor(apiKey: string, model = FALLBACK_MODEL) {
-    this.client = new OpenAI({ apiKey });
+    this.client = new OpenAI({ apiKey, baseURL: BASE_URL });
     this.defaultModel = model;
   }
 
@@ -25,15 +30,25 @@ export class OpenAIProvider implements ProviderInterface {
     if (this.resolvedAutoModel) return this.resolvedAutoModel;
     try {
       const page = await this.client.models.list();
-      const first = page.data[0]?.id;
+      const freeModels = page.data.filter((m) => {
+        const { pricing } = m as unknown as OpenRouterModelPricing;
+        return pricing?.prompt === "0" && pricing?.completion === "0";
+      });
+      const pool = freeModels.length > 0 ? freeModels : page.data;
+      const first = pool[0]?.id;
       if (first) {
         this.resolvedAutoModel = first;
-        logger.info(`[openai] MODEL=auto → "${first}" (first model from API)`);
+        logger.info(
+          `[openrouter] MODEL=auto → "${first}"` +
+            (freeModels.length > 0
+              ? ` (first of ${freeModels.length} free models from API)`
+              : " (no free models found, first model from API)")
+        );
         return first;
       }
-      logger.warn(`[openai] MODEL=auto → no models returned by API, falling back to "${FALLBACK_MODEL}"`);
+      logger.warn(`[openrouter] MODEL=auto → no models returned by API, falling back to "${FALLBACK_MODEL}"`);
     } catch (err) {
-      logger.warn(`[openai] MODEL=auto discovery failed, falling back to "${FALLBACK_MODEL}": ${err instanceof Error ? err.message : String(err)}`);
+      logger.warn(`[openrouter] MODEL=auto discovery failed, falling back to "${FALLBACK_MODEL}": ${err instanceof Error ? err.message : String(err)}`);
     }
     this.resolvedAutoModel = FALLBACK_MODEL;
     return this.resolvedAutoModel;

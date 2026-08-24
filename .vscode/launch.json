@@ -1,0 +1,42 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug: MCalendar App (:3000)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "${workspaceFolder}/MCalendar",
+      "skipFiles": ["<node_internals>/**"],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Debug: Agent Server (:3002 breakpoints)",
+      "type": "node",
+      "request": "attach",
+      "port": 9229,
+      "restart": true,
+      "skipFiles": ["<node_internals>/**"],
+      "preLaunchTask": "agent: server debug (:3002)"
+    },
+    {
+      "name": "Debug: Agent UI (:3001 attach open browser)",
+      "type": "chrome",
+      "request": "attach",
+      "port": 9222,
+      "webRoot": "${workspaceFolder}/MCalendar-Agent/ui",
+      "preLaunchTask": "agent: vite dev (:3001)"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Debug ALL (App 3000 + Server 3002 + UI 3001)",
+      "configurations": [
+        "Debug: MCalendar App (:3000)",
+        "Debug: Agent Server (:3002 breakpoints)",
+        "Debug: Agent UI (:3001 attach open browser)"
+      ]
+    }
+  ]
+}

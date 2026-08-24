@@ -1,8 +1,9 @@
 import type { ProviderInterface, AgentConfig } from "./types.js";
 import { AnthropicProvider } from "./anthropic.js";
-// import { OpenAIProvider } from "./openai.js";      // UNCOMMENT TO ENABLE
-// import { GoogleProvider } from "./google.js";      // UNCOMMENT TO ENABLE
-// import { OllamaProvider } from "./ollama.js";      // UNCOMMENT TO ENABLE
+import { OpenAIProvider } from "./openai.js";
+import { GoogleProvider } from "./google.js";
+import { OllamaProvider } from "./ollama.js";
+import { OpenRouterProvider } from "./openrouter.js";
 
 const providerInstances = new Map<string, ProviderInterface>();
 
@@ -17,43 +18,21 @@ export function createProvider(name: string, apiKey: string, model?: string): Pr
     case "anthropic":
       provider = new AnthropicProvider(apiKey, model);
       break;
-    // case "openai":                                         // UNCOMMENT TO ENABLE
-    //   provider = new OpenAIProvider(apiKey, model);
-    //   break;
-    // case "google":                                         // UNCOMMENT TO ENABLE
-    //   provider = new GoogleProvider(apiKey, model);
-    //   break;
-    // case "ollama":                                         // UNCOMMENT TO ENABLE
-    //   provider = new OllamaProvider(apiKey, model);
-    //   break;
-
-    // The following commented-out cases are for future provider support. Uncomment and implement as needed.
-    //case "anthropic": {
-    //  const apiKey = process.env[config.apiKeyEnv ?? "ANTHROPIC_API_KEY"];
-    //  if (!apiKey) throw new Error(`Missing env var: ${config.apiKeyEnv ?? "ANTHROPIC_API_KEY"}`);
-    //  provider = new AnthropicProvider(apiKey, config.model);
-    //  break;
-    //}
-    // case "openai": {                                         // UNCOMMENT TO ENABLE
-    //   const apiKey = process.env[config.apiKeyEnv ?? "OPENAI_API_KEY"];
-    //   if (!apiKey) throw new Error(`Missing env var: ${config.apiKeyEnv ?? "OPENAI_API_KEY"}`);
-    //   provider = new OpenAIProvider(apiKey, config.model);
-    //   break;
-    // }
-    // case "google": {                                         // UNCOMMENT TO ENABLE
-    //   const apiKey = process.env[config.apiKeyEnv ?? "GOOGLE_API_KEY"];
-    //   if (!apiKey) throw new Error(`Missing env var: ${config.apiKeyEnv ?? "GOOGLE_API_KEY"}`);
-    //   provider = new GoogleProvider(apiKey, config.model);
-    //   break;
-    // }
-    // case "ollama": {                                         // UNCOMMENT TO ENABLE
-    //   provider = new OllamaProvider(config.baseURL, config.model);
-    //   break;
-    // }
+    case "openai":
+      provider = new OpenAIProvider(apiKey, model);
+      break;
+    case "google":
+      provider = new GoogleProvider(apiKey, model);
+      break;
+    case "ollama":
+      provider = new OllamaProvider(process.env.OLLAMA_BASE_URL, model);
+      break;
+    case "openrouter":
+      provider = new OpenRouterProvider(apiKey, model);
+      break;
     default:
       throw new Error(
-        `Unknown provider: "${name}". Available: anthropic. ` +
-        `To enable others, uncomment the provider file and registry case.`
+        `Unknown provider: "${name}". Available: anthropic, openai, google, ollama, openrouter.`
       );
   }
 

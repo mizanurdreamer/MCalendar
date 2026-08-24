@@ -41,7 +41,7 @@ const consoleFormat = winston.format.combine(
   })
 );
 
-const winstonLogger = winston.createLogger({
+export const winstonInstance = winston.createLogger({
   level: "debug",
   transports: [
     new winston.transports.Console({ format: consoleFormat }),
@@ -59,36 +59,36 @@ const winstonLogger = winston.createLogger({
 
 export const logger = {
   info(message: string) {
-    winstonLogger.info(message);
+    winstonInstance.info(message);
   },
 
   success(message: string) {
-    winstonLogger.info(`✅ ${message}`);
+    winstonInstance.info(`✅ ${message}`);
   },
 
   warn(message: string) {
-    winstonLogger.warn(message);
+    winstonInstance.warn(message);
   },
 
   error(message: string) {
-    winstonLogger.error(message);
+    winstonInstance.error(message);
   },
 
   debug(message: string) {
-    winstonLogger.debug(message);
+    winstonInstance.debug(message);
   },
 
   task(taskName: string, provider: string) {
-    winstonLogger.info(`🧠 ${taskName} → ${provider}`);
+    winstonInstance.info(`🧠 ${taskName} → ${provider}`);
   },
 
   tool(toolName: string, arg?: string) {
     const detail = arg ? `(${arg})` : "";
-    winstonLogger.debug(`📖 ${toolName} ${detail}`);
+    winstonInstance.debug(`📖 ${toolName} ${detail}`);
   },
 
   prompt(agentName: string, systemPrompt: string, userMessage: string, response?: string) {
-    winstonLogger.info(`[PROMPT] ${agentName}`, {
+    winstonInstance.info(`[PROMPT] ${agentName}`, {
       agent: agentName,
       systemPrompt,
       userMessage,
@@ -104,6 +104,6 @@ export const logger = {
       ...lines.map((l) => `║ ${l.padEnd(maxLen)} ║`),
       `╚${border}╝`,
     ].join("\n");
-    winstonLogger.info(`\n${box}\n`);
+    winstonInstance.info(`\n${box}\n`);
   },
 };

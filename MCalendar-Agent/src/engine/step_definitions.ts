@@ -11,10 +11,12 @@ import {
   adaptCommitAndPush,
   adaptCreatePR,
   adaptSummarize,
+  adaptProjectDiscovery,
 } from "./step_adapters.js";
 
 export function getIssuePipeline(): StepDefinition[] {
   return [
+    { name: "discover_project", run: adaptProjectDiscovery() },
     { name: "analyze_issue",    run: adaptIssueAnalyzer() },
     { name: "plan",             run: adaptPlanning() },
     { name: "setup_branch",     run: adaptBranchSetup() },
@@ -30,6 +32,7 @@ export function getIssuePipeline(): StepDefinition[] {
 
 export function getCommitPipeline(): StepDefinition[] {
   return [
+    { name: "discover_project", run: adaptProjectDiscovery() },
     { name: "triage_commit",    run: adaptCommitAnalyzer() },
     { name: "plan",             run: adaptPlanning() },
     { name: "setup_branch",     run: adaptBranchSetup() },

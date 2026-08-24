@@ -9,12 +9,14 @@ const DEFAULT_MODELS: Record<string, string> = {
   openai: "gpt-4o",
   google: "gemini-2.5-flash",
   ollama: "llama3.2",
+  openrouter: "meta-llama/llama-3.1-8b-instruct:free",
 };
 
 const PROVIDER_API_KEY_ENV: Record<string, string> = {
   anthropic: "ANTHROPIC_API_KEY",
   openai: "OPENAI_API_KEY",
   google: "GOOGLE_API_KEY",
+  openrouter: "OPENROUTER_API_KEY",
 };
 
 export interface AppConfig {
@@ -55,8 +57,8 @@ export function loadConfig(): AppConfig {
     throw new Error(`Unknown PROVIDER: "${provider}". Available: ${Object.keys(DEFAULT_MODELS).join(", ")}`);
   }
 
-  const envModel = process.env.MODEL;
-  const resolvedModel = (envModel && envModel !== "auto") ? envModel : DEFAULT_MODELS[provider];
+  const envModel = process.env.MODEL?.trim();
+  const resolvedModel = (!envModel || envModel.toLowerCase() === "auto") ? "auto" : envModel;
 
   const apiKeyEnv = PROVIDER_API_KEY_ENV[provider];
   if (apiKeyEnv && !process.env[apiKeyEnv]) {

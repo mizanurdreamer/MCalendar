@@ -52,6 +52,16 @@ export interface StepDefinition {
   condition?: (ctx: SharedContext) => boolean;
 }
 
+export interface ProjectContext {
+  framework: string;
+  testRunner: string;
+  dependencies: Record<string, string>;
+  dataModels: string;
+  apiRoutes: string[];
+  existingTestPatterns: string;
+  testUtils: string;
+}
+
 export interface SharedContext {
   mode: "issue" | "commit";
   issue?: GitHubIssue;
@@ -88,6 +98,8 @@ export interface SharedContext {
 
   branchName?: string;
   baseBranch?: string;
+
+  projectContext?: ProjectContext;
 
   retryHistory: RetryAttempt[];
   stepHistory: StepRecord[];
