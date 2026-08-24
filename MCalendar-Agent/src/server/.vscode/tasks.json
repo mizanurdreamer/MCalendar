@@ -1,0 +1,28 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "server: dev debug",
+      "type": "shell",
+      "command": "npm run dev:server:debug",
+      "cwd": "${workspaceFolder}/../..",
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": {
+        "owner": "server-dev-debug",
+        "pattern": {
+          "regexp": "^$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^.",
+          "endsPattern": "Listening on|EADDRINUSE|Error"
+        }
+      }
+    }
+  ]
+}

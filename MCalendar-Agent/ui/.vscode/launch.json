@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "▶ Debug UI (attach to open browser)",
+      "type": "chrome",
+      "request": "attach",
+      "port": 3001,
+      "webRoot": "${workspaceFolder}",
+      "preLaunchTask": "ui: vite dev"
+    }
+  ]
+}
