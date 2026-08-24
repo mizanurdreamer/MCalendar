@@ -5,12 +5,28 @@ import { logger } from "../utils/logger.js";
 const RETRYABLE_CODES = ["ECONNRESET", "ETIMEDOUT", "ENOTFOUND", "EAI_AGAIN"];
 const RETRYABLE_STATUS_CODES = [502, 503, 504, 429];
 
+const PERMISSION_HINT =
+  "Your GitHub token lacks permission for this action. " +
+  "Fine-grained token: GitHub Settings → Developer settings → Personal access tokens → " +
+  "grant 'Pull requests: Read and write' and 'Issues: Read and write' for this repo. " +
+  "Classic token: regenerate with the full 'repo' scope. " +
+  "Then update GITHUB_TOKEN in .env and restart.";
+
 function isRetryable(err: unknown): boolean {
   const e = err as { code?: string; status?: number; message?: string };
-  if (e.code && RETRYABLE_CODES.includes(e.code)) return true;
+  // Check status first — accessing .code on Octokit RequestError triggers a deprecation warning
   if (e.status && RETRYABLE_STATUS_CODES.includes(e.status)) return true;
+  if (!e.status && e.code && RETRYABLE_CODES.includes(e.code)) return true;
   if (e.message?.includes("other side closed")) return true;
   return false;
+}
+
+function withPermissionHint(err: unknown, action: string): never {
+  const e = err as { status?: number; message?: string };
+  if (e.status === 403 || String(e.message).includes("Resource not accessible")) {
+    throw new Error(`${action} failed — token permission missing (403). ${PERMISSION_HINT}`);
+  }
+  throw err instanceof Error ? err : new Error(String(err));
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -78,27 +94,35 @@ export class GitHubClient {
   }
 
   async addComment(issueNumber: number, body: string): Promise<void> {
-    return this.withRetry(`addComment(#${issueNumber})`, async () => {
-      await this.octokit.issues.createComment({
-        owner: this.owner,
-        repo: this.repo,
-        issue_number: issueNumber,
-        body,
+    try {
+      return await this.withRetry(`addComment(#${issueNumber})`, async () => {
+        await this.octokit.issues.createComment({
+          owner: this.owner,
+          repo: this.repo,
+          issue_number: issueNumber,
+          body,
+        });
       });
-    });
+    } catch (err) {
+      withPermissionHint(err, `Commenting on issue #${issueNumber}`);
+    }
   }
 
   async addPRComment(prUrl: string, body: string): Promise<void> {
     const prNumber = parseInt(prUrl.split("/").pop() ?? "0", 10);
     if (!prNumber) return;
-    return this.withRetry(`addPRComment(#${prNumber})`, async () => {
-      await this.octokit.issues.createComment({
-        owner: this.owner,
-        repo: this.repo,
-        issue_number: prNumber,
-        body,
+    try {
+      return await this.withRetry(`addPRComment(#${prNumber})`, async () => {
+        await this.octokit.issues.createComment({
+          owner: this.owner,
+          repo: this.repo,
+          issue_number: prNumber,
+          body,
+        });
       });
-    });
+    } catch (err) {
+      withPermissionHint(err, `Commenting on PR #${prNumber}`);
+    }
   }
 
   async createPR(params: {
@@ -108,15 +132,19 @@ export class GitHubClient {
     base: string;
     draft?: boolean;
   }): Promise<GitHubPR> {
-    return this.withRetry(`createPR(${params.head}→${params.base})`, async () => {
-      const { data } = await this.octokit.pulls.create({
-        owner: this.owner,
-        repo: this.repo,
-        ...params,
-        draft: params.draft ?? false,
+    try {
+      return await this.withRetry(`createPR(${params.head}→${params.base})`, async () => {
+        const { data } = await this.octokit.pulls.create({
+          owner: this.owner,
+          repo: this.repo,
+          ...params,
+          draft: params.draft ?? false,
+        });
+        return data as unknown as GitHubPR;
       });
-      return data as unknown as GitHubPR;
-    });
+    } catch (err) {
+      withPermissionHint(err, `Creating PR ${params.head}→${params.base}`);
+    }
   }
 
   async getDefaultBranch(): Promise<string> {
@@ -177,28 +205,36 @@ export class GitHubClient {
     event: "APPROVE" | "COMMENT" | "REQUEST_CHANGES";
     body?: string;
   }): Promise<GitHubReview> {
-    return this.withRetry(`createReview(PR #${params.pull_number})`, async () => {
-      const { data } = await this.octokit.pulls.createReview({
-        owner: this.owner,
-        repo: this.repo,
-        ...params,
+    try {
+      return await this.withRetry(`createReview(PR #${params.pull_number})`, async () => {
+        const { data } = await this.octokit.pulls.createReview({
+          owner: this.owner,
+          repo: this.repo,
+          ...params,
+        });
+        return data as unknown as GitHubReview;
       });
-      return data as unknown as GitHubReview;
-    });
+    } catch (err) {
+      withPermissionHint(err, `Reviewing PR #${params.pull_number}`);
+    }
   }
 
   async mergePR(params: {
     pull_number: number;
     merge_method?: "merge" | "squash" | "rebase";
   }): Promise<void> {
-    return this.withRetry(`mergePR(PR #${params.pull_number})`, async () => {
-      await this.octokit.pulls.merge({
-        owner: this.owner,
-        repo: this.repo,
-        ...params,
-        merge_method: params.merge_method ?? "squash",
+    try {
+      return await this.withRetry(`mergePR(PR #${params.pull_number})`, async () => {
+        await this.octokit.pulls.merge({
+          owner: this.owner,
+          repo: this.repo,
+          ...params,
+          merge_method: params.merge_method ?? "squash",
+        });
       });
-    });
+    } catch (err) {
+      withPermissionHint(err, `Merging PR #${params.pull_number}`);
+    }
   }
 }
 
