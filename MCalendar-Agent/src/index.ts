@@ -6,6 +6,7 @@ import { processCommit } from "./orchestrator/commit_orchestrator.js";
 import { startWatcher } from "./watcher/issue_orchestrator_watcher.js";
 import { StateManager } from "./watcher/issue_state_tracker.js";
 import { CommitStateManager } from "./watcher/commit_state_tracker.js";
+import { startWebServer } from "./server/http.js";
 import { logger } from "./utils/logger.js";
 
 const program = new Command();
@@ -216,6 +217,19 @@ program
         console.log(`  #${issue.number}  ${issue.title}  ${labels ? `[${labels}]` : ""}`);
       }
       console.log();
+    } catch (err) {
+      logger.error(`Error: ${err}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("ui")
+  .description("Start the web UI server (chat + jobs dashboard)")
+  .option("-p, --port <port>", "Server port (default: WEB_PORT env or 3002)")
+  .action(async (opts: { port?: string }) => {
+    try {
+      await startWebServer({ port: opts.port ? parseInt(opts.port, 10) : undefined });
     } catch (err) {
       logger.error(`Error: ${err}`);
       process.exit(1);

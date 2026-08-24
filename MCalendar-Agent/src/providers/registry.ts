@@ -3,6 +3,7 @@ import { AnthropicProvider } from "./anthropic.js";
 import { OpenAIProvider } from "./openai.js";
 import { GoogleProvider } from "./google.js";
 import { OllamaProvider } from "./ollama.js";
+import { OpenRouterProvider } from "./openrouter.js";
 
 const providerInstances = new Map<string, ProviderInterface>();
 
@@ -26,9 +27,12 @@ export function createProvider(name: string, apiKey: string, model?: string): Pr
     case "ollama":
       provider = new OllamaProvider(process.env.OLLAMA_BASE_URL, model);
       break;
+    case "openrouter":
+      provider = new OpenRouterProvider(apiKey, model);
+      break;
     default:
       throw new Error(
-        `Unknown provider: "${name}". Available: anthropic, openai, google, ollama.`
+        `Unknown provider: "${name}". Available: anthropic, openai, google, ollama, openrouter.`
       );
   }
 

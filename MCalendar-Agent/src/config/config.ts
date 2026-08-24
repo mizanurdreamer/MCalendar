@@ -9,12 +9,14 @@ const DEFAULT_MODELS: Record<string, string> = {
   openai: "gpt-4o",
   google: "gemini-2.5-flash",
   ollama: "llama3.2",
+  openrouter: "meta-llama/llama-3.1-8b-instruct:free",
 };
 
 const PROVIDER_API_KEY_ENV: Record<string, string> = {
   anthropic: "ANTHROPIC_API_KEY",
   openai: "OPENAI_API_KEY",
   google: "GOOGLE_API_KEY",
+  openrouter: "OPENROUTER_API_KEY",
 };
 
 export interface AppConfig {

@@ -42,6 +42,87 @@ function parseIssueAnalysis(raw: string): IssueAnalysis {
   };
 }
 
+export function adaptProjectDiscovery(): StepFunction {
+  return async (ctx) => {
+    if (ctx.projectContext) {
+      logger.info("[project_discovery] Already discovered, skipping");
+      record(ctx, "discover_project", undefined, "Using cached project context", "next");
+      return { action: "next" };
+    }
+
+    logger.info("[project_discovery] Discovering project structure...");
+
+    // 1. Read package.json for framework and dependencies
+    let framework = "unknown";
+    let testRunner = "playwright";
+    let dependencies: Record<string, string> = {};
+
+    try {
+      const pkgContent = ctx.reader.readFile("package.json");
+      const pkg = JSON.parse(pkgContent);
+      dependencies = { ...pkg.dependencies, ...pkg.devDependencies };
+      framework = pkg.dependencies?.next ? "nextjs" : pkg.dependencies?.react ? "react" : "unknown";
+      if (pkg.devDependencies?.["@playwright/test"]) testRunner = "playwright";
+      else if (pkg.devDependencies?.vitest) testRunner = "vitest";
+      else if (pkg.devDependencies?.jest) testRunner = "jest";
+    } catch {
+      logger.warn("[project_discovery] Could not read package.json");
+    }
+
+    // 2. Read Prisma schema for data models
+    let dataModels = "";
+    try {
+      dataModels = ctx.reader.readFile("prisma/schema.prisma");
+    } catch {
+      logger.warn("[project_discovery] Could not read prisma/schema.prisma");
+    }
+
+    // 3. List API routes
+    let apiRoutes: string[] = [];
+    try {
+      const apiFiles = ctx.reader.listDirectory("app/api");
+      apiRoutes = apiFiles.filter(f => f.endsWith(".ts") || f.endsWith(".js")).map(f => `app/api/${f}`);
+    } catch {
+      logger.warn("[project_discovery] Could not list app/api");
+    }
+
+    // 4. Read existing test patterns
+    let existingTestPatterns = "";
+    let testUtils = "";
+    try {
+      const testFiles = ctx.testReader.listDirectory("tests");
+      const sampleFiles = testFiles.filter(f => f.endsWith(".spec.ts") || f.endsWith(".test.ts")).slice(0, 3);
+      for (const f of sampleFiles) {
+        existingTestPatterns += `\n--- ${f} ---\n${ctx.testReader.readFile(`tests/${f}`)}`;
+      }
+      // Read test utils if they exist
+      try {
+        testUtils = ctx.testReader.readFile("tests/utils/token.ts");
+      } catch {
+        try {
+          testUtils = ctx.testReader.readFile("tests/utils/index.ts");
+        } catch { /* ignore */ }
+      }
+    } catch {
+      logger.warn("[project_discovery] Could not read test files");
+    }
+
+    ctx.projectContext = {
+      framework,
+      testRunner,
+      dependencies,
+      dataModels,
+      apiRoutes,
+      existingTestPatterns,
+      testUtils,
+    };
+
+    logger.success(`[project_discovery] Discovered: ${framework}, ${testRunner}, ${apiRoutes.length} API routes`);
+    record(ctx, "discover_project", undefined, `Framework: ${framework}, Test runner: ${testRunner}`, "next");
+    return { action: "next" };
+  };
+}
+
 export function adaptIssueAnalyzer(): StepFunction {
   return async (ctx) => {
     if (!ctx.issue) {

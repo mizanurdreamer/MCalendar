@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { SharedContext } from "../engine/shared_context.js";
+import type { SharedContext, ProjectContext } from "../engine/shared_context.js";
 
 type AgentType =
   | "commit_analyzer"
@@ -201,14 +201,36 @@ function replaceProjectName(template: string, projectName: string): string {
   return template.replace(/\{PROJECT_NAME\}/g, projectName);
 }
 
+function injectProjectContext(template: string, projectContext?: ProjectContext): string {
+  if (!projectContext) return template;
+
+  const deps = Object.entries(projectContext.dependencies)
+    .map(([k, v]) => `${k}: ${v}`)
+    .join(", ") || "none";
+
+  return template
+    .replace(/\{FRAMEWORK\}/g, projectContext.framework)
+    .replace(/\{TEST_RUNNER\}/g, projectContext.testRunner)
+    .replace(/\{DEPENDENCIES\}/g, deps)
+    .replace(/\{DATA_MODELS\}/g, projectContext.dataModels || "(not found)")
+    .replace(/\{API_ROUTES\}/g, projectContext.apiRoutes.join(", ") || "(none found)")
+    .replace(/\{EXISTING_TEST_PATTERNS\}/g, projectContext.existingTestPatterns || "(no existing tests found)")
+    .replace(/\{TEST_UTILS\}/g, projectContext.testUtils || "(no test utils found)");
+}
+
 export function buildPrompt(input: PromptBuilderInput): string {
   const { agentType, projectName, context, superAdminEmail, superAdminPassword } = input;
 
   const sections: string[] = [];
+  const projectContext = context?.projectContext;
 
-  // 1. Role
+  // 1. Role (with project context injected)
   const roleName = `role_${agentType}`;
-  sections.push(replaceProjectName(loadTemplate(roleName), projectName));
+  let roleTemplate = replaceProjectName(loadTemplate(roleName), projectName);
+  if (["issue_analyzer", "tests_generator", "commit_analyzer"].includes(agentType)) {
+    roleTemplate = injectProjectContext(roleTemplate, projectContext);
+  }
+  sections.push(roleTemplate);
 
   // 2. Tool catalog
   sections.push(buildToolCatalog());
@@ -219,10 +241,10 @@ export function buildPrompt(input: PromptBuilderInput): string {
     sections.push(loadTemplate(toolInstructionName));
   }
 
-  // 4. Project discovery (for agents that need to understand the project)
-  if (["issue_analyzer", "tests_generator"].includes(agentType)) {
-    sections.push(loadTemplate("project_discovery"));
-  }
+  // 4. Project discovery (REMOVED — now injected into role template above)
+  // if (["issue_analyzer", "tests_generator"].includes(agentType)) {
+  //   sections.push(loadTemplate("project_discovery"));
+  // }
 
   // 5. Test credentials (for agents that write tests)
   if (["tests_generator", "tests_reviewer"].includes(agentType)) {

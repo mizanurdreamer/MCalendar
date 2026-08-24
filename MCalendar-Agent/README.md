@@ -55,7 +55,8 @@ src/
 │   ├── anthropic.ts                # Claude
 │   ├── openai.ts                   # OpenAI
 │   ├── google.ts                   # Gemini
-│   └── ollama.ts                   # Local models
+│   ├── ollama.ts                   # Local models
+│   └── openrouter.ts               # OpenRouter (100+ models, free-model auto-selection)
 ├── codebase/                       # Project analysis
 │   ├── reader.ts                   # Read MCalendar files
 │   └── structure.ts                # Build project map
@@ -68,6 +69,14 @@ src/
 │   ├── file.ts                     # File I/O
 │   ├── tools.ts                    # Agent tool definitions
 │   └── types.ts                    # TaskName, TaskResult
+├── server/                         # Web UI backend
+│   ├── http.ts                     # Express app (REST API + static UI serving)
+│   ├── main.ts                     # Standalone server entry point
+│   ├── ws_hub.ts                   # WebSocket hub (log/job/chat event broadcast)
+│   ├── log_transport.ts            # Winston transport → WebSocket broadcast
+│   ├── run_manager.ts              # Job manager (single-job lock + history)
+│   └── chat_agent.ts               # Conversational agent with orchestrator tools
+├── ui/                             # React chat frontend (built by Vite → ui/dist)
 └── index.ts                        # CLI entry point
 ```
 
@@ -193,6 +202,7 @@ pipeline_engine → summarize (agent_summarize)
 - **Auto-retry failed runs** — crashed pipelines or runs ending with failing tests are requeued and retried on the next poll (`RUN_MAX_RETRIES`, default 1); inspect via `npm start -- retry list`
 - **Post results as GitHub comments** with test summaries
 - **Three modes**: Issue (manual), Watch (auto-detect issues + commits), Watch-branch (commits only)
+- **Web UI** — Claude-style chat console that can run any pipeline, answer questions about the project, and stream live agent logs (`npm run ui`)
 
 ## Prerequisites
 
@@ -237,13 +247,68 @@ pipeline_engine → summarize (agent_summarize)
    npm start -- list
    ```
 
+## Web UI
+
+A Claude-style chat console for operating the agent from the browser — no CLI needed. Start it with:
+
+```bash
+npm run ui        # builds the UI bundle, then serves it from the API server → http://localhost:3002
+
+# Development (hot reload):
+npm run dev:ui       # Vite dev server on port 3001 (proxies /api + /ws to the API)
+npm run dev:server   # API server with tsx watch on port 3002
+```
+
+### What the chat can do
+
+The chat agent uses your configured `PROVIDER`/`MODEL` and decides on its own which tools to call:
+
+| You type | It does |
+|----------|---------|
+| *"process issue #3"* | Starts the full test-generation pipeline **in the background** — you can keep chatting; a result summary is posted automatically when it finishes |
+| *"process commit abc1234"* | Starts commit triage + optional test generation in the background |
+| *"what issues are open?"* / *"anything pending in retries?"* | Queries GitHub / retry queue |
+| *"how is auth implemented?"* | Reads files from the target project via the codebase reader |
+| *"is anything running?"* | Reports current job status |
+
+While a pipeline job runs, winston agent logs stream live into the collapsible **Logs** drawer at the bottom, an inline **job card** shows progress, and the final summary (tests passed/failed, duration, files written) arrives as a chat message. You can continue asking questions while jobs run.
+
+**Note:** only one pipeline job can run at a time (orchestrators share one git worktree). Starting a second job returns "already running".
+
+### UI Features
+
+| Area | Description |
+|------|-------------|
+| Chat pane | Markdown-rendered assistant replies, Enter to send, Shift+Enter for newline |
+| Sidebar | Open issues (click to compose a processing prompt), retry queue (+ clear), current job, recent jobs history |
+| Job cards | Live progress bar while running; pass/fail stats and error details when finished |
+| Live logs | Collapsible bottom drawer streaming all agent activity via WebSocket |
+| Suggested prompts | Quick-start chips in the sidebar footer |
+
+### REST API
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/config` | GET | Repo, provider/model info (no secrets) |
+| `/api/issues` | GET | List open GitHub issues |
+| `/api/job` | GET | Current job status + recent history |
+| `/api/jobs/issue` | POST | Start issue pipeline `{ number: int }` |
+| `/api/jobs/commit` | POST | Start commit pipeline `{ sha: string, branch?: string }` |
+| `/api/retries` | GET | Pending retry-queue entries |
+| `/api/retries/clear` | POST | Clear all retries |
+| `/api/chat` | POST | Send chat message `{ message: string, history?: [{ role, content }] }` |
+
+WebSocket events are broadcast at `/ws`: `log`, `job:update`, `job:result`, `chat:activity`, `retries:update`.
+
+The API server binds to `127.0.0.1` on port `3002` by default — change via `WEB_HOST`/`WEB_PORT` in `.env`. In dev mode, the Vite UI runs on port `3001` and proxies API/WebSocket calls to the server. (Port 3000 is left free for the MCalendar app under test.) No secrets are exposed through the API.
+
 ## Configuration
 
 ### .env
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `PROVIDER` | Yes | AI provider: `anthropic`, `openai`, `google`, or `ollama` |
+| `PROVIDER` | Yes | AI provider: `anthropic`, `openai`, `google`, `ollama`, or `openrouter` |
 | `MODEL` | No | Model name or `auto` (default: `auto` — provider discovers available models from its API and uses the first one) |
 | `ANTHROPIC_API_KEY` | If using Anthropic | Anthropic API key |
 | `OPENAI_API_KEY` | If using OpenAI | OpenAI API key |
@@ -260,6 +325,8 @@ pipeline_engine → summarize (agent_summarize)
 | `RUN_MAX_RETRIES` | No | Auto-retries of failed runs (crash or failing tests) by the watcher (default: 1; `0` disables) |
 | `AGENT_ENABLED` | No | Enable/disable agent (default: `true`). Set to `false` to stop all processing |
 | `WATCH_BRANCH` | No | Branch to watch for commits (alternative to `--branch` flag) |
+| `WEB_PORT` | No | Web UI API server port (default: `3002`) |
+| `WEB_HOST` | No | Web UI bind address (default: `127.0.0.1`) |
 
 ### Model Auto-Selection
 
@@ -279,8 +346,11 @@ If discovery fails (bad key, network error), each provider falls back to a safe 
 | `openai` | `gpt-5.4` |
 | `google` | `gemini-2.5-flash` |
 | `ollama` | `llama3.2` |
+| `openrouter` | `meta-llama/llama-3.1-8b-instruct:free` |
 
 See `.env.example` for a reference list of known model names per provider.
+
+**OpenRouter note:** with `MODEL=auto`, OpenRouter prefers **free models** — it filters the API list to models with zero prompt/completion pricing and picks the first one. If no free models are available, it falls back to the first model in the list.
 
 ### agent.config.json
 
@@ -379,6 +449,8 @@ All agents have access to these tools. The AI decides which tools to use based o
 
 | Command | Description |
 |---------|-------------|
+| `npm run ui` | Build + start the Web UI (chat console) at http://localhost:3002 |
+| `npm run dev:ui` / `npm run dev:server` | Hot-reload development mode for UI / API server |
 | `npm start -- issue <number>` | Process a specific GitHub issue |
 | `npm start -- watch` | Watch for new issues (auto-process) |
 | `npm start -- watch --branch main` | Watch for issues + commits on `main` |
@@ -414,9 +486,14 @@ ANTHROPIC_API_KEY=sk-ant-...
 PROVIDER=ollama
 MODEL=auto
 # OLLAMA_BASE_URL=http://localhost:11434/v1
+
+# Switch to OpenRouter (one key → 100+ models; auto prefers free models)
+PROVIDER=openrouter
+MODEL=auto
+OPENROUTER_API_KEY=sk-or-...
 ```
 
-All four providers are enabled by default — no code changes needed.
+All five providers are enabled by default — no code changes needed.
 
 ## Supported Providers
 
@@ -426,6 +503,7 @@ All four providers are enabled by default — no code changes needed.
 | **OpenAI** | `openai` | `gpt-5.4` | Active |
 | **Google Gemini** | `@google/genai` | `gemini-2.5-flash` | Active |
 | **Ollama** | `openai` (compat) | `llama3.2` | Active |
+| **OpenRouter** | `openai` (compat) | `meta-llama/llama-3.1-8b-instruct:free` | Active |
 
 ## Acceptance Criteria
 
