@@ -24,7 +24,7 @@ export async function analyzeIssue(
   logger.task(agentName, `${getTaskProviderName(agentName, agentConfig)}/${getTaskModel(agentName, agentConfig)}`);
 
   const systemPrompt = buildPrompt({
-    agentType: "issue_analyzer",
+    agentType: AGENT_NAMES.ISSUE_ANALYZER,
     projectName,
     context,
   });

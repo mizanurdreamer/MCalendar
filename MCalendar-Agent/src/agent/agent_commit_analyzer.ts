@@ -24,7 +24,7 @@ export async function analyzeCommit(
   logger.task(agentName, `${getTaskProviderName(agentName, agentConfig)}/${getTaskModel(agentName, agentConfig)}`);
 
   const systemPrompt = buildPrompt({
-    agentType: "commit_analyzer",
+    agentType: AGENT_NAMES.COMMIT_ANALYZER,
     projectName,
     context,
   });

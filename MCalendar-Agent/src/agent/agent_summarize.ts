@@ -23,7 +23,7 @@ export async function summarizeResults(
   logger.task(agentName, `${getTaskProviderName(agentName, agentConfig)}/${getTaskModel(agentName, agentConfig)}`);
 
   const systemPrompt = buildPrompt({
-    agentType: "summarize",
+    agentType: AGENT_NAMES.SUMMARIZE,
     projectName,
   });
 

@@ -23,7 +23,7 @@ export async function generateTestReport(
   logger.task(agentName, `${getTaskProviderName(agentName, agentConfig)}/${getTaskModel(agentName, agentConfig)}`);
 
   const systemPrompt = buildPrompt({
-    agentType: "report_generator",
+    agentType: AGENT_NAMES.TESTS_REPORT_GENERATOR,
     projectName,
   });
 

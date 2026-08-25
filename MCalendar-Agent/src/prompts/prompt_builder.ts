@@ -1,14 +1,15 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { SharedContext, ProjectContext } from "../engine/shared_context.js";
+import { AGENT_NAMES } from "../utils/agent_names.js";
 
 type AgentType =
-  | "commit_analyzer"
-  | "issue_analyzer"
-  | "tests_generator"
-  | "tests_reviewer"
-  | "report_generator"
-  | "summarize";
+  | typeof AGENT_NAMES.COMMIT_ANALYZER
+  | typeof AGENT_NAMES.ISSUE_ANALYZER
+  | typeof AGENT_NAMES.TESTS_GENERATOR
+  | typeof AGENT_NAMES.TESTS_REVIEWER
+  | typeof AGENT_NAMES.TESTS_REPORT_GENERATOR
+  | typeof AGENT_NAMES.SUMMARIZE;
 
 interface PromptBuilderInput {
   agentType: AgentType;
@@ -225,10 +226,13 @@ export function buildPrompt(input: PromptBuilderInput): string {
   const sections: string[] = [];
   const projectContext = context?.projectContext;
 
+  // Strip "agent_" prefix for template names (AGENT_NAMES.ISSUE_ANALYZER -> "issue_analyzer")
+  const templateName = agentType.replace(/^agent_/, "");
+
   // 1. Role (with project context injected)
-  const roleName = `role_${agentType}`;
+  const roleName = `role_${templateName}`;
   let roleTemplate = replaceProjectName(loadTemplate(roleName), projectName);
-  if (["tests_generator"].includes(agentType)) {
+  if (agentType === AGENT_NAMES.TESTS_GENERATOR) {
     roleTemplate = injectProjectContext(roleTemplate, projectContext);
   }
   sections.push(roleTemplate);
@@ -237,35 +241,26 @@ export function buildPrompt(input: PromptBuilderInput): string {
   sections.push(buildToolCatalog());
 
   // 3. Agent-specific tool instructions
-  const toolInstructionName = `tool_instructions_${agentType}`;
+  const toolInstructionName = `tool_instructions_${templateName}`;
   if (fs.existsSync(path.join(TEMPLATES_DIR, `${toolInstructionName}.md`))) {
     sections.push(loadTemplate(toolInstructionName));
   }
 
-  // 4. Project discovery (REMOVED — now injected into role template above)
-  // if (["issue_analyzer", "tests_generator"].includes(agentType)) {
-  //   sections.push(loadTemplate("project_discovery"));
-  // }
-
-  // 5. Test credentials (for agents that write tests)
-  if (["tests_generator", "tests_reviewer"].includes(agentType)) {
+  // 4. Test credentials (for agents that write tests)
+  if (agentType === AGENT_NAMES.TESTS_GENERATOR || agentType === AGENT_NAMES.TESTS_REVIEWER) {
     sections.push(buildTestCredentials(superAdminEmail, superAdminPassword));
   }
 
-  // 6. Context-specific sections
+  // 5. Context-specific sections
   if (context) {
-    if (agentType === "commit_analyzer") {
-      sections.push(buildCommitContext(context));
-    } else if (agentType === "issue_analyzer") {
-      sections.push(buildIssueContext(context));
-    } else if (agentType === "tests_generator") {
+    if (agentType === AGENT_NAMES.TESTS_GENERATOR) {
       sections.push(buildAnalysisContext(context));
-    } else if (agentType === "tests_reviewer") {
+    } else if (agentType === AGENT_NAMES.TESTS_REVIEWER) {
       sections.push(buildErrorContext(context));
     }
   }
 
-  // 7. Output format instructions (per agent type)
+  // 6. Output format instructions (per agent type)
   sections.push(getOutputFormat(agentType));
 
   return sections.join("\n\n");
@@ -273,12 +268,12 @@ export function buildPrompt(input: PromptBuilderInput): string {
 
 function getOutputFormat(agentType: AgentType): string {
   switch (agentType) {
-    case "commit_analyzer":
+    case AGENT_NAMES.COMMIT_ANALYZER:
       return `## Output Format
 Respond with ONLY valid JSON (no markdown, no code fences):
 { "needsTests": true/false, "reason": "brief explanation", "scope": "optional test scope suggestion or null" }`;
 
-    case "issue_analyzer":
+    case AGENT_NAMES.ISSUE_ANALYZER:
       return `## Output Format
 Respond with ONLY valid JSON (no markdown, no code fences):
 {
@@ -301,7 +296,7 @@ Respond with ONLY valid JSON (no markdown, no code fences):
 
 If no tests are needed (e.g., documentation-only change), set needs_tests to false and explain why in the summary.`;
 
-    case "tests_generator":
+    case AGENT_NAMES.TESTS_GENERATOR:
       return `## Output Format
 Generate complete, working Playwright test files.
 The test file MUST be a complete, runnable .spec.ts file.
@@ -311,7 +306,7 @@ The analysis provided includes test scenarios with names, types, and description
 Each test scenario MUST have a corresponding test case.
 Name the test using the scenario name (e.g., test('should allow login with valid credentials')).`;
 
-    case "tests_reviewer":
+    case AGENT_NAMES.TESTS_REVIEWER:
       return `## Output Format
 If the test passes after your review:
 - Verify all acceptance criteria are covered
@@ -321,7 +316,7 @@ If the test passes after your review:
 If issues exist:
 - Respond with "REVIEW: FAILED" and fix them using the write_test_file tool`;
 
-    case "report_generator":
+    case AGENT_NAMES.TESTS_REPORT_GENERATOR:
       return `## Output Format
 Format as concise markdown with:
 1. Summary line (X passed, Y failed)
@@ -329,7 +324,7 @@ Format as concise markdown with:
 3. Error details (if any failures)
 4. Recommendations (if failures suggest specific fixes)`;
 
-    case "summarize":
+    case AGENT_NAMES.SUMMARIZE:
       return `## Output Format
 Format as a clear, concise GitHub markdown comment with:
 1. Issue title and number

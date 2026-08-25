@@ -24,7 +24,7 @@ export async function generateTests(
   logger.task(agentName, `${getTaskProviderName(agentName, agentConfig)}/${getTaskModel(agentName, agentConfig)}`);
 
   const systemPrompt = buildPrompt({
-    agentType: "tests_generator",
+    agentType: AGENT_NAMES.TESTS_GENERATOR,
     projectName,
     context,
   });

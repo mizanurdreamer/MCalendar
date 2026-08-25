@@ -163,12 +163,13 @@ export function adaptIssueAnalyzer(): StepFunction {
       return { action: "stop", reason: "No issue provided" };
     }
 
-    await discoverProjectContext(ctx);
-
     const issue = ctx.issue;
+    const labels = issue.labels.map((l: { name: string }) => l.name).join(", ") || "none";
     const userMessage = `Issue #${issue.number}: ${issue.title}
+    Labels: ${labels}
+    Created: ${issue.created_at}
 
-${issue.body ?? "(no description)"}`;
+    ${issue.body ?? "(no description)"}`;
 
     const output = await analyzeIssue(
       ctx.agentConfig, ctx.reader, ctx.runner,
@@ -205,8 +206,6 @@ export function adaptCommitAnalyzer(): StepFunction {
       return { action: "stop", reason: "No commit diff provided" };
     }
 
-    await discoverProjectContext(ctx);
-
     const diff = ctx.commitDiff;
     const shortSha = diff.sha.slice(0, 7);
 
@@ -215,9 +214,12 @@ export function adaptCommitAnalyzer(): StepFunction {
       .join("\n");
 
     const userMessage = `Commit ${shortSha}: ${diff.message}
+    Author: ${diff.author}
+    Date: ${diff.date}
+    Changes: +${diff.totalAdditions}/-${diff.totalDeletions} lines across ${diff.files.length} file(s)
 
-Files changed:
-${fileList}`;
+    Files changed:
+    ${fileList}`;
 
     const output = await analyzeCommit(
       ctx.agentConfig, ctx.reader, ctx.runner,

@@ -61,7 +61,7 @@ Respond with a CONCISE analysis:
 3. You may explore the project with read_file/list_directory if you need more context.`;
 
   const systemPrompt = buildPrompt({
-    agentType: "tests_reviewer",
+    agentType: AGENT_NAMES.TESTS_REVIEWER,
     projectName,
     context,
   });
@@ -107,7 +107,7 @@ export async function reviewTests(
   logger.task(agentName, `${getTaskProviderName(agentName, agentConfig)}/${getTaskModel(agentName, agentConfig)}`);
 
   const systemPrompt = buildPrompt({
-    agentType: "tests_reviewer",
+    agentType: AGENT_NAMES.TESTS_REVIEWER,
     projectName,
     context: sharedContext,
   });
