@@ -82,11 +82,12 @@ export class PlaywrightRunner {
           const tests = (spec.tests ?? []) as Record<string, unknown>[];
           for (const test of tests) {
             const result = (test.results ?? []) as Record<string, unknown>[];
-            if (result.length > 0 && (result[0] as Record<string, unknown>).status === "passed") {
+            const lastResult = result.length > 0 ? result[result.length - 1] as Record<string, unknown> : undefined;
+            if (lastResult && lastResult.status === "passed") {
               passed++;
             } else {
               failed++;
-              const errorObj = (result[0] as Record<string, unknown>)?.error as Record<string, unknown> | undefined;
+              const errorObj = lastResult?.error as Record<string, unknown> | undefined;
               if (errorObj?.message) {
                 const msg = errorObj.message as string;
                 errors.push(msg);

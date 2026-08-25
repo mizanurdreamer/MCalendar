@@ -228,7 +228,7 @@ export function buildPrompt(input: PromptBuilderInput): string {
   // 1. Role (with project context injected)
   const roleName = `role_${agentType}`;
   let roleTemplate = replaceProjectName(loadTemplate(roleName), projectName);
-  if (["issue_analyzer", "tests_generator", "commit_analyzer"].includes(agentType)) {
+  if (["tests_generator"].includes(agentType)) {
     roleTemplate = injectProjectContext(roleTemplate, projectContext);
   }
   sections.push(roleTemplate);

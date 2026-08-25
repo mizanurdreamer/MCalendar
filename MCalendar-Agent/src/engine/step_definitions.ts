@@ -11,37 +11,34 @@ import {
   adaptCommitAndPush,
   adaptCreatePR,
   adaptSummarize,
-  adaptProjectDiscovery,
 } from "./step_adapters.js";
 
 export function getIssuePipeline(): StepDefinition[] {
   return [
-    { name: "discover_project", run: adaptProjectDiscovery() },
     { name: "analyze_issue",    run: adaptIssueAnalyzer() },
     { name: "plan",             run: adaptPlanning() },
     { name: "setup_branch",     run: adaptBranchSetup() },
     { name: "generate_tests",   run: adaptTestGenerator() },
     { name: "run_tests",        run: adaptRunTests() },
-    { name: "review_and_fix",   run: adaptReviewAndFix(),  condition: (ctx: SharedContext) => !!ctx.testResult && !ctx.testResult.success },
+    { name: "review_and_fix",   run: adaptReviewAndFix(),  condition: (ctx: SharedContext) => !!ctx.testResult && !ctx.testResult.success && ctx.retries < ctx.maxRetries },
     { name: "generate_report",  run: adaptReportGenerator() },
     { name: "commit_push",      run: adaptCommitAndPush() },
-    { name: "create_pr",        run: adaptCreatePR(),  condition: (ctx: SharedContext) => !!ctx.githubClient },
+    { name: "create_pr",        run: adaptCreatePR() },
     { name: "summarize",        run: adaptSummarize() },
   ];
 }
 
 export function getCommitPipeline(): StepDefinition[] {
   return [
-    { name: "discover_project", run: adaptProjectDiscovery() },
     { name: "triage_commit",    run: adaptCommitAnalyzer() },
     { name: "plan",             run: adaptPlanning() },
     { name: "setup_branch",     run: adaptBranchSetup() },
     { name: "generate_tests",   run: adaptTestGenerator() },
     { name: "run_tests",        run: adaptRunTests() },
-    { name: "review_and_fix",   run: adaptReviewAndFix(),  condition: (ctx: SharedContext) => !!ctx.testResult && !ctx.testResult.success },
+    { name: "review_and_fix",   run: adaptReviewAndFix(),  condition: (ctx: SharedContext) => !!ctx.testResult && !ctx.testResult.success && ctx.retries < ctx.maxRetries },
     { name: "generate_report",  run: adaptReportGenerator() },
     { name: "commit_push",      run: adaptCommitAndPush() },
-    { name: "create_pr",        run: adaptCreatePR(),  condition: (ctx: SharedContext) => !!ctx.githubClient },
+    { name: "create_pr",        run: adaptCreatePR() },
     { name: "summarize",        run: adaptSummarize() },
   ];
 }

@@ -10,6 +10,7 @@ import { formatTestReport } from "../test_runner/reporter.js";
 import { GitBranch } from "../github/git_operations.js";
 import { logger } from "../utils/logger.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
+import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers/registry.js";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -21,6 +22,120 @@ function record(ctx: SharedContext, name: string, agent: string | undefined, out
     output: output.slice(0, 200),
     decision,
   });
+}
+
+async function discoverProjectContext(ctx: SharedContext): Promise<void> {
+  if (ctx.projectContext) return;
+
+  let tree = "";
+  try { tree = ctx.reader.getProjectStructure(); } catch { /* ignore */ }
+
+  let deps: Record<string, string> = {};
+  try {
+    const pkg = JSON.parse(ctx.reader.readFile("package.json"));
+    deps = { ...pkg.dependencies, ...pkg.devDependencies };
+  } catch { /* ignore */ }
+
+  let dataModels = "";
+  try { dataModels = ctx.reader.readFile("prisma/schema.prisma"); } catch { /* ignore */ }
+
+  let apiRoutes: string[] = [];
+  try { apiRoutes = ctx.reader.getApiRoutes(); } catch { /* ignore */ }
+
+  let existingTestPatterns = "";
+  let testUtils = "";
+  try {
+    const testFiles = ctx.testReader.listDirectory("tests");
+    const sampleFiles = testFiles.filter(f => f.endsWith(".spec.ts") || f.endsWith(".test.ts")).slice(0, 3);
+    for (const f of sampleFiles) {
+      existingTestPatterns += `\n--- ${f} ---\n${ctx.testReader.readFile(`tests/${f}`)}`;
+    }
+    try {
+      testUtils = ctx.testReader.readFile("tests/utils/token.ts");
+    } catch {
+      try { testUtils = ctx.testReader.readFile("tests/utils/index.ts"); } catch { /* ignore */ }
+    }
+  } catch { /* ignore */ }
+
+  const depsStr = Object.entries(deps).map(([k, v]) => `${k}: ${v}`).join(", ") || "none";
+
+  const userMessage = `Map this project and return a JSON object. The file tree and dependencies are provided below. You may use read_file or list_directory to inspect key files if needed.
+
+PROJECT FILE TREE:
+${tree}
+
+DEPENDENCIES:
+${depsStr}
+
+Return ONLY valid JSON with this exact shape:
+{
+  "language": "typescript|python|go|java|rust|other",
+  "framework": "nextjs|react|express|vue|angular|django|flask|fastapi|spring|gin|other",
+  "testRunner": "playwright|jest|vitest|pytest|junit|go test|cargo test|other",
+  "packageManager": "npm|yarn|pnpm|pip|poetry|go|cargo|maven|gradle|other",
+  "buildTool": "next|vite|webpack|tsc|go build|cargo build|maven|gradle|other",
+  "dataModels": "describe ORM/model files found",
+  "apiRoutes": ["list API route patterns found"],
+  "pageRoutes": ["list page/view routes found"],
+  "testDirectories": ["tests/", "e2e/", "__tests__/"]
+}`;
+
+  try {
+    const provider = getTaskProvider(AGENT_NAMES.ISSUE_ANALYZER, ctx.agentConfig);
+    logger.task("discover_project", `${getTaskProviderName(AGENT_NAMES.ISSUE_ANALYZER, ctx.agentConfig)}/${getTaskModel(AGENT_NAMES.ISSUE_ANALYZER, ctx.agentConfig)}`);
+
+    const response = await provider.chat({
+      system: "You are a codebase cartographer. Map ANY stack (JS/TS/Python/Java/Go/Rust). Inspect key files to identify framework, test runner, ORM, and route patterns. Output ONLY valid JSON.",
+      messages: [{ role: "user", content: userMessage }],
+      maxTokens: 4096,
+      temperature: 0.2,
+    });
+
+    const textBlocks = response.content.filter((b): b is { type: "text"; text: string } => b.type === "text");
+    const raw = textBlocks.map((b) => b.text).join("\n");
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+
+    if (jsonMatch) {
+      const d = JSON.parse(jsonMatch[0]);
+      ctx.projectContext = {
+        framework: d.framework || "unknown",
+        testRunner: d.testRunner || "unknown",
+        dependencies: d.dependencies || deps,
+        dataModels: d.dataModels || dataModels,
+        apiRoutes: Array.isArray(d.apiRoutes) ? d.apiRoutes : apiRoutes,
+        projectStructure: tree,
+        existingTestPatterns,
+        testUtils,
+      };
+      logger.success(`[discover] ${d.language}/${d.framework}/${d.testRunner}`);
+      return;
+    }
+  } catch (err) {
+    logger.warn(`[discover] LLM discovery failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  let framework = "unknown";
+  let testRunner = "playwright";
+  if (deps.next) framework = "nextjs";
+  else if (deps.react) framework = "react";
+  else if (deps.vue) framework = "vue";
+  else if (deps["@angular/core"]) framework = "angular";
+  else if (deps.svelte) framework = "svelte";
+  if (deps["@playwright/test"]) testRunner = "playwright";
+  else if (deps.vitest) testRunner = "vitest";
+  else if (deps.jest) testRunner = "jest";
+
+  ctx.projectContext = {
+    framework,
+    testRunner,
+    dependencies: deps,
+    dataModels,
+    apiRoutes,
+    projectStructure: tree,
+    existingTestPatterns,
+    testUtils,
+  };
+  logger.info(`[discover] Fallback: ${framework}/${testRunner}`);
 }
 
 function parseIssueAnalysis(raw: string): IssueAnalysis {
@@ -42,113 +157,18 @@ function parseIssueAnalysis(raw: string): IssueAnalysis {
   };
 }
 
-export function adaptProjectDiscovery(): StepFunction {
-  return async (ctx) => {
-    if (ctx.projectContext) {
-      logger.info("[project_discovery] Already discovered, skipping");
-      record(ctx, "discover_project", undefined, "Using cached project context", "next");
-      return { action: "next" };
-    }
-
-    logger.info("[project_discovery] Discovering project structure...");
-
-    // 1. Read package.json for framework and dependencies
-    let framework = "unknown";
-    let testRunner = "playwright";
-    let dependencies: Record<string, string> = {};
-
-    try {
-      const pkgContent = ctx.reader.readFile("package.json");
-      const pkg = JSON.parse(pkgContent);
-      dependencies = { ...pkg.dependencies, ...pkg.devDependencies };
-      framework = pkg.dependencies?.next ? "nextjs" : pkg.dependencies?.react ? "react" : "unknown";
-      if (pkg.devDependencies?.["@playwright/test"]) testRunner = "playwright";
-      else if (pkg.devDependencies?.vitest) testRunner = "vitest";
-      else if (pkg.devDependencies?.jest) testRunner = "jest";
-    } catch {
-      logger.warn("[project_discovery] Could not read package.json");
-    }
-
-    // 2. Read Prisma schema for data models
-    let dataModels = "";
-    try {
-      dataModels = ctx.reader.readFile("prisma/schema.prisma");
-    } catch {
-      logger.warn("[project_discovery] Could not read prisma/schema.prisma");
-    }
-
-    // 3. List API routes (recursive, with HTTP methods)
-    let apiRoutes: string[] = [];
-    try {
-      apiRoutes = ctx.reader.getApiRoutes();
-    } catch {
-      logger.warn("[project_discovery] Could not read app/api routes");
-    }
-
-    // 4. Full project directory/file tree
-    let projectStructure = "";
-    try {
-      projectStructure = ctx.reader.getProjectStructure();
-    } catch {
-      logger.warn("[project_discovery] Could not read project structure");
-    }
-
-    // 5. Read existing test patterns
-    let existingTestPatterns = "";
-    let testUtils = "";
-    try {
-      const testFiles = ctx.testReader.listDirectory("tests");
-      const sampleFiles = testFiles.filter(f => f.endsWith(".spec.ts") || f.endsWith(".test.ts")).slice(0, 3);
-      for (const f of sampleFiles) {
-        existingTestPatterns += `\n--- ${f} ---\n${ctx.testReader.readFile(`tests/${f}`)}`;
-      }
-      // Read test utils if they exist
-      try {
-        testUtils = ctx.testReader.readFile("tests/utils/token.ts");
-      } catch {
-        try {
-          testUtils = ctx.testReader.readFile("tests/utils/index.ts");
-        } catch { /* ignore */ }
-      }
-    } catch {
-      logger.warn("[project_discovery] Could not read test files");
-    }
-
-    ctx.projectContext = {
-      framework,
-      testRunner,
-      dependencies,
-      dataModels,
-      apiRoutes,
-      projectStructure,
-      existingTestPatterns,
-      testUtils,
-    };
-
-    logger.success(`[project_discovery] Discovered: ${framework}, ${testRunner}, ${apiRoutes.length} API routes`);
-    record(ctx, "discover_project", undefined, `Framework: ${framework}, Test runner: ${testRunner}`, "next");
-    return { action: "next" };
-  };
-}
-
 export function adaptIssueAnalyzer(): StepFunction {
   return async (ctx) => {
     if (!ctx.issue) {
       return { action: "stop", reason: "No issue provided" };
     }
 
+    await discoverProjectContext(ctx);
+
     const issue = ctx.issue;
-    const userMessage = `Analyze this GitHub issue and determine what E2E tests need to be written.
+    const userMessage = `Issue #${issue.number}: ${issue.title}
 
-ISSUE #${issue.number}: ${issue.title}
-LABELS: ${issue.labels.join(", ") || "none"}
-CREATED: ${issue.created_at}
-
-DESCRIPTION:
-${issue.body ?? "(no description)"}
-
-Read the project source code using your tools to understand the codebase before analyzing.
-Respond with ONLY valid JSON.`;
+${issue.body ?? "(no description)"}`;
 
     const output = await analyzeIssue(
       ctx.agentConfig, ctx.reader, ctx.runner,
@@ -163,14 +183,14 @@ Respond with ONLY valid JSON.`;
 
     if (!analysis.needs_tests) {
       logger.info(`Issue #${issue.number}: ${analysis.summary}`);
-      record(ctx, "analyze_issue", AGENT_NAMES.ISSUE_ANALYZER, analysis.summary, "stop");
-      return { action: "stop", reason: `Analysis: ${analysis.summary}` };
+      record(ctx, "analyze_issue", AGENT_NAMES.ISSUE_ANALYZER, analysis.summary, "goto:summarize");
+      return { action: "goto", step: "summarize" };
     }
 
     if (analysis.test_scenarios.length === 0) {
       logger.warn(`Issue #${issue.number}: Analysis returned no test scenarios`);
-      record(ctx, "analyze_issue", AGENT_NAMES.ISSUE_ANALYZER, "No test scenarios identified", "stop");
-      return { action: "stop", reason: "Analysis returned no test scenarios" };
+      record(ctx, "analyze_issue", AGENT_NAMES.ISSUE_ANALYZER, "No test scenarios identified", "goto:summarize");
+      return { action: "goto", step: "summarize" };
     }
 
     logger.info(`Issue #${issue.number}: ${analysis.test_scenarios.length} test scenarios identified`);
@@ -185,6 +205,8 @@ export function adaptCommitAnalyzer(): StepFunction {
       return { action: "stop", reason: "No commit diff provided" };
     }
 
+    await discoverProjectContext(ctx);
+
     const diff = ctx.commitDiff;
     const shortSha = diff.sha.slice(0, 7);
 
@@ -192,18 +214,10 @@ export function adaptCommitAnalyzer(): StepFunction {
       .map((f) => `  ${f.filename} (${f.status}, +${f.additions}/-${f.deletions})`)
       .join("\n");
 
-    const userMessage = `Analyze this commit to determine if it needs new or updated E2E tests.
+    const userMessage = `Commit ${shortSha}: ${diff.message}
 
-COMMIT: ${shortSha} — ${diff.message}
-AUTHOR: ${diff.author}
-DATE: ${diff.date}
-TOTAL: +${diff.totalAdditions}/-${diff.totalDeletions} lines across ${diff.files.length} file(s)
-
-FILES CHANGED:
-${fileList}
-
-Read the project source code using your tools to understand the codebase before analyzing.
-The full diff is provided in your system context above.`;
+Files changed:
+${fileList}`;
 
     const output = await analyzeCommit(
       ctx.agentConfig, ctx.reader, ctx.runner,
@@ -229,8 +243,8 @@ The full diff is provided in your system context above.`;
 
     if (!analysis.needsTests) {
       logger.info(`Skipping commit ${shortSha}: ${analysis.reason}`);
-      record(ctx, "triage_commit", AGENT_NAMES.COMMIT_ANALYZER, output, "stop");
-      return { action: "stop", reason: `Commit triage: ${analysis.reason}` };
+      record(ctx, "triage_commit", AGENT_NAMES.COMMIT_ANALYZER, output, "goto:summarize");
+      return { action: "goto", step: "summarize" };
     }
 
     record(ctx, "triage_commit", AGENT_NAMES.COMMIT_ANALYZER, output, "next");
@@ -307,6 +321,10 @@ export function adaptBranchSetup(): StepFunction {
 
 export function adaptTestGenerator(): StepFunction {
   return async (ctx) => {
+    if (ctx.projectContext) {
+      try { ctx.projectContext.projectStructure = ctx.reader.getProjectStructure(); } catch { /* ignore */ }
+    }
+
     let testFilename: string;
     if (ctx.mode === "issue" && ctx.issue) {
       testFilename = `issue-${ctx.issue.number}-${GitBranch.slugify(ctx.issue.title)}.spec.ts`;
@@ -321,52 +339,34 @@ export function adaptTestGenerator(): StepFunction {
     let userMessage: string;
     if (ctx.mode === "issue" && ctx.issue && ctx.issueAnalysis) {
       const scenarios = ctx.issueAnalysis.test_scenarios
-        .map((s, i) => `${i + 1}. ${s.name} (${s.type}): ${s.description}`)
-        .join("\n");
-      const acceptanceCriteria = ctx.issueAnalysis.test_scenarios
-        .filter((s) => s.acceptance_criterion)
-        .map((s) => `- ${s.acceptance_criterion}`)
+        .map((s, i) => `${i + 1}. ${s.name} (${s.type}): ${s.description}${s.acceptance_criterion ? ` [criteria: ${s.acceptance_criterion}]` : ""}`)
         .join("\n");
 
-      userMessage = `Generate a Playwright E2E test file for this issue.
+      userMessage = `Write a Playwright E2E test file for this issue.
 
-ISSUE: #${ctx.issue.number} — ${ctx.issue.title}
-DESCRIPTION: ${ctx.issue.body}
+Issue #${ctx.issue.number}: ${ctx.issue.title}
+${ctx.issue.body ?? ""}
 
-ANALYSIS:
-Summary: ${ctx.issueAnalysis.summary}
-Functionality to test: ${ctx.issueAnalysis.functionality_to_test.join(", ")}
-Relevant files: ${ctx.issueAnalysis.relevant_files.join(", ")}
-API endpoints: ${ctx.issueAnalysis.api_endpoints.join(", ")}
-Role checks: ${ctx.issueAnalysis.role_checks.join(", ")}
-Edge cases: ${ctx.issueAnalysis.edge_cases.join(", ")}
+TEST SCENARIOS (write one test case per scenario):
+${scenarios || "(no scenarios — generate based on the issue)"}
 
-TEST SCENARIOS:
-${scenarios}
-
-ACCEPTANCE CRITERIA (each MUST have a test case):
-${acceptanceCriteria || "(none specified)"}
-
-FILENAME: ${testFilename}
-IMPORTANT: Use the write_test_file tool to save the test as "${testFilename}".`;
+Use read_file/list_directory to explore source files as needed.
+Use the write_test_file tool to save the test as "${testFilename}".`;
     } else if (ctx.mode === "commit" && ctx.commitDiff) {
       const diff = ctx.commitDiff;
       const shortSha = diff.sha.slice(0, 7);
-      const changedFilesContext = diff.files
-        .map((f) => `- ${f.filename} (${f.status}, +${f.additions}/-${f.deletions})`)
-        .join("\n");
-      const commitContext = `## COMMIT: ${shortSha} — ${diff.message.split("\n")[0]}
+      const changedFiles = diff.files.map((f) => `  ${f.filename} (${f.status})`).join("\n");
 
-**Author:** ${diff.author}
-**Changed files:**
-${changedFilesContext}
+      userMessage = `Write a Playwright E2E test file for this commit.
 
-**Test scope suggestion:** ${ctx.commitAnalysis?.scope ?? "General E2E testing of changed functionality"}
+Commit ${shortSha}: ${diff.message}
+Scope: ${ctx.commitAnalysis?.scope ?? "General E2E testing"}
 
-**Diff details:**
-${diff.files.map((f) => `### ${f.filename}\n\`\`\`diff\n${f.patch ?? "(no patch)"}\n\`\`\``).join("\n\n")}`;
+Files changed:
+${changedFiles}
 
-      userMessage = `Generate a Playwright E2E test file for this commit.\n\nFilename: ${testFilename}\n\nScope: ${ctx.commitAnalysis?.scope ?? "General E2E testing"}\n\nCommit Context:\n${commitContext}\n\nIMPORTANT: Use the write_test_file tool to save the test as "${testFilename}".`;
+Use read_file/list_directory to explore source files as needed.
+Use the write_test_file tool to save the test as "${testFilename}".`;
     } else {
       return { action: "stop", reason: "No analysis data available for test generation" };
     }
@@ -388,13 +388,13 @@ export function adaptRunTests(): StepFunction {
   return async (ctx) => {
     if (!ctx.testFilename) {
       logger.warn("[run_tests] No test filename set");
-      return { action: "stop", reason: "No test filename set" };
+      return { action: "goto", step: "summarize" };
     }
 
     const testFile = path.join(ctx.testOutputPath, ctx.testFilename);
     if (!fs.existsSync(testFile)) {
       logger.warn(`[run_tests] Test file not found: ${testFile}`);
-      return { action: "stop", reason: `Test file not found: ${ctx.testFilename}` };
+      return { action: "goto", step: "summarize" };
     }
 
     logger.info(`[run_tests] Running test: ${ctx.testFilename}`);
@@ -414,6 +414,8 @@ export function adaptRunTests(): StepFunction {
       }
     } else {
       logger.warn("[run_tests] Tests failed but no error messages captured");
+      const tail = result.output.slice(-2000).replace(/\x1B\[[0-9;]*m/g, "");
+      if (tail) result.errors.push(tail);
     }
 
     if (ctx.retries < ctx.maxRetries && result.errors.length > 0) {
@@ -422,8 +424,8 @@ export function adaptRunTests(): StepFunction {
     }
 
     logger.error(`[run_tests] Max retries (${ctx.maxRetries}) exhausted — tests still failing`);
-    record(ctx, "run_tests", undefined, `${result.passed}/${result.total} passed (retries exhausted)`, "stop");
-    return { action: "stop", reason: `Tests failed after ${ctx.maxRetries} retries: ${result.errors.join(", ")}` };
+    record(ctx, "run_tests", undefined, `${result.passed}/${result.total} passed (retries exhausted)`, "next");
+    return { action: "next" };
   };
 }
 
@@ -437,13 +439,17 @@ export function adaptReviewAndFix(): StepFunction {
       return { action: "next" };
     }
 
+    if (ctx.projectContext) {
+      try { ctx.projectContext.projectStructure = ctx.reader.getProjectStructure(); } catch { /* ignore */ }
+    }
+
     logger.info(`[review] Starting review_and_fix for ${ctx.testFilename} (attempt ${ctx.retries + 1}/${ctx.maxRetries})`);
     logger.info(`[review] Errors: ${ctx.testResult.errors.length}`);
 
     const testContent = ctx.testReader.readFile(ctx.testFilename);
     ctx.testContent = testContent;
 
-    // Step 1: Analyze the error first (don't re-read files)
+    // Step 1: Analyze the error first
     const analysis = await analyzeTestError(
       ctx.agentConfig, ctx.reader, ctx.runner,
       ctx.testOutputPath, ctx.codebasePath,
@@ -536,10 +542,15 @@ export function adaptReportGenerator(): StepFunction {
 
 export function adaptCommitAndPush(): StepFunction {
   return async (ctx) => {
+    if (!ctx.testFilename) {
+      record(ctx, "commit_push", undefined, "Skipped (no test file)", "next");
+      return { action: "next" };
+    }
+
     if (!ctx.commitAutoApprove) {
       logger.info("COMMIT_AUTO_APPROVE=false — skipping push");
-      record(ctx, "commit_push", undefined, "Skipped (commit auto-approve disabled)", "stop");
-      return { action: "stop", reason: "COMMIT_AUTO_APPROVE=false — push skipped" };
+      record(ctx, "commit_push", undefined, "Skipped (commit auto-approve disabled)", "next");
+      return { action: "next" };
     }
 
     let commitMessage: string;
@@ -559,7 +570,7 @@ export function adaptCommitAndPush(): StepFunction {
 
 export function adaptCreatePR(): StepFunction {
   return async (ctx) => {
-    if (!ctx.githubClient) {
+    if (!ctx.githubClient || !ctx.testFilename) {
       return { action: "next" };
     }
 

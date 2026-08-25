@@ -38,6 +38,10 @@ export async function analyzeTestError(
     ).join("\n")}`
     : "";
 
+  const structureContext = context?.projectContext?.projectStructure
+    ? `\n\nCURRENT PROJECT STRUCTURE:\n${context.projectContext.projectStructure}`
+    : "";
+
   const userMessage = `Analyze this test failure and explain WHY it's failing and WHAT needs to be fixed.
 
 Filename: ${testFilename}
@@ -49,12 +53,12 @@ ${testContent}
 
 Errors:
 ${errors.join("\n\n")}
-${historyContext}
+${historyContext}${structureContext}
 
 Respond with a CONCISE analysis:
 1. Root cause (what exactly is wrong)
 2. What to change (specific fix instructions)
-3. Do NOT re-read files - use the information above.`;
+3. You may explore the project with read_file/list_directory if you need more context.`;
 
   const systemPrompt = buildPrompt({
     agentType: "tests_reviewer",
@@ -108,7 +112,11 @@ export async function reviewTests(
     context: sharedContext,
   });
 
-  const userMessage = `Fix this test. Do NOT re-read files you already understand.
+  const structureContext = sharedContext?.projectContext?.projectStructure
+    ? `\n\nCURRENT PROJECT STRUCTURE:\n${sharedContext.projectContext.projectStructure}`
+    : "";
+
+  const userMessage = `Fix this test.
 
 Filename: ${testFilename}
 
@@ -121,8 +129,9 @@ Errors:
 ${errors.join("\n\n")}
 
 Analysis:
-${context}
+${context}${structureContext}
 
+You may explore the project with read_file/list_directory if you need more context.
 Use the write_test_file tool to save the fixed test.`;
 
   const result = await runAgentLoop(

@@ -4,6 +4,8 @@ You have TWO responsibilities:
 1. REVIEW: Check the generated test for quality
 2. FIX: If the test is failing, fix it
 
+A CURRENT project structure snapshot is provided in your context. It reflects all files as of this moment. You may explore beyond it with read_file/list_directory if you need more context.
+
 ## Review Checklist
 
 - Correctness — does it test what's required?
