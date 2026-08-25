@@ -39,11 +39,6 @@ export async function runAgentLoop(
     }
   }
   
-  // if(agentName === AGENT_NAMES.ISSUE_ANALYZER || agentName === AGENT_NAMES.TESTS_GENERATOR ){
-  //   logger.info(`bypassing Agent : ${agentName} with maxIterations=${maxIterations} and maxRetries=${ctx.maxRetries ?? 3}`);
-  //   return `[${agentName} Agent bypassed for this task]`;
-  // }
-  
   const tools = createAgentTools(ctx.reader, ctx.runner, ctx.codebasePath);
   const messages: ChatMessage[] = [{ role: "user", content: userMessage }];
   logger.prompt(agentName, systemPrompt, userMessage);
