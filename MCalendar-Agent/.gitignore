@@ -4,5 +4,6 @@ dist/
 state/processed.json
 .cache/
 logs/
+reports/
 *.log
 .DS_Store

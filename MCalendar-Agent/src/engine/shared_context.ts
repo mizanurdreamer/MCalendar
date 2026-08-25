@@ -92,6 +92,7 @@ export interface SharedContext {
   testContent?: string;
   testResult?: TestResult;
   report?: string;
+  reportPath?: string;
   summary?: string;
   prUrl?: string;
   planResult?: string;

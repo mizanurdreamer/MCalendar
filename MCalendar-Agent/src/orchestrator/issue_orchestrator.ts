@@ -86,5 +86,7 @@ export async function processIssue(
     testsFailed: result.testResult?.failed ?? 0,
     retries: result.retries,
     retryHistory: result.retryHistory,
+    report: result.report,
+    reportPath: result.reportPath,
   };
 }

@@ -96,5 +96,7 @@ export async function processCommit(
     testsFailed: result.testResult?.failed ?? 0,
     retries: result.retries,
     retryHistory: result.retryHistory,
+    report: result.report,
+    reportPath: result.reportPath,
   };
 }

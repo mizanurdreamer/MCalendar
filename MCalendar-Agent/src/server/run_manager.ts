@@ -204,6 +204,9 @@ export function formatJobResult(job: JobInfo): string {
   if (r.filesWritten?.length) {
     parts.push(`**Test files:** ${r.filesWritten.map((f) => `\`${f}\``).join(", ")}`);
   }
+  if (r.reportPath) {
+    parts.push(`📄 **Report:** \`${r.reportPath}\``);
+  }
   return parts.join("\n");
 }
 

@@ -1,4 +1,6 @@
 import { execSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 import { logger } from "../utils/logger.js";
 
 export interface TestResult {
@@ -8,6 +10,7 @@ export interface TestResult {
   failed: number;
   output: string;
   errors: string[];
+  htmlReportPath?: string;
 }
 
 export class PlaywrightRunner {
@@ -19,7 +22,7 @@ export class PlaywrightRunner {
 
   run(filename?: string): TestResult {
     const testPath = filename ? `tests/${filename}` : "tests/";
-    const cmd = `npx playwright test ${testPath} --reporter=json`;
+    const cmd = `npx playwright test ${testPath} --reporter=json,html`;
 
     try {
       const output = execSync(cmd, {
@@ -37,6 +40,32 @@ export class PlaywrightRunner {
       if (output) logger.error(`[playwright] Output: ${output.slice(0, 500)}`);
       return this.parseOutput(output, false);
     }
+  }
+
+  /**
+   * The html reporter writes its report relative to the playwright package
+   * discovery root (nearest ancestor with the package installed), which may be
+   * above the test project — so scan upward from the test project for a
+   * freshly-written playwright-report/index.html.
+   */
+  private findFreshHtmlReport(maxAgeMs = 15 * 60_000): string | undefined {
+    let dir = path.resolve(this.codebasePath);
+    const cutoff = Date.now() - maxAgeMs;
+
+    for (let depth = 0; depth < 4; depth++) {
+      const candidate = path.join(dir, "playwright-report", "index.html");
+      try {
+        if (fs.existsSync(candidate) && fs.statSync(candidate).mtimeMs >= cutoff) {
+          return candidate;
+        }
+      } catch {
+        // ignore stat errors and keep scanning
+      }
+      const parent = path.dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+    return undefined;
   }
 
   private parseOutput(output: string, rawSuccess: boolean): TestResult {
@@ -80,6 +109,7 @@ export class PlaywrightRunner {
         failed,
         output,
         errors,
+        htmlReportPath: this.findFreshHtmlReport(),
       };
     } catch {
       logger.error(`[playwright] JSON parse failed — using raw output as error`);
@@ -90,6 +120,7 @@ export class PlaywrightRunner {
         failed: rawSuccess ? 0 : 1,
         output,
         errors: rawSuccess ? [] : [output],
+        htmlReportPath: this.findFreshHtmlReport(),
       };
     }
   }

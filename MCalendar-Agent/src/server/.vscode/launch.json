@@ -5,7 +5,7 @@
       "name": "▶ Debug Server (breakpoints)",
       "type": "node",
       "request": "attach",
-      "port": "http://127.0.0.1:3002",
+      "port": 3002,
       "restart": true,
       "skipFiles": ["<node_internals>/**"],
       "preLaunchTask": "server: dev debug"

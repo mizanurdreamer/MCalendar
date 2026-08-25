@@ -12,6 +12,8 @@ export interface TaskResult {
   testsFailed?: number;
   retries?: number;
   retryHistory?: { attempt: number; errors: string[]; analysis?: string }[];
+  report?: string;
+  reportPath?: string;
 }
 
 export const ALL_TASKS: TaskName[] = [
