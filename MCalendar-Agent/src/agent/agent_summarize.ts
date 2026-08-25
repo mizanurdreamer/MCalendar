@@ -27,7 +27,7 @@ export async function summarizeResults(
     projectName,
   });
 
-  return runAgentLoop(
+  const result = await runAgentLoop(
     {
       provider,
       reader,
@@ -43,4 +43,7 @@ export async function summarizeResults(
     maxIterations,
     agentName
   );
+
+  logger.success("Summarization complete");
+  return result;
 }

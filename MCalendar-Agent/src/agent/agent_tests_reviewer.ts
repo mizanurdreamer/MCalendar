@@ -151,7 +151,7 @@ Use the write_test_file tool to save the fixed test.`;
     agentName
   );
 
-  logger.success("Review complete");
+  logger.success("Review & fix completed");
   logger.info(`Fix result: ${result.slice(0, 300)}`);
   return result;
 }

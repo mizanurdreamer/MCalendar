@@ -90,56 +90,6 @@ function buildTestCredentials(superAdminEmail?: string, superAdminPassword?: str
   return lines.join("\n");
 }
 
-function buildCommitContext(context: SharedContext): string {
-  if (!context.commitDiff) return "";
-
-  const diff = context.commitDiff;
-  const shortSha = diff.sha.slice(0, 7);
-
-  const lines: string[] = [];
-  lines.push("## Commit Being Analyzed");
-  lines.push(`- Commit: ${shortSha} — ${diff.message}`);
-  lines.push(`- Author: ${diff.author}`);
-  lines.push(`- Date: ${diff.date}`);
-  lines.push(`- Changes: +${diff.totalAdditions}/-${diff.totalDeletions} lines across ${diff.files.length} file(s)`);
-  lines.push("");
-
-  lines.push("### Files Changed");
-  for (const file of diff.files) {
-    lines.push(`- ${file.filename} (${file.status}, +${file.additions}/-${file.deletions})`);
-  }
-  lines.push("");
-
-  lines.push("### Diff Details");
-  for (const file of diff.files) {
-    lines.push(`### ${file.filename}`);
-    lines.push("```diff");
-    lines.push(file.patch ?? "(no patch available)");
-    lines.push("```");
-    lines.push("");
-  }
-
-  return lines.join("\n");
-}
-
-function buildIssueContext(context: SharedContext): string {
-  if (!context.issue) return "";
-
-  const issue = context.issue;
-
-  const lines: string[] = [];
-  lines.push("## Issue Being Analyzed");
-  lines.push(`- Issue #${issue.number}: ${issue.title}`);
-  lines.push(`- Labels: ${issue.labels.join(", ") || "none"}`);
-  lines.push(`- Created: ${issue.created_at}`);
-  lines.push("");
-
-  lines.push("### Description");
-  lines.push(issue.body ?? "(no description)");
-
-  return lines.join("\n");
-}
-
 function buildAnalysisContext(context: SharedContext): string {
   const lines: string[] = [];
 

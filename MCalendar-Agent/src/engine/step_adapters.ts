@@ -1,4 +1,4 @@
-import type { SharedContext, StepFunction, CommitAnalysis, IssueAnalysis } from "./shared_context.js";
+import type { SharedContext, StepFunction, CommitAnalysis, IssueAnalysis, ProjectContext } from "./shared_context.js";
 import { analyzeIssue } from "../agent/agent_issue_analyzer.js";
 import { analyzeCommit } from "../agent/agent_commit_analyzer.js";
 import { generateTests } from "../agent/agent_tests_generator.js";
@@ -11,8 +11,38 @@ import { GitBranch } from "../github/git_operations.js";
 import { logger } from "../utils/logger.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
 import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers/registry.js";
+import { readJson, writeJson } from "../utils/file.js";
 import fs from "node:fs";
 import path from "node:path";
+
+const CONTEXT_DIR = ".agent-context";
+const CONTEXT_FILE = path.join(CONTEXT_DIR, "project-context.json");
+
+function ensureContextDir(): void {
+  if (!fs.existsSync(CONTEXT_DIR)) {
+    fs.mkdirSync(CONTEXT_DIR, { recursive: true });
+  }
+}
+
+function loadProjectContextFromFile(): ProjectContext | null {
+  try {
+    if (fs.existsSync(CONTEXT_FILE)) {
+      return readJson<ProjectContext>(CONTEXT_FILE);
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+function saveProjectContextToFile(context: ProjectContext): void {
+  try {
+    ensureContextDir();
+    writeJson(CONTEXT_FILE, context);
+  } catch (err) {
+    // ignore write errors
+  }
+}
 
 function record(ctx: SharedContext, name: string, agent: string | undefined, output: string, decision: string) {
   ctx.stepHistory.push({
@@ -26,6 +56,14 @@ function record(ctx: SharedContext, name: string, agent: string | undefined, out
 
 async function discoverProjectContext(ctx: SharedContext): Promise<void> {
   if (ctx.projectContext) return;
+
+  // Try to load from saved file first
+  const savedContext = loadProjectContextFromFile();
+  if (savedContext) {
+    ctx.projectContext = savedContext;
+    logger.info(`[discover] Loaded project context from ${CONTEXT_FILE}`);
+    return;
+  }
 
   let tree = "";
   try { tree = ctx.reader.getProjectStructure(); } catch { /* ignore */ }
@@ -107,7 +145,9 @@ Return ONLY valid JSON with this exact shape:
         existingTestPatterns,
         testUtils,
       };
-      logger.success(`[discover] ${d.language}/${d.framework}/${d.testRunner}`);
+      // Save to file for future runs
+      saveProjectContextToFile(ctx.projectContext);
+      logger.success(`[discover] ${d.language}/${d.framework}/${d.testRunner} (saved)`);
       return;
     }
   } catch (err) {
@@ -135,7 +175,9 @@ Return ONLY valid JSON with this exact shape:
     existingTestPatterns,
     testUtils,
   };
-  logger.info(`[discover] Fallback: ${framework}/${testRunner}`);
+  // Save fallback context to file
+  saveProjectContextToFile(ctx.projectContext);
+  logger.info(`[discover] Fallback: ${framework}/${testRunner} (saved)`);
 }
 
 function parseIssueAnalysis(raw: string): IssueAnalysis {
@@ -163,6 +205,9 @@ export function adaptIssueAnalyzer(): StepFunction {
       return { action: "stop", reason: "No issue provided" };
     }
 
+    // Discover project context first (loads from file or runs LLM discovery)
+    await discoverProjectContext(ctx);
+
     const issue = ctx.issue;
     const labels = issue.labels.map((l: { name: string }) => l.name).join(", ") || "none";
     const userMessage = `Issue #${issue.number}: ${issue.title}
@@ -189,13 +234,12 @@ export function adaptIssueAnalyzer(): StepFunction {
     }
 
     if (analysis.test_scenarios.length === 0) {
-      logger.warn(`Issue #${issue.number}: Analysis returned no test scenarios`);
-      record(ctx, "analyze_issue", AGENT_NAMES.ISSUE_ANALYZER, "No test scenarios identified", "goto:summarize");
-      return { action: "goto", step: "summarize" };
+      logger.warn(`Issue #${issue.number}: Analysis returned no test scenarios — proceeding anyway`);
+      record(ctx, "analyze_issue", AGENT_NAMES.ISSUE_ANALYZER, "No test scenarios, proceeding with generator", "next");
+    } else {
+      logger.info(`Issue #${issue.number}: ${analysis.test_scenarios.length} test scenarios identified`);
+      record(ctx, "analyze_issue", AGENT_NAMES.ISSUE_ANALYZER, analysis.summary, "next");
     }
-
-    logger.info(`Issue #${issue.number}: ${analysis.test_scenarios.length} test scenarios identified`);
-    record(ctx, "analyze_issue", AGENT_NAMES.ISSUE_ANALYZER, analysis.summary, "next");
     return { action: "next" };
   };
 }
@@ -205,6 +249,9 @@ export function adaptCommitAnalyzer(): StepFunction {
     if (!ctx.commitDiff) {
       return { action: "stop", reason: "No commit diff provided" };
     }
+
+    // Discover project context first (loads from file or runs LLM discovery)
+    await discoverProjectContext(ctx);
 
     const diff = ctx.commitDiff;
     const shortSha = diff.sha.slice(0, 7);
@@ -254,55 +301,6 @@ export function adaptCommitAnalyzer(): StepFunction {
   };
 }
 
-export function adaptPlanning(): StepFunction {
-  return async (ctx) => {
-    if (!ctx.issueAnalysis && !ctx.commitAnalysis) {
-      record(ctx, "plan", undefined, "Skipped (no analysis)", "next");
-      return { action: "next" };
-    }
-
-    const analysis = ctx.issueAnalysis ?? ctx.commitAnalysis;
-    const input = ctx.issue
-      ? `ISSUE #${ctx.issue.number}: ${ctx.issue.title}\nDESCRIPTION:\n${ctx.issue.body ?? "(no description)"}\n\nANALYSIS:\n${JSON.stringify(analysis, null, 2)}`
-      : ctx.commitDiff
-        ? `COMMIT: ${ctx.commitDiff.sha.slice(0, 7)} — ${ctx.commitDiff.message}\nANALYSIS:\n${JSON.stringify(analysis, null, 2)}`
-        : "No analysis available";
-
-    const prompt = `You are a test planning agent. Given the following analysis, produce a structured test plan.
-
-${input}
-
-Return a JSON object with this shape:
-{
-  "plan_summary": "one sentence summary",
-  "test_areas": ["area1", "area2"],
-  "key_assertions": ["assertion1", "assertion2"],
-  "risk_areas": ["risk1", "risk2"],
-  "estimated_test_count": 3
-}`;
-
-    const { getTaskProvider, getTaskProviderName, getTaskModel } = await import("../providers/registry.js");
-    const provider = getTaskProvider(AGENT_NAMES.ISSUE_ANALYZER, ctx.agentConfig);
-    logger.task("test_planner", `${getTaskProviderName(AGENT_NAMES.ISSUE_ANALYZER, ctx.agentConfig)}/${getTaskModel(AGENT_NAMES.ISSUE_ANALYZER, ctx.agentConfig)}`);
-
-    const response = await provider.chat({
-      system: "You are a focused test planning agent. Output only valid JSON.",
-      messages: [{ role: "user", content: prompt }],
-      maxTokens: 1024,
-      temperature: 0.3,
-    });
-
-    const textBlocks = response.content.filter((b): b is { type: "text"; text: string } => b.type === "text");
-    const planOutput = textBlocks.map((b) => b.text).join("\n");
-    logger.prompt("test_planner", "You are a focused test planning agent. Output only valid JSON.", prompt, planOutput);
-
-    ctx.planResult = planOutput;
-    record(ctx, "plan", "test_planner", planOutput.slice(0, 200), "next");
-    logger.info(`Plan: ${planOutput.slice(0, 120)}...`);
-    return { action: "next" };
-  };
-}
-
 export function adaptBranchSetup(): StepFunction {
   return async (ctx) => {
     if (ctx.mode === "issue" && ctx.issue) {
@@ -323,6 +321,7 @@ export function adaptBranchSetup(): StepFunction {
 
 export function adaptTestGenerator(): StepFunction {
   return async (ctx) => {
+    // Project context already discovered in analyzer step; refresh structure
     if (ctx.projectContext) {
       try { ctx.projectContext.projectStructure = ctx.reader.getProjectStructure(); } catch { /* ignore */ }
     }

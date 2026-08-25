@@ -46,6 +46,6 @@ export async function generateTestReport(
     agentName
   );
 
-  logger.success("Report generated");
+  logger.success("Report generated successfully");
   return result;
 }

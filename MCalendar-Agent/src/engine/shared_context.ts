@@ -96,7 +96,6 @@ export interface SharedContext {
   reportPath?: string;
   summary?: string;
   prUrl?: string;
-  planResult?: string;
 
   branchName?: string;
   baseBranch?: string;
