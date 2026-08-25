@@ -11,6 +11,8 @@ You have access to tools to read project files, write test files, and run tests.
 - **Data Models (Prisma schema)**:
 {DATA_MODELS}
 - **API Routes**: {API_ROUTES}
+- **Project Structure (all directories and files)**:
+{PROJECT_STRUCTURE}
 - **Existing Test Patterns**:
 {EXISTING_TEST_PATTERNS}
 - **Test Utilities** (JWT signing, helpers, etc.):

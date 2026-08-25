@@ -214,6 +214,7 @@ function injectProjectContext(template: string, projectContext?: ProjectContext)
     .replace(/\{DEPENDENCIES\}/g, deps)
     .replace(/\{DATA_MODELS\}/g, projectContext.dataModels || "(not found)")
     .replace(/\{API_ROUTES\}/g, projectContext.apiRoutes.join(", ") || "(none found)")
+    .replace(/\{PROJECT_STRUCTURE\}/g, projectContext.projectStructure || "(not found)")
     .replace(/\{EXISTING_TEST_PATTERNS\}/g, projectContext.existingTestPatterns || "(no existing tests found)")
     .replace(/\{TEST_UTILS\}/g, projectContext.testUtils || "(no test utils found)");
 }

@@ -11,6 +11,8 @@ Your task is to analyze a commit diff and determine if it needs new or updated E
 - **Data Models (Prisma schema)**:
 {DATA_MODELS}
 - **API Routes**: {API_ROUTES}
+- **Project Structure (all directories and files)**:
+{PROJECT_STRUCTURE}
 
 ## Decision Criteria
 

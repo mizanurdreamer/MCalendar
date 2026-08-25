@@ -11,6 +11,8 @@ Your task is to analyze the issue and determine what E2E tests need to be writte
 - **Data Models (Prisma schema)**:
 {DATA_MODELS}
 - **API Routes**: {API_ROUTES}
+- **Project Structure (all directories and files)**:
+{PROJECT_STRUCTURE}
 
 ## Analysis Requirements
 

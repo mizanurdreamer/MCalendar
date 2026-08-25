@@ -58,6 +58,7 @@ export interface ProjectContext {
   dependencies: Record<string, string>;
   dataModels: string;
   apiRoutes: string[];
+  projectStructure: string;
   existingTestPatterns: string;
   testUtils: string;
 }

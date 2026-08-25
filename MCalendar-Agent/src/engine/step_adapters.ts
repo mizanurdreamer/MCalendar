@@ -77,16 +77,23 @@ export function adaptProjectDiscovery(): StepFunction {
       logger.warn("[project_discovery] Could not read prisma/schema.prisma");
     }
 
-    // 3. List API routes
+    // 3. List API routes (recursive, with HTTP methods)
     let apiRoutes: string[] = [];
     try {
-      const apiFiles = ctx.reader.listDirectory("app/api");
-      apiRoutes = apiFiles.filter(f => f.endsWith(".ts") || f.endsWith(".js")).map(f => `app/api/${f}`);
+      apiRoutes = ctx.reader.getApiRoutes();
     } catch {
-      logger.warn("[project_discovery] Could not list app/api");
+      logger.warn("[project_discovery] Could not read app/api routes");
     }
 
-    // 4. Read existing test patterns
+    // 4. Full project directory/file tree
+    let projectStructure = "";
+    try {
+      projectStructure = ctx.reader.getProjectStructure();
+    } catch {
+      logger.warn("[project_discovery] Could not read project structure");
+    }
+
+    // 5. Read existing test patterns
     let existingTestPatterns = "";
     let testUtils = "";
     try {
@@ -113,6 +120,7 @@ export function adaptProjectDiscovery(): StepFunction {
       dependencies,
       dataModels,
       apiRoutes,
+      projectStructure,
       existingTestPatterns,
       testUtils,
     };
