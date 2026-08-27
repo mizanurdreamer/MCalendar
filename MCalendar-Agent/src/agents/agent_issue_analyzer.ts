@@ -125,15 +125,26 @@ ${issue.body ?? "(no description)"}`;
   private parseIssueAnalysis(raw: string): NonNullable<AgentState["issueAnalysis"]> {
     logger.debug(`[AgentIssueAnalyzer] Parsing response (${raw.length} chars)`);
     
-    try {
-      // Use non-greedy match to avoid catastrophic backtracking on large responses
-      const jsonMatch = raw.match(/\{[\s\S]*?\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
+    // Try multiple parsing strategies
+    const strategies = [
+      () => this.tryParseJson(raw),
+      () => this.tryParseJson(this.extractAndFixJson(raw)),
+      () => this.tryParseJson(this.fixCommonJsonIssues(raw)),
+    ];
+    
+    for (const strategy of strategies) {
+      try {
+        const result = strategy();
+        if (result) {
+          return result;
+        }
+      } catch (err) {
+        // Continue to next strategy
+        logger.debug(`[AgentIssueAnalyzer] Strategy failed: ${err}`);
       }
-    } catch (err) {
-      logger.warn(`[AgentIssueAnalyzer] JSON parse failed: ${err}`);
     }
+    
+    logger.warn(`[AgentIssueAnalyzer] All JSON parse strategies failed`);
     return {
       summary: raw.slice(0, 500),
       functionality_to_test: [],
@@ -144,5 +155,57 @@ ${issue.body ?? "(no description)"}`;
       role_checks: [],
       needs_tests: !raw.toUpperCase().includes("NO_TESTS_NEEDED"),
     };
+  }
+  
+  private tryParseJson(jsonStr: string): NonNullable<AgentState["issueAnalysis"]> | null {
+    const jsonMatch = jsonStr.match(/\{[\s\S]*?\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+    return null;
+  }
+  
+  private extractAndFixJson(raw: string): string {
+    // Try to find the outermost JSON object
+    let braceCount = 0;
+    let startIdx = -1;
+    let endIdx = -1;
+    
+    for (let i = 0; i < raw.length; i++) {
+      if (raw[i] === '{') {
+        if (braceCount === 0) startIdx = i;
+        braceCount++;
+      } else if (raw[i] === '}') {
+        braceCount--;
+        if (braceCount === 0 && startIdx !== -1) {
+          endIdx = i;
+          break;
+        }
+      }
+    }
+    
+    if (startIdx !== -1 && endIdx !== -1) {
+      return raw.slice(startIdx, endIdx + 1);
+    }
+    return raw;
+  }
+  
+  private fixCommonJsonIssues(jsonStr: string): string {
+    let fixed = jsonStr;
+    
+    // Fix missing commas between array/object elements
+    // Pattern: "value"  "nextValue" or "value"  { or }
+    fixed = fixed.replace(/("|}|])\s*\n\s*(["{])/g, '$1,\n$2');
+    
+    // Fix missing commas between array elements on same line
+    fixed = fixed.replace(/("|}|])\s+(["{])/g, '$1, $2');
+    
+    // Remove trailing commas before } or ]
+    fixed = fixed.replace(/,(\s*[}\]])/g, '$1');
+    
+    // Fix missing commas between properties in objects
+    fixed = fixed.replace(/(":[^,{}\[\]]*)\s*\n\s*(")/g, '$1,\n$2');
+    
+    return fixed;
   }
 }
