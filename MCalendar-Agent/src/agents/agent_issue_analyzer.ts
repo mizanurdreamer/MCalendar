@@ -115,17 +115,24 @@ ${issue.body ?? "(no description)"}`;
     });
 
     const textBlocks = response.content.filter((b): b is { type: "text"; text: string } => b.type === "text");
-    return textBlocks.map((b) => b.text).join("\n");
+    const result = textBlocks.map((b) => b.text).join("\n");
+    
+    logger.debug(`[AgentIssueAnalyzer] Response received (${result.length} chars)`);
+    
+    return result;
   }
 
   private parseIssueAnalysis(raw: string): NonNullable<AgentState["issueAnalysis"]> {
+    logger.debug(`[AgentIssueAnalyzer] Parsing response (${raw.length} chars)`);
+    
     try {
-      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      // Use non-greedy match to avoid catastrophic backtracking on large responses
+      const jsonMatch = raw.match(/\{[\s\S]*?\}/);
       if (jsonMatch) {
         return JSON.parse(jsonMatch[0]);
       }
-    } catch {
-      // fall through
+    } catch (err) {
+      logger.warn(`[AgentIssueAnalyzer] JSON parse failed: ${err}`);
     }
     return {
       summary: raw.slice(0, 500),

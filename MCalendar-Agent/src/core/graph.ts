@@ -327,12 +327,37 @@ export class AgenticGraph {
     ];
 
     for (const key of keys) {
-      if (JSON.stringify(oldState[key]) !== JSON.stringify(newState[key])) {
+      if (!this.deepEqual(oldState[key], newState[key])) {
         (changes as any)[key] = newState[key];
       }
     }
 
     return changes;
+  }
+
+  private deepEqual(a: unknown, b: unknown): boolean {
+    if (a === b) return true;
+    if (a === null || b === null) return a === b;
+    if (typeof a !== "object" || typeof b !== "object") return a === b;
+    
+    const arrA = Array.isArray(a);
+    const arrB = Array.isArray(b);
+    if (arrA !== arrB) return false;
+    
+    if (arrA) {
+      const arrA_ = a as unknown[];
+      const arrB_ = b as unknown[];
+      if (arrA_.length !== arrB_.length) return false;
+      return arrA_.every((val, idx) => this.deepEqual(val, arrB_[idx]));
+    }
+    
+    const keysA = Object.keys(a as Record<string, unknown>);
+    const keysB = Object.keys(b as Record<string, unknown>);
+    if (keysA.length !== keysB.length) return false;
+    
+    const objA = a as Record<string, unknown>;
+    const objB = b as Record<string, unknown>;
+    return keysA.every(key => this.deepEqual(objA[key], objB[key]));
   }
 
   registerAgent(name: AgentName, agent: BaseAgent): void {
