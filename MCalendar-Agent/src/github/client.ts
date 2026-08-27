@@ -65,7 +65,7 @@ export class GitHubClient {
 
   async getIssue(number: number): Promise<GitHubIssue> {
     return this.withRetry(`getIssue(#${number})`, async () => {
-      const { data } = await this.octokit.issues.get({
+      const { data } = await this.octokit.rest.issues.get({
         owner: this.owner,
         repo: this.repo,
         issue_number: number,
@@ -76,12 +76,10 @@ export class GitHubClient {
 
   async listOpenIssues(): Promise<GitHubIssue[]> {
     return this.withRetry("listOpenIssues", async () => {
-      const { data } = await this.octokit.issues.listForRepo({
+      const { data } = await this.octokit.rest.issues.listForRepo({
         owner: this.owner,
         repo: this.repo,
         state: "open",
-        sort: "created",
-        direction: "desc",
         per_page: 30,
       });
       return (data as unknown as GitHubIssue[]).filter((i) => !i.pull_request);
@@ -96,7 +94,7 @@ export class GitHubClient {
   async addComment(issueNumber: number, body: string): Promise<void> {
     try {
       return await this.withRetry(`addComment(#${issueNumber})`, async () => {
-        await this.octokit.issues.createComment({
+        await this.octokit.rest.issues.createComment({
           owner: this.owner,
           repo: this.repo,
           issue_number: issueNumber,
@@ -113,7 +111,7 @@ export class GitHubClient {
     if (!prNumber) return;
     try {
       return await this.withRetry(`addPRComment(#${prNumber})`, async () => {
-        await this.octokit.issues.createComment({
+        await this.octokit.rest.issues.createComment({
           owner: this.owner,
           repo: this.repo,
           issue_number: prNumber,
@@ -130,15 +128,13 @@ export class GitHubClient {
     body: string;
     head: string;
     base: string;
-    draft?: boolean;
   }): Promise<GitHubPR> {
     try {
       return await this.withRetry(`createPR(${params.head}→${params.base})`, async () => {
-        const { data } = await this.octokit.pulls.create({
+        const { data } = await this.octokit.rest.pulls.create({
           owner: this.owner,
           repo: this.repo,
           ...params,
-          draft: params.draft ?? false,
         });
         return data as unknown as GitHubPR;
       });
@@ -149,7 +145,7 @@ export class GitHubClient {
 
   async getDefaultBranch(): Promise<string> {
     return this.withRetry("getDefaultBranch", async () => {
-      const { data } = await this.octokit.repos.get({
+      const { data } = await this.octokit.rest.repos.get({
         owner: this.owner,
         repo: this.repo,
       });
@@ -159,7 +155,7 @@ export class GitHubClient {
 
   async listCommits(branch: string, since?: string): Promise<GitHubCommit[]> {
     return this.withRetry(`listCommits(${branch})`, async () => {
-      const { data } = await this.octokit.repos.listCommits({
+      const { data } = await this.octokit.rest.repos.listCommits({
         owner: this.owner,
         repo: this.repo,
         sha: branch,
@@ -172,7 +168,7 @@ export class GitHubClient {
 
   async getCommitDiff(sha: string): Promise<CommitDiff> {
     return this.withRetry(`getCommitDiff(${sha.slice(0, 7)})`, async () => {
-      const { data } = await this.octokit.repos.getCommit({
+      const { data } = await this.octokit.rest.repos.getCommit({
         owner: this.owner,
         repo: this.repo,
         ref: sha,
@@ -207,7 +203,7 @@ export class GitHubClient {
   }): Promise<GitHubReview> {
     try {
       return await this.withRetry(`createReview(PR #${params.pull_number})`, async () => {
-        const { data } = await this.octokit.pulls.createReview({
+        const { data } = await this.octokit.rest.pulls.createReview({
           owner: this.owner,
           repo: this.repo,
           ...params,
@@ -225,7 +221,7 @@ export class GitHubClient {
   }): Promise<void> {
     try {
       return await this.withRetry(`mergePR(PR #${params.pull_number})`, async () => {
-        await this.octokit.pulls.merge({
+        await this.octokit.rest.pulls.merge({
           owner: this.owner,
           repo: this.repo,
           ...params,

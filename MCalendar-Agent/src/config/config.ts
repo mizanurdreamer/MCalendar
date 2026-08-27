@@ -49,7 +49,7 @@ export interface AppConfig {
 }
 
 export function loadConfig(): AppConfig {
-  dotenv.config({ override: true });
+  dotenv.config({ override: true } as unknown as { path?: string; override?: boolean });
 
   const provider = process.env.PROVIDER;
   if (!provider) throw new Error("Missing required env var: PROVIDER");

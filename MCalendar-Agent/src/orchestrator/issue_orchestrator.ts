@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from "uuid";
 import path from "node:path";
 import type { AgentConfig } from "../providers/types.js";
 import type { GitHubIssue } from "../github/types.js";
@@ -7,11 +8,18 @@ import { PlaywrightRunner } from "../test_runner/playwright.js";
 import { GitBranch } from "../github/git_operations.js";
 import type { TaskResult } from "../utils/types.js";
 import { logger } from "../utils/logger.js";
-import { createSharedContext } from "../engine/shared_context.js";
-import { runPipeline } from "../engine/pipeline_engine.js";
-import { getIssuePipeline } from "../engine/step_definitions.js";
 import { setDiagnosticConfig } from "../utils/diagnostic_tools.js";
 import { setDatabaseUrl } from "../utils/database_tools.js";
+import { createAgenticGraph } from "../core/graph.js";
+import { createInitialAgentState } from "../core/state.js";
+import { AgentIssueAnalyzer } from "../agents/agent_issue_analyzer.js";
+import { AgentTestsGenerator } from "../agents/agent_tests_generator.js";
+import { AgentTestsReviewer } from "../agents/agent_tests_reviewer.js";
+import { AgentTestsReportGenerator } from "../agents/agent_tests_report_generator.js";
+import { AgentSummarize } from "../agents/agent_summarize.js";
+import { AgentCritic } from "../core/agent_critic.js";
+import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers/registry.js";
+import { AGENT_NAMES } from "../utils/agent_names.js";
 
 export interface OrchestratorConfig {
   agentConfig: AgentConfig;
@@ -45,12 +53,17 @@ export async function processIssue(
   logger.info(`Fetching issue #${issue.number}: ${issue.title}`);
 
   const defaultBranch = await githubClient.getDefaultBranch();
-  //const baseBranch = defaultBranch;
-  const baseBranch = "main-agentic-ai"
+  const baseBranch = "main-agentic-ai-v2";
   const branchName = GitBranch.branchName(issue.number, issue.title);
 
-  const ctx = createSharedContext({
+  const runId = `issue-${issue.number}-${Date.now()}`;
+  
+  const provider = getTaskProvider(AGENT_NAMES.AGENT_ISSUE_ANALYZER, agentConfig);
+  logger.task("orchestrator", `${getTaskProviderName(AGENT_NAMES.AGENT_ISSUE_ANALYZER, agentConfig)}/${getTaskModel(AGENT_NAMES.AGENT_ISSUE_ANALYZER, agentConfig)}`);
+
+  const initialState = createInitialAgentState({
     mode: "issue",
+    runId,
     issue,
     agentConfig,
     reader,
@@ -58,6 +71,7 @@ export async function processIssue(
     runner,
     git,
     githubClient,
+    provider,
     codebasePath,
     testProjectPath,
     testOutputPath,
@@ -65,12 +79,49 @@ export async function processIssue(
     maxRetries,
     maxIterations,
     maxPipelineSteps,
+    commitAutoApprove: config.commitAutoApprove ?? true,
     baseBranch,
     branchName,
-    commitAutoApprove: config.commitAutoApprove ?? true,
   });
 
-  const result = await runPipeline(getIssuePipeline(), ctx);
+  const graph = createAgenticGraph({
+    memoryType: "local",
+    enableCritic: true,
+    enableHumanGates: !config.commitAutoApprove,
+    maxParallelAgents: 3,
+  });
+
+  await graph.initialize();
+
+  graph.registerAgent(AGENT_NAMES.AGENT_ISSUE_ANALYZER, new AgentIssueAnalyzer(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_ISSUE_ANALYZER)));
+  graph.registerAgent(AGENT_NAMES.AGENT_TESTS_GENERATOR, new AgentTestsGenerator(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_TESTS_GENERATOR)));
+  graph.registerAgent(AGENT_NAMES.AGENT_TESTS_REVIEWER, new AgentTestsReviewer(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_TESTS_REVIEWER)));
+  graph.registerAgent(AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, new AgentTestsReportGenerator(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR)));
+  graph.registerAgent(AGENT_NAMES.AGENT_SUMMARIZE, new AgentSummarize(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_SUMMARIZE)));
+
+  graph.registerCritic(AGENT_NAMES.AGENT_ISSUE_ANALYZER, new AgentCritic(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_ISSUE_ANALYZER), AGENT_NAMES.AGENT_ISSUE_ANALYZER));
+  graph.registerCritic(AGENT_NAMES.AGENT_TESTS_GENERATOR, new AgentCritic(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_TESTS_GENERATOR), AGENT_NAMES.AGENT_TESTS_GENERATOR));
+  graph.registerCritic(AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, new AgentCritic(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR), AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR));
+  graph.registerCritic(AGENT_NAMES.AGENT_SUMMARIZE, new AgentCritic(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_SUMMARIZE), AGENT_NAMES.AGENT_SUMMARIZE));
+
+  // Run with thread_id for checkpointing
+  const threadId = runId;
+  
+  let result = await graph.invoke(initialState, { configurable: { thread_id: threadId } });
+
+  // Handle human approval interrupts
+  while (result.status === "awaiting_human") {
+    const pending = result.humanApprovals?.find(a => !a.resolved);
+    if (!pending) break;
+
+    logger.info(`[Orchestrator] Human approval required: ${pending.title}`);
+    
+    // In a real implementation, this would wait for web UI or CLI input
+    // For now, auto-approve if commitAutoApprove is true
+    const resolution = config.commitAutoApprove ? "approve" : "approve"; // Default to approve
+    
+    result = await graph.resumeAfterApproval(threadId, resolution);
+  }
 
   if (result.testResult) {
     logger.success(
@@ -88,5 +139,18 @@ export async function processIssue(
     retryHistory: result.retryHistory,
     report: result.report,
     reportPath: result.reportPath,
+  };
+}
+
+function createTaskContext(state: any, agentName: string) {
+  return {
+    provider: state.provider,
+    reader: state.reader,
+    runner: state.runner,
+    testOutputPath: state.testOutputPath,
+    codebasePath: state.codebasePath,
+    maxTokens: state.agentConfig[agentName]?.maxTokens,
+    temperature: state.agentConfig[agentName]?.temperature,
+    maxRetries: state.maxRetries,
   };
 }

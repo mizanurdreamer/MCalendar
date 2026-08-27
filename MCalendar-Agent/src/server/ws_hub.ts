@@ -9,14 +9,14 @@ let wss: WebSocketServer | null = null;
 export function attachWs(server: Server): void {
   wss = new WebSocketServer({ server, path: "/ws" });
 
-  wss.on("connection", (socket) => {
+  wss.on("connection", (socket: WebSocket) => {
     clients.add(socket);
     socket.send(JSON.stringify({ type: "connected" } satisfies WsEvent));
 
     socket.on("close", () => clients.delete(socket));
     socket.on("error", () => clients.delete(socket));
 
-    socket.on("message", (raw) => {
+    socket.on("message", (raw: Buffer) => {
       try {
         const msg = JSON.parse(raw.toString()) as WsEvent;
         if (msg.type === "ping") socket.send(JSON.stringify({ type: "pong" }));

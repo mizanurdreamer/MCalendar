@@ -103,6 +103,9 @@ export class PlaywrightRunner {
       for (const suite of suites) walk(suite);
 
       logger.info(`[playwright] Parsed: ${passed} passed, ${failed} failed, ${errors.length} errors`);
+      if (output) {
+        logger.info(`[playwright] Full output:\n${output}`);
+      }
       return {
         success: failed === 0,
         total: passed + failed,
@@ -114,6 +117,9 @@ export class PlaywrightRunner {
       };
     } catch {
       logger.error(`[playwright] JSON parse failed — using raw output as error`);
+      if (output) {
+        logger.info(`[playwright] Raw output:\n${output}`);
+      }
       return {
         success: rawSuccess,
         total: 0,

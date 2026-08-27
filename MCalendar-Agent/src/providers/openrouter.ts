@@ -30,7 +30,7 @@ export class OpenRouterProvider implements ProviderInterface {
     if (this.resolvedAutoModel) return this.resolvedAutoModel;
     try {
       const page = await this.client.models.list();
-      const freeModels = page.data.filter((m) => {
+      const freeModels = page.data.filter((m: any) => {
         const { pricing } = m as unknown as OpenRouterModelPricing;
         return pricing?.prompt === "0" && pricing?.completion === "0";
       });

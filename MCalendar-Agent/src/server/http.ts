@@ -1,7 +1,8 @@
 import path from "node:path";
 import fs from "node:fs";
 import http from "node:http";
-import express, { type Request, type Response, type NextFunction } from "express";
+import express from "express";
+import type { Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { loadConfig } from "../config/config.js";
 import { GitHubClient } from "../github/client.js";
@@ -12,6 +13,26 @@ import { RunManager } from "./run_manager.js";
 import { runChatTurn } from "./chat_agent.js";
 import { attachWs, broadcast, connectedCount } from "./ws_hub.js";
 import { attachLogBroadcast } from "./log_transport.js";
+import { getPendingApprovals as getStoredApprovals, resolveApproval as resolveStoredApproval, createApprovalRequest as createStoredApproval } from "../core/approval_store.js";
+
+export interface ApprovalRequest {
+  id: string;
+  agent: string;
+  type: "plan" | "test_generation" | "commit_push" | "pr_creation" | "architecture_decision";
+  title: string;
+  description: string;
+  data: any;
+  options: { label: string; value: string }[];
+  defaultOption?: string;
+  createdAt: number;
+  resolved?: boolean;
+  resolution?: string;
+}
+
+// Re-export from shared store
+export const createApprovalRequest = createStoredApproval;
+export const getPendingApprovals = getStoredApprovals;
+export const resolveApproval = resolveStoredApproval;
 
 export interface WebServerOptions {
   port?: number;
@@ -126,6 +147,27 @@ export async function startWebServer(options: WebServerOptions = {}): Promise<vo
     res.json({ cleared });
   });
 
+  app.get("/api/approvals", (_req: Request, res: Response) => {
+    res.json({ approvals: getPendingApprovals() });
+  });
+
+  app.post("/api/approvals/resolve", async (req: Request, res: Response) => {
+    const parsed = z.object({
+      id: z.string().min(1),
+      resolution: z.string().min(1),
+    }).safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Body must be { id: string, resolution: string }" });
+      return;
+    }
+    const approval = resolveApproval(parsed.data.id, parsed.data.resolution);
+    if (!approval) {
+      res.status(404).json({ error: "Approval not found" });
+      return;
+    }
+    res.json({ ok: true });
+  });
+
   app.post("/api/chat", async (req: Request, res: Response) => {
     const parsed = chatRequestSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -150,7 +192,7 @@ export async function startWebServer(options: WebServerOptions = {}): Promise<vo
   const uiDist = path.resolve(process.cwd(), "ui", "dist");
   if (fs.existsSync(uiDist)) {
     app.use(express.static(uiDist));
-    app.get(/^\/(?!api|ws).*/, (_req: Request, res: Response) => {
+    app.get("*", (_req: Request, res: Response) => {
       res.sendFile(path.join(uiDist, "index.html"));
     });
   } else {
@@ -165,7 +207,7 @@ export async function startWebServer(options: WebServerOptions = {}): Promise<vo
   const port = options.port ?? parseInt(process.env.WEB_PORT ?? "3002", 10);
   const host = options.host ?? process.env.WEB_HOST ?? "127.0.0.1";
 
-  const server = http.createServer(app);
+  const server = http.createServer(app as any);
   attachWs(server);
 
   server.listen(port, host, () => {

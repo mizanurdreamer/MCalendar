@@ -4,7 +4,7 @@ An autonomous AI agent that reads GitHub issues and branch commits, analyzes the
 
 ## Agent Overview
 
-The agent is a pipeline of specialized AI sub-agents. Each sub-agent has a single responsibility and runs independently with its own system prompt. The **pipeline engine** (`engine/pipeline_engine.ts`) chains these sub-agents together, with each step returning a decision that controls what happens next (next, goto, retry, stop, done).
+The agent is a **LangGraph-based multi-agent system**. Each sub-agent has a single responsibility and runs independently with its own system prompt. The **Supervisor** routes between agents using a state graph, with decisions controlling flow (route, parallel, wait, complete, fail, request_approval).
 
 Provider and model are configured via `.env` — all tasks use the same provider/model automatically. With `MODEL=auto` (default), the provider discovers its available models from its own API at runtime and uses the first one.
 
@@ -12,20 +12,25 @@ Provider and model are configured via `.env` — all tasks use the same provider
 
 ```
 src/
-├── engine/                         # Pipeline engine + core AI loop
-│   ├── agent_runner_engine.ts      # ReAct loop (tool-use, conversation management)
-│   ├── shared_context.ts           # Shared context object passed between steps
-│   ├── pipeline_engine.ts          # Step runner with goto/retry/stop/done routing
-│   ├── step_adapters.ts            # Wraps agent functions into pipeline steps
-│   └── step_definitions.ts         # Defines issue/commit pipeline sequences
-├── agent/                          # AI-powered sub-agents (single responsibility)
+├── core/                           # LangGraph agentic framework
+│   ├── graph.ts                    # LangGraph StateGraph with checkpointing
+│   ├── supervisor.ts               # Routes agents (route/parallel/wait/complete/fail/approval)
+│   ├── state.ts                    # AgentState, AgentPlan, memory, messages, approvals
+│   ├── planner.ts                  # AdvancedPlanner generates master plans with dependencies
+│   ├── critic.ts                   # CriticAgent for self-revision (score-based)
+│   ├── memory.ts                   # InMemoryStore for cross-run learning
+│   ├── message_bus.ts              # Pub/sub for inter-agent communication
+│   ├── approval_store.ts           # File-based approval persistence
+│   ├── base_agent.ts               # BaseAgent with planning, execution, reflection
+│   └── adapters.ts                 # SharedContext for agent communication
+├── agents/                         # AI-powered sub-agents (single responsibility)
 │   ├── agent_issue_analyzer.ts     # Analyze issue → determine test scenarios
 │   ├── agent_tests_generator.ts    # Generate Playwright test code
 │   ├── agent_tests_reviewer.ts     # Review + fix failing tests
 │   ├── agent_tests_report_generator.ts  # Format test results
 │   ├── agent_summarize.ts          # Format GitHub comment
 │   └── agent_commit_analyzer.ts    # Decide if commit needs tests
-├── orchestrator/                   # Thin setup shells (delegate to pipeline engine)
+├── orchestrator/                   # Thin setup shells (delegate to agentic graph)
 │   ├── issue_orchestrator.ts       # Setup context → run issue pipeline
 │   └── commit_orchestrator.ts      # Setup context → run commit pipeline
 ├── github/                         # GitHub integration
@@ -68,7 +73,10 @@ src/
 │   ├── repo_resolver.ts            # URL detection, git clone, name extraction
 │   ├── file.ts                     # File I/O
 │   ├── tools.ts                    # Agent tool definitions
-│   └── types.ts                    # TaskName, TaskResult
+│   ├── types.ts                    # TaskName, TaskResult
+│   ├── diagnostic_tools.ts         # Diagnostic tool definitions
+│   ├── dev_tools.ts                # Developer tool definitions
+│   └── database_tools.ts           # Database tool definitions
 ├── server/                         # Web UI backend
 │   ├── http.ts                     # Express app (REST API + static UI serving)
 │   ├── main.ts                     # Standalone server entry point
@@ -84,16 +92,15 @@ src/
 
 | Agent | File | Purpose |
 |-------|------|---------|
-| `agent_runner_engine` | `src/engine/agent_runner_engine.ts` | Core ReAct loop — runs any sub-agent with tool calls (read files, write tests, run Playwright) and conversation management. |
-| `pipeline_engine` | `src/engine/pipeline_engine.ts` | Executes step sequences with goto/retry/stop/done routing based on step decisions. |
-| `issue_orchestrator` | `src/orchestrator/issue_orchestrator.ts` | Thin setup shell — creates context, runs issue pipeline, returns TaskResult. |
-| `commit_orchestrator` | `src/orchestrator/commit_orchestrator.ts` | Thin setup shell — creates context, runs commit pipeline, returns TaskResult. |
-| `agent_issue_analyzer` | `src/agent/agent_issue_analyzer.ts` | Reads a GitHub issue, explores the codebase, and determines what E2E test scenarios to write. |
-| `agent_tests_generator` | `src/agent/agent_tests_generator.ts` | Generates Playwright test code based on analysis. Uses tools to write test files. |
-| `agent_tests_reviewer` | `src/agent/agent_tests_reviewer.ts` | Reviews generated tests and fixes failures. Runs in a retry loop (up to 3x). |
-| `agent_tests_report_generator` | `src/agent/agent_tests_report_generator.ts` | Formats test results into a structured report. |
-| `agent_summarize` | `src/agent/agent_summarize.ts` | Formats test results into a GitHub comment. |
-| `agent_commit_analyzer` | `src/agent/agent_commit_analyzer.ts` | Reads a commit diff and decides whether it needs new or updated E2E tests. |
+| `supervisor` | `src/core/supervisor.ts` | Routes agents through LangGraph state graph (route/parallel/wait/complete/fail/approval). |
+| `planner` | `src/core/planner.ts` | AdvancedPlanner generates master plans with dependencies & parallel groups. |
+| `critic` | `src/core/critic.ts` | CriticAgent for self-revision with scoring (0-100) and automated fixes. |
+| `agent_issue_analyzer` | `src/agents/agent_issue_analyzer.ts` | Reads a GitHub issue, explores the codebase, and determines what E2E test scenarios to write. |
+| `agent_tests_generator` | `src/agents/agent_tests_generator.ts` | Generates Playwright test code based on analysis. Uses tools to write test files. |
+| `agent_tests_reviewer` | `src/agents/agent_tests_reviewer.ts` | Reviews generated tests and fixes failures. Runs in a retry loop (up to 3x). |
+| `agent_tests_report_generator` | `src/agents/agent_tests_report_generator.ts` | Formats test results into a structured report. |
+| `agent_summarize` | `src/agents/agent_summarize.ts` | Formats test results into a GitHub comment. |
+| `agent_commit_analyzer` | `src/agents/agent_commit_analyzer.ts` | Reads a commit diff and decides whether it needs new or updated E2E tests. |
 
 ### Non-AI Helpers
 
@@ -101,21 +108,22 @@ src/
 |--------|------|---------|
 | `GitBranch` | `src/github/git_operations.ts` | Local git operations + commitAndPush + createPR. |
 | `tests_runner` | `src/test_runner/tests_runner.ts` | Execute Playwright tests and return results. |
-| `shared_context` | `src/engine/shared_context.ts` | Shared context object + decision types for pipeline steps. |
-| `step_adapters` | `src/engine/step_adapters.ts` | Wraps agent functions into pipeline steps (adaptIssueAnalyzer, adaptTestGenerator, etc.). |
-| `step_definitions` | `src/engine/step_definitions.ts` | Defines issue/commit pipeline step sequences. |
+| `shared_context` | `src/core/adapters.ts` | Shared context object for agent communication. |
+| `memory` | `src/core/memory.ts` | InMemoryStore for cross-run learning. |
+| `message_bus` | `src/core/message_bus.ts` | Pub/sub for inter-agent communication. |
 
 ## How It Works
 
-Both modes use the **pipeline engine** (`src/engine/pipeline_engine.ts`). Each step reads/writes a shared context and returns a decision that controls flow:
+Both modes use the **LangGraph agentic framework** (`src/core/graph.ts`). The **Supervisor** (`src/core/supervisor.ts`) routes between agents using a state graph, where each agent returns a decision that controls flow:
 
 | Decision | Meaning |
 |----------|---------|
-| `next` | Proceed to the next step |
-| `goto` | Jump to a named step |
-| `retry` | Jump to a step + increment retry counter |
-| `stop` | Halt pipeline (e.g., "no tests needed") |
-| `done` | Successful completion |
+| `route` | Proceed to the next agent |
+| `parallel` | Run multiple agents simultaneously |
+| `wait` | Await human approval |
+| `complete` | Successful completion |
+| `fail` | Pipeline failed |
+| `request_approval` | Request human approval |
 
 ### Issue Mode
 
@@ -123,34 +131,24 @@ Both modes use the **pipeline engine** (`src/engine/pipeline_engine.ts`). Each s
 GitHub Issue Created
         |
         v
-orchestrator → create shared context
+orchestrator → create initial AgentState
         |
         v
-pipeline_engine → analyze_issue (agent_issue_analyzer)
-        |        → understand what to test
+Supervisor → agent_issue_analyzer (AgentIssueAnalyzer)
+        |        → analyze issue, determine test scenarios
         v
-pipeline_engine → setup_branch (git)
-        |
-        v
-pipeline_engine → generate_tests (agent_tests_generator)
+Supervisor → agent_tests_generator (AgentTestsGenerator)
         |        → write Playwright test code
         v
-pipeline_engine → run_tests (tests_runner)
-        |        → if failures, returns "retry" → jumps to review_and_fix
+Supervisor → run_tests (PlaywrightRunner via tools)
+        |        → if failures, Supervisor routes back to agent_tests_generator
         v
-pipeline_engine → generate_report (agent_tests_report_generator)
-        |
+Supervisor → agent_tests_report_generator + agent_summarize (parallel)
+        |        → generate report & GitHub comment
         v
-pipeline_engine → commit_push (git)
-        |
+Supervisor → git commit + PR creation (via tools)
         v
-pipeline_engine → create_pr (git + GitHub)
-        |
-        v
-pipeline_engine → summarize (agent_summarize)
-        |        → post GitHub comment
-        v
-        done
+        completed
 ```
 
 ### Commit Mode
@@ -159,32 +157,26 @@ pipeline_engine → summarize (agent_summarize)
 Commit pushed to branch
         |
         v
-orchestrator → create shared context
+orchestrator → create initial AgentState
         |
         v
-pipeline_engine → triage_commit (agent_commit_analyzer)
+Supervisor → agent_commit_analyzer (AgentCommitAnalyzer)
         |        → decide if tests needed
-        |        → if not needed, returns "stop" → pipeline halts
+        |        → if not needed, Supervisor routes to agent_summarize → completed
         v
-pipeline_engine → setup_branch (git)
-        |
-        v
-pipeline_engine → generate_tests (agent_tests_generator)
+Supervisor → agent_tests_generator (AgentTestsGenerator)
         |        → write test code
         v
-pipeline_engine → run_tests (tests_runner)
-        |        → if failures, returns "retry" → jumps to review_and_fix
+Supervisor → run_tests (PlaywrightRunner via tools)
+        |        → if failures, Supervisor routes back to agent_tests_generator
         v
-pipeline_engine → generate_report (agent_tests_report_generator)
-        |
+Supervisor → agent_tests_report_generator + agent_summarize (parallel)
+        |        → generate report & GitHub comment
         v
-pipeline_engine → commit_push (git)
-        |
+Supervisor → git commit + PR creation (via tools)
         v
-pipeline_engine → create_pr (git + GitHub)
-        |
-        v
-pipeline_engine → summarize (agent_summarize)
+        completed
+```
         |        → post GitHub comment
         v
         done

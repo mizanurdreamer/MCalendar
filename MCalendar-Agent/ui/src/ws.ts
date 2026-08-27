@@ -8,7 +8,15 @@ export type WsEvent =
   | { type: "job:result"; job: JobInfo }
   | { type: "chat:activity"; phase: "start" | "end"; name: string }
   | { type: "chat:summary"; jobId: string; title: string; markdown: string }
-  | { type: "retries:update" };
+  | { type: "retries:update" }
+  // Agentic events
+  | { type: "agent:status"; agent: string; status: string; timestamp: string }
+  | { type: "agent:plan"; agent: string; plan: any; timestamp: string }
+  | { type: "agent:step"; agent: string; step: any; timestamp: string }
+  | { type: "agent:reflection"; agent: string; reflection: any; timestamp: string }
+  | { type: "checkpoint:saved"; runId: string; step: number; agent: string; timestamp: string }
+  | { type: "human:approval:requested"; request: any }
+  | { type: "human:approval:resolved"; requestId: string; resolution: string; timestamp: string };
 
 export interface LogEntry {
   id: number;
@@ -24,6 +32,52 @@ export interface ChatSummary {
   markdown: string;
 }
 
+export interface AgentStatus {
+  agent: string;
+  status: "idle" | "planning" | "executing" | "reflecting" | "awaiting_approval" | "completed" | "failed";
+  updatedAt: number;
+}
+
+export interface AgentPlan {
+  agent: string;
+  goal: string;
+  steps: any[];
+  estimatedIterations: number;
+  riskLevel: "low" | "medium" | "high";
+  createdAt: number;
+  parallelGroups?: string[][];
+}
+
+export interface AgentStep {
+  agent: string;
+  stepId: string;
+  tool: string;
+  args: any;
+  expectedOutcome: string;
+  reasoning: string;
+  status: "pending" | "running" | "completed" | "failed";
+  startedAt?: number;
+  completedAt?: number;
+}
+
+export interface Reflection {
+  agent: string;
+  score: number;
+  strengths: string[];
+  weaknesses: string[];
+  suggestions: string[];
+  shouldRevise: boolean;
+  timestamp: number;
+}
+
+export interface Checkpoint {
+  runId: string;
+  step: number;
+  agent: string;
+  timestamp: number;
+  status: string;
+}
+
 const MAX_LOGS = 400;
 
 export function useAgentSocket() {
@@ -33,8 +87,16 @@ export function useAgentSocket() {
   const [activity, setActivity] = useState<{ name: string; startedAt: number }[]>([]);
   const [retriesVersion, setRetriesVersion] = useState(0);
   const [chatSummaries, setChatSummaries] = useState<ChatSummary[]>([]);
+  // Agentic state
+  const [agentStatuses, setAgentStatuses] = useState<Map<string, AgentStatus>>(new Map());
+  const [agentPlans, setAgentPlans] = useState<Map<string, AgentPlan>>(new Map());
+  const [agentSteps, setAgentSteps] = useState<AgentStep[]>([]);
+  const [reflections, setReflections] = useState<Reflection[]>([]);
+  const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
+  const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
   const logIdRef = useRef(0);
   const summaryIdRef = useRef(0);
+  const stepIdRef = useRef(0);
 
   useEffect(() => {
     let socket: WebSocket | null = null;
@@ -108,6 +170,72 @@ export function useAgentSocket() {
         case "retries:update":
           setRetriesVersion((v) => v + 1);
           break;
+        // Agentic events
+        case "agent:status": {
+          setAgentStatuses((prev) => {
+            const next = new Map(prev);
+            next.set(msg.agent, {
+              agent: msg.agent,
+              status: msg.status as AgentStatus["status"],
+              updatedAt: Date.parse(msg.timestamp) || Date.now(),
+            });
+            return next;
+          });
+          break;
+        }
+        case "agent:plan": {
+          setAgentPlans((prev) => {
+            const next = new Map(prev);
+            next.set(msg.agent, { ...msg.plan, agent: msg.agent, createdAt: Date.parse(msg.timestamp) || Date.now() });
+            return next;
+          });
+          break;
+        }
+        case "agent:step": {
+          setAgentSteps((prev) => {
+            const existing = prev.findIndex(s => s.stepId === msg.step.stepId && s.agent === msg.agent);
+            const step: AgentStep = {
+              agent: msg.agent,
+              stepId: msg.step.stepId,
+              tool: msg.step.tool,
+              args: msg.step.args,
+              expectedOutcome: msg.step.expectedOutcome,
+              reasoning: msg.step.reasoning,
+              status: msg.step.status,
+              startedAt: msg.step.startedAt,
+              completedAt: msg.step.completedAt,
+            };
+            if (existing >= 0) {
+              const next = [...prev];
+              next[existing] = step;
+              return next;
+            }
+            return [...prev, step];
+          });
+          break;
+        }
+        case "agent:reflection": {
+          setReflections((prev) => [
+            ...prev,
+            { ...msg.reflection, agent: msg.agent, timestamp: Date.parse(msg.timestamp) || Date.now() },
+          ].slice(-50));
+          break;
+        }
+        case "checkpoint:saved": {
+          setCheckpoints((prev) => [
+            { runId: msg.runId, step: msg.step, agent: msg.agent, timestamp: Date.parse(msg.timestamp) || Date.now(), status: "saved" },
+            ...prev,
+          ].slice(-20));
+          break;
+        }
+        case "human:approval:requested": {
+          setPendingApprovals((prev) => [...prev, { ...msg.request, requestedAt: Date.now() }]);
+          break;
+        }
+        case "human:approval:resolved": {
+          setPendingApprovals((prev) => prev.filter(a => a.id !== msg.requestId));
+          break;
+        }
       }
     };
 
@@ -120,5 +248,19 @@ export function useAgentSocket() {
     };
   }, []);
 
-  return { connected, logs, jobs, activity, retriesVersion, chatSummaries };
+  return { 
+    connected, 
+    logs, 
+    jobs, 
+    activity, 
+    retriesVersion, 
+    chatSummaries,
+    // Agentic
+    agentStatuses,
+    agentPlans,
+    agentSteps,
+    reflections,
+    checkpoints,
+    pendingApprovals,
+  };
 }

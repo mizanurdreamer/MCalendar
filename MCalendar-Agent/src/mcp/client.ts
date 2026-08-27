@@ -26,16 +26,15 @@ export async function initMcpClient(browser = "chromium"): Promise<void> {
   transport = new StdioClientTransport({
     command: "npx",
     args: ["@playwright/mcp@latest", "--headless", `--browser=${browser}`],
-    stderr: "pipe",
   });
 
-  client = new Client({ name: "mcalendar-agent", version: "1.0.0" });
+  client = new Client({} as any);
 
-  transport.onerror = (err) => {
+  transport.onerror = (err: Error) => {
     logger.warn(`MCP transport error: ${err.message}`);
   };
 
-  await client.connect(transport);
+  await client.connect();
   logger.success("Playwright MCP server connected");
 
   const { tools } = await client.listTools();
@@ -52,7 +51,7 @@ export async function callMcpTool(
   }
 
   try {
-    const result = await client.callTool({ name, arguments: args });
+    const result = await client.callTool(name, args);
     const content = (result as { content?: Array<{ type: string; text?: string }> }).content ?? [];
     return content
       .filter((c) => c.type === "text")

@@ -8,6 +8,23 @@ import { StateManager } from "./watcher/issue_state_tracker.js";
 import { CommitStateManager } from "./watcher/commit_state_tracker.js";
 import { startWebServer } from "./server/http.js";
 import { logger } from "./utils/logger.js";
+import { createAgenticGraph } from "./core/graph.js";
+import { createInitialAgentState } from "./core/state.js";
+import { AgentIssueAnalyzer } from "./agents/agent_issue_analyzer.js";
+import { AgentTestsGenerator } from "./agents/agent_tests_generator.js";
+import { AgentTestsReviewer } from "./agents/agent_tests_reviewer.js";
+import { AgentTestsReportGenerator } from "./agents/agent_tests_report_generator.js";
+import { AgentSummarize } from "./agents/agent_summarize.js";
+import { AgentCommitAnalyzer } from "./agents/agent_commit_analyzer.js";
+import { AgentCritic } from "./core/agent_critic.js";
+import { getTaskProvider, getTaskProviderName, getTaskModel } from "./providers/registry.js";
+import { AGENT_NAMES } from "./utils/agent_names.js";
+import { CodebaseReader } from "./codebase/reader.js";
+import { PlaywrightRunner } from "./test_runner/playwright.js";
+import { GitBranch } from "./github/git_operations.js";
+import path from "node:path";
+import { setDiagnosticConfig } from "./utils/diagnostic_tools.js";
+import { setDatabaseUrl } from "./utils/database_tools.js";
 
 const program = new Command();
 
@@ -39,7 +56,7 @@ program
         `Processing issue #${issue.number}: ${issue.title}`,
       ]);
 
-      const result = await processIssue(issue, {
+      const orchestratorConfig = {
         agentConfig: config.agentConfig,
         githubClient: github,
         codebasePath: config.codebasePath,
@@ -51,7 +68,9 @@ program
         databaseUrl: config.databaseUrl,
         apiBaseUrl: config.apiBaseUrl,
         commitAutoApprove: config.commitAutoApprove,
-      });
+      };
+
+      const result = await processIssue(issue, orchestratorConfig);
 
       logger.success(`\n✅ Done — ${result.output}`);
     } catch (err) {
@@ -83,7 +102,7 @@ program
 
       const diff = await github.getCommitDiff(sha);
 
-      const result = await processCommit(diff, {
+      const orchestratorConfig = {
         agentConfig: config.agentConfig,
         githubClient: github,
         codebasePath: config.codebasePath,
@@ -96,7 +115,9 @@ program
         databaseUrl: config.databaseUrl,
         apiBaseUrl: config.apiBaseUrl,
         commitAutoApprove: config.commitAutoApprove,
-      });
+      };
+
+      const result = await processCommit(diff, orchestratorConfig);
 
       if (result.skipped) {
         logger.info(`Skipped: ${result.analysis?.reason}`);
@@ -289,7 +310,7 @@ retryCmd
         `Retrying issue #${issue.number}: ${issue.title}`,
       ]);
 
-      const result = await processIssue(issue, {
+      const orchestratorConfig = {
         agentConfig: config.agentConfig,
         githubClient: github,
         codebasePath: config.codebasePath,
@@ -301,7 +322,9 @@ retryCmd
         databaseUrl: config.databaseUrl,
         apiBaseUrl: config.apiBaseUrl,
         commitAutoApprove: config.commitAutoApprove,
-      });
+      };
+
+      const result = await processIssue(issue, orchestratorConfig);
 
       if (result.success) {
         stateManager.resolveIssueRetry(issueNumber);
@@ -339,7 +362,7 @@ retryCmd
 
       const diff = await github.getCommitDiff(sha);
 
-      const result = await processCommit(diff, {
+      const orchestratorConfig = {
         agentConfig: config.agentConfig,
         githubClient: github,
         codebasePath: config.codebasePath,
@@ -352,7 +375,9 @@ retryCmd
         databaseUrl: config.databaseUrl,
         apiBaseUrl: config.apiBaseUrl,
         commitAutoApprove: config.commitAutoApprove,
-      });
+      };
+
+      const result = await processCommit(diff, orchestratorConfig);
 
       if (result.success) {
         commitState.resolveCommitRetry(sha);
@@ -375,6 +400,57 @@ retryCmd
     const issuesCleared = stateManager.clearIssueRetries();
     const commitsCleared = commitState.clearCommitRetries();
     logger.success(`Cleared ${issuesCleared} issue retry(ies) and ${commitsCleared} commit retry(ies).`);
+  });
+
+// Approval command for agentic mode
+program
+  .command("approve")
+  .description("Approve a pending human approval request (for agentic mode)")
+  .argument("<thread-id>", "Thread ID from agentic run")
+  .argument("<resolution>", "Resolution: approve or reject")
+  .action(async (threadId: string, resolution: string) => {
+    try {
+      const config = loadConfig();
+      if (!config.agentEnabled) {
+        logger.info("Agent is disabled (AGENT_ENABLED=false). Exiting.");
+        return;
+      }
+      
+      logger.banner([
+        "🤖 MCalendar Multi-AI Test Agent",
+        `Approving thread: ${threadId}`,
+        `Resolution: ${resolution}`,
+      ]);
+
+      const github = new GitHubClient(config.githubToken, config.repoOwner, config.repoName, config.githubMaxRetries);
+      const reader = new CodebaseReader(config.codebasePath);
+      const testReader = new CodebaseReader(config.testProjectPath);
+      const runner = new PlaywrightRunner(config.testProjectPath);
+      const git = new GitBranch(config.codebasePath);
+      const testOutputPath = path.join(config.testProjectPath, "tests");
+
+      const provider = getTaskProvider(AGENT_NAMES.AGENT_ISSUE_ANALYZER, config.agentConfig);
+
+      // We need to resume an existing graph - create a minimal graph to resume
+      const graph = createAgenticGraph({
+        memoryType: "local",
+        enableCritic: true,
+        enableHumanGates: true,
+        maxParallelAgents: 3,
+      });
+
+      await graph.initialize();
+
+      const result = await graph.resumeAfterApproval(threadId, resolution);
+
+      logger.success(`\n✅ Resumed — Status: ${result.status}`);
+      if (result.testResult) {
+        logger.info(`Tests: ${result.testResult.passed} passed, ${result.testResult.failed} failed`);
+      }
+    } catch (err) {
+      logger.error(`Error: ${err}`);
+      process.exit(1);
+    }
   });
 
 program.parse();

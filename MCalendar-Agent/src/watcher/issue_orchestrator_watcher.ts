@@ -43,6 +43,7 @@ export async function startWatcher(config: WatcherConfig): Promise<void> {
   logger.banner([
     "🤖 MCalendar Multi-AI Test Agent — Watch Mode",
     `Polling every ${pollIntervalMin}m for: ${modes.join(" + ")}`,
+    `Orchestration: Agentic (LangGraph)`,
     `Last processed issue: #${stateManager.getLastProcessedNumber()}`,
     `Pending retries: ${stateManager.getDueIssueRetries().length + commitState.getDueCommitRetries().length}`,
   ]);

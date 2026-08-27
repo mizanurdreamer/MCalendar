@@ -43,9 +43,22 @@ export interface PendingRetry {
   lastError: string;
 }
 
-export interface RetriesResponse {
-  issues: PendingRetry[];
-  commits: PendingRetry[];
+export interface ApprovalRequest {
+  id: string;
+  agent: string;
+  type: "plan" | "test_generation" | "commit_push" | "pr_creation" | "architecture_decision";
+  title: string;
+  description: string;
+  data: any;
+  options: { label: string; value: string }[];
+  defaultOption?: string;
+  createdAt: number;
+  resolved?: boolean;
+  resolution?: string;
+}
+
+export interface ApprovalsResponse {
+  approvals: ApprovalRequest[];
 }
 
 export interface AppConfigResponse {
@@ -83,5 +96,11 @@ export const api = {
     request<{ reply: string }>("/api/chat", {
       method: "POST",
       body: JSON.stringify({ message, history }),
+    }),
+  getPendingApprovals: () => request<ApprovalsResponse>("/api/approvals"),
+  resolveApproval: (id: string, resolution: string) =>
+    request<{ ok: boolean }>("/api/approvals/resolve", {
+      method: "POST",
+      body: JSON.stringify({ id, resolution }),
     }),
 };

@@ -27,6 +27,8 @@ export interface ToolDefinition {
   inputSchema: Record<string, unknown>;
 }
 
+export type Tool = ToolDefinition;
+
 export interface ChatResponse {
   content: ContentBlock[];
   stopReason: "end_turn" | "tool_use";

@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from "uuid";
 import path from "node:path";
 import type { AgentConfig } from "../providers/types.js";
 import type { CommitDiff } from "../github/types.js";
@@ -7,11 +8,18 @@ import { PlaywrightRunner } from "../test_runner/playwright.js";
 import { GitBranch } from "../github/git_operations.js";
 import type { TaskResult } from "../utils/types.js";
 import { logger } from "../utils/logger.js";
-import { createSharedContext } from "../engine/shared_context.js";
-import { runPipeline } from "../engine/pipeline_engine.js";
-import { getCommitPipeline } from "../engine/step_definitions.js";
 import { setDiagnosticConfig } from "../utils/diagnostic_tools.js";
 import { setDatabaseUrl } from "../utils/database_tools.js";
+import { createAgenticGraph } from "../core/graph.js";
+import { createInitialAgentState } from "../core/state.js";
+import { AgentCommitAnalyzer } from "../agents/agent_commit_analyzer.js";
+import { AgentTestsGenerator } from "../agents/agent_tests_generator.js";
+import { AgentTestsReviewer } from "../agents/agent_tests_reviewer.js";
+import { AgentTestsReportGenerator } from "../agents/agent_tests_report_generator.js";
+import { AgentSummarize } from "../agents/agent_summarize.js";
+import { AgentCritic } from "../core/agent_critic.js";
+import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers/registry.js";
+import { AGENT_NAMES } from "../utils/agent_names.js";
 
 export interface CommitOrchestratorConfig {
   agentConfig: AgentConfig;
@@ -46,8 +54,14 @@ export async function processCommit(
 
   const branchName = `test/commit-${shortSha}`;
 
-  const ctx = createSharedContext({
+  const runId = `commit-${shortSha}-${Date.now()}`;
+
+  const provider = getTaskProvider(AGENT_NAMES.AGENT_COMMIT_ANALYZER, agentConfig);
+  logger.task("orchestrator", `${getTaskProviderName(AGENT_NAMES.AGENT_COMMIT_ANALYZER, agentConfig)}/${getTaskModel(AGENT_NAMES.AGENT_COMMIT_ANALYZER, agentConfig)}`);
+
+  const initialState = createInitialAgentState({
     mode: "commit",
+    runId,
     commitDiff: diff,
     agentConfig,
     reader,
@@ -55,6 +69,7 @@ export async function processCommit(
     runner,
     git: new GitBranch(codebasePath),
     githubClient,
+    provider,
     codebasePath,
     testProjectPath,
     testOutputPath,
@@ -62,12 +77,47 @@ export async function processCommit(
     maxRetries,
     maxIterations,
     maxPipelineSteps,
+    commitAutoApprove: config.commitAutoApprove ?? true,
     baseBranch: targetBranch,
     branchName,
-    commitAutoApprove: config.commitAutoApprove ?? true,
   });
 
-  const result = await runPipeline(getCommitPipeline(), ctx);
+  const graph = createAgenticGraph({
+    memoryType: "local",
+    enableCritic: true,
+    enableHumanGates: !config.commitAutoApprove,
+    maxParallelAgents: 3,
+  });
+
+  await graph.initialize();
+
+  graph.registerAgent(AGENT_NAMES.AGENT_COMMIT_ANALYZER, new AgentCommitAnalyzer(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_COMMIT_ANALYZER)));
+  graph.registerAgent(AGENT_NAMES.AGENT_TESTS_GENERATOR, new AgentTestsGenerator(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_TESTS_GENERATOR)));
+  graph.registerAgent(AGENT_NAMES.AGENT_TESTS_REVIEWER, new AgentTestsReviewer(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_TESTS_REVIEWER)));
+  graph.registerAgent(AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, new AgentTestsReportGenerator(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR)));
+  graph.registerAgent(AGENT_NAMES.AGENT_SUMMARIZE, new AgentSummarize(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_SUMMARIZE)));
+
+  graph.registerCritic(AGENT_NAMES.AGENT_COMMIT_ANALYZER, new AgentCritic(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_COMMIT_ANALYZER), AGENT_NAMES.AGENT_COMMIT_ANALYZER));
+  graph.registerCritic(AGENT_NAMES.AGENT_TESTS_GENERATOR, new AgentCritic(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_TESTS_GENERATOR), AGENT_NAMES.AGENT_TESTS_GENERATOR));
+  graph.registerCritic(AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, new AgentCritic(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR), AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR));
+  graph.registerCritic(AGENT_NAMES.AGENT_SUMMARIZE, new AgentCritic(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_SUMMARIZE), AGENT_NAMES.AGENT_SUMMARIZE));
+
+  // Run with thread_id for checkpointing
+  const threadId = runId;
+  
+  let result = await graph.invoke(initialState, { configurable: { thread_id: threadId } });
+
+  // Handle human approval interrupts
+  while (result.status === "awaiting_human") {
+    const pending = result.humanApprovals?.find(a => !a.resolved);
+    if (!pending) break;
+
+    logger.info(`[Orchestrator] Human approval required: ${pending.title}`);
+    
+    const resolution = config.commitAutoApprove ? "approve" : "approve";
+    
+    result = await graph.resumeAfterApproval(threadId, resolution);
+  }
 
   if (result.status === "skipped" && result.commitAnalysis && !result.commitAnalysis.needsTests) {
     logger.info(`Commit ${shortSha} skipped: ${result.commitAnalysis.reason}`);
@@ -98,5 +148,18 @@ export async function processCommit(
     retryHistory: result.retryHistory,
     report: result.report,
     reportPath: result.reportPath,
+  };
+}
+
+function createTaskContext(state: any, agentName: string) {
+  return {
+    provider: state.provider,
+    reader: state.reader,
+    runner: state.runner,
+    testOutputPath: state.testOutputPath,
+    codebasePath: state.codebasePath,
+    maxTokens: state.agentConfig[agentName]?.maxTokens,
+    temperature: state.agentConfig[agentName]?.temperature,
+    maxRetries: state.maxRetries,
   };
 }

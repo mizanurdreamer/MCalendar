@@ -4,6 +4,11 @@ import { useAgentSocket } from "./ws";
 import { Sidebar } from "./components/Sidebar";
 import { JobCard, Markdown } from "./components/JobCard";
 import { LogDrawer } from "./components/LogDrawer";
+import { HumanApprovalPanel } from "./components/HumanApprovalPanel";
+import { AgentStatusPanel } from "./components/AgentStatusPanel";
+import { AgentPlanPanel } from "./components/AgentPlanPanel";
+import { AgentStepsPanel } from "./components/AgentStepsPanel";
+import { CheckpointPanel } from "./components/CheckpointPanel";
 
 type UiMessage =
   | { kind: "text"; id: string; role: "user" | "assistant"; content: string }
@@ -148,6 +153,16 @@ export default function App() {
       />
 
       <main className="main">
+        <HumanApprovalPanel />
+        
+        {/* Agentic Panels */}
+        <div className="agentic-panels">
+          <AgentStatusPanel />
+          <AgentPlanPanel />
+          <AgentStepsPanel />
+          <CheckpointPanel />
+        </div>
+
         <div className="messages" ref={scrollRef}>
           {messages.map((msg) =>
             msg.kind === "text" ? (

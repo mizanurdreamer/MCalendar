@@ -1,4 +1,4 @@
-import { GoogleGenAI, FunctionCallingConfigMode } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import type {
   ProviderInterface,
   ChatParams,
@@ -24,8 +24,8 @@ export class GoogleProvider implements ProviderInterface {
   private async resolveAutoModel(): Promise<string> {
     if (this.resolvedAutoModel) return this.resolvedAutoModel;
     try {
-      const pager = await this.client.models.list();
-      for await (const m of pager) {
+      const models = await this.client.models.list();
+      for await (const m of models) {
         if (m.name) {
           const id = m.name.replace(/^models\//, "");
           this.resolvedAutoModel = id;
@@ -69,10 +69,10 @@ export class GoogleProvider implements ProviderInterface {
       ],
     }));
 
-    const response = await this.client.models.generateContent({
-      model: effectiveModel,
+    const response = await this.client.models.generateContent(
+      effectiveModel,
       contents,
-      config: {
+      {
         systemInstruction: system,
         maxOutputTokens: maxTokens,
         temperature,
@@ -82,44 +82,38 @@ export class GoogleProvider implements ProviderInterface {
         toolConfig: functionDeclarations
           ? {
               functionCallingConfig: {
-                mode: FunctionCallingConfigMode.AUTO,
+                mode: "AUTO",
               },
             }
           : undefined,
-      },
-    });
-
-    const contentBlocks: ContentBlock[] = [];
-    const text = response.text;
-    if (text) contentBlocks.push({ type: "text", text });
-
-    const functionCalls = response.functionCalls;
-    if (functionCalls) {
-      for (const fc of functionCalls) {
-        contentBlocks.push({
-          type: "tool_use",
-          id: `gemini-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-          name: fc.name ?? "unknown_function",
-          input: (fc.args as Record<string, unknown>) ?? {},
-        });
       }
+    );
+
+    const text = response.text ?? "";
+    const toolCalls = response.functionCalls?.map((fc: { name: string; args: Record<string, unknown> }) => ({
+      name: fc.name,
+      arguments: fc.args,
+    }));
+
+    const contentBlocks: ContentBlock[] = [{ type: "text", text }];
+    if (toolCalls && toolCalls.length > 0) {
+      toolCalls.forEach((tc: { name: string; arguments: Record<string, unknown> }) => {
+        contentBlocks.push({ type: "tool_use", id: tc.name, name: tc.name, input: tc.arguments });
+      });
     }
 
     return {
       content: contentBlocks,
-      stopReason: functionCalls && functionCalls.length > 0 ? "tool_use" : "end_turn",
-      usage: {
-        inputTokens: response.usageMetadata?.promptTokenCount ?? 0,
-        outputTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
-      },
+      stopReason: toolCalls && toolCalls.length > 0 ? "tool_use" : "end_turn",
+      usage: { inputTokens: 0, outputTokens: 0 },
     };
   }
 
-  private convertTool(tool: ToolDefinition) {
+  private convertTool(tool: ToolDefinition): any {
     return {
       name: tool.name,
       description: tool.description,
-      parametersJsonSchema: tool.inputSchema,
+      parameters: tool.inputSchema,
     };
   }
 }

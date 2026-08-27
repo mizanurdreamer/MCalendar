@@ -1,10 +1,10 @@
-import simpleGit from "simple-git";
+import { simpleGit, SimpleGit } from "simple-git";
 import type { GitHubClient } from "./client.js";
 import type { GitHubPR } from "./types.js";
 import { logger } from "../utils/logger.js";
 
 export class GitBranch {
-  private git: ReturnType<typeof simpleGit>;
+  private git: SimpleGit;
   private basePath: string;
 
   constructor(basePath: string) {
@@ -17,13 +17,13 @@ export class GitBranch {
     return status.current ?? "main";
   }
 
-  async createAndCheckout(branchName: string, baseBranch: string): Promise<void> {
+async createAndCheckout(branchName: string, baseBranch: string): Promise<void> {
     await this.git.fetch("origin", baseBranch);
-    const branches = await this.git.branchLocal();
+    const branches = await this.git.branch();
     if (branches.all.includes(branchName)) {
       await this.git.checkout(branchName);
     } else {
-      await this.git.checkoutLocalBranch(branchName);
+      await this.git.checkout(branchName, ["-b"]);
     }
   }
 
