@@ -16,6 +16,7 @@ let client: any = null;
 let transport: StdioClientTransport | null = null;
 let cachedTools: McpToolDef[] = [];
 let refCount = 0;
+const mcpTimeoutMs = parseInt(process.env.MCP_TIMEOUT_MS ?? "300000", 10);
 
 export async function initMcpClient(browser = "chromium"): Promise<void> {
   refCount++;
@@ -52,7 +53,7 @@ export async function callMcpTool(
   }
 
   try {
-    const result = await client.callTool(name, args);
+    const result = await client.callTool(name, args, { timeout: mcpTimeoutMs });
     const content = (result as { content?: Array<{ type: string; text?: string }> }).content ?? [];
     return content
       .filter((c) => c.type === "text")
