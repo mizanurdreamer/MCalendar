@@ -4,7 +4,7 @@ import { BaseAgent } from "../core/base_agent.js";
 import { logger } from "../utils/logger.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
 import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers/registry.js";
-import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL } from "../utils/constants.js";
+import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL, MESSAGE_TYPE, AGENT_EVENT, CORE_AGENT_NAMES } from "../utils/constants.js";
 
 const SUBMIT_ANALYSIS_TOOL: ToolDefinition = {
   name: "submit_analysis",
@@ -154,6 +154,13 @@ ${issue.body ?? "(no description)"}`;
       state.error = `Issue analysis failed: ${err}`;
       this.updateStatus(AGENT_STATUS.FAILED);
     }
+
+    this.sendMessage(CORE_AGENT_NAMES.SUPERVISOR, MESSAGE_TYPE.NOTIFICATION, {
+      event: AGENT_EVENT.ISSUE_ANALYZED,
+      issueNumber: state.issue?.number,
+      needsTests: state.issueAnalysis?.needs_tests ?? false,
+      scenarios: state.issueAnalysis?.test_scenarios?.length ?? 0,
+    });
 
     return state;
   }

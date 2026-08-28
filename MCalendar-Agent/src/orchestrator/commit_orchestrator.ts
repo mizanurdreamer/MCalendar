@@ -38,6 +38,7 @@ export interface CommitOrchestratorConfig {
   commitAutoApprove?: boolean;
   playwrightMcpEnabled?: boolean;
   playwrightMcpBrowser?: string;
+  playwrightWorkers?: number;
 }
 
 export async function processCommit(
@@ -47,7 +48,7 @@ export async function processCommit(
   const { agentConfig, githubClient, codebasePath, testProjectPath, maxRetries, maxIterations, maxPipelineSteps, targetBranch, projectName } = config;
   const reader = new CodebaseReader(codebasePath);
   const testReader = new CodebaseReader(testProjectPath);
-  const runner = new PlaywrightRunner(testProjectPath);
+  const runner = new PlaywrightRunner(testProjectPath, config.playwrightWorkers ?? 6);
   const testOutputPath = path.join(testProjectPath, "tests");
 
   setDiagnosticConfig({ databaseUrl: config.databaseUrl, apiBaseUrl: config.apiBaseUrl });

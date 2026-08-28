@@ -437,7 +437,7 @@ program
       const github = new GitHubClient(config.githubToken, config.repoOwner, config.repoName, config.githubMaxRetries);
       const reader = new CodebaseReader(config.codebasePath);
       const testReader = new CodebaseReader(config.testProjectPath);
-      const runner = new PlaywrightRunner(config.testProjectPath);
+      const runner = new PlaywrightRunner(config.testProjectPath, config.playwrightWorkers ?? 6);
       const git = new GitBranch(config.codebasePath);
       const testOutputPath = path.join(config.testProjectPath, "tests");
 

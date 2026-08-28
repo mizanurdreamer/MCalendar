@@ -3,7 +3,7 @@ import { BaseAgent } from "../core/base_agent.js";
 import { logger } from "../utils/logger.js";
 import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers/registry.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
-import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL } from "../utils/constants.js";
+import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL, MESSAGE_TYPE, AGENT_EVENT, CORE_AGENT_NAMES } from "../utils/constants.js";
 import { createAgentTools, executeTool } from "../utils/tools.js";
 import { isMcpTool, callMcpTool } from "../mcp/client.js";
 import type { ToolDefinition, ChatMessage, ContentBlock } from "../providers/types.js";
@@ -141,6 +141,13 @@ Return the fixed test file content via write_test_file tool.`;
       state.error = `Test review failed: ${err}`;
       this.updateStatus(AGENT_STATUS.FAILED);
     }
+
+    this.sendMessage(CORE_AGENT_NAMES.SUPERVISOR, MESSAGE_TYPE.NOTIFICATION, {
+      event: AGENT_EVENT.TESTS_REVIEWED,
+      filename: testFilename,
+      attempt: state.retries,
+      errorsFixed: testResult?.errors?.length ?? 0,
+    });
 
     return state;
   }

@@ -15,14 +15,16 @@ export interface TestResult {
 
 export class PlaywrightRunner {
   private codebasePath: string;
+  private workers: number;
 
-  constructor(codebasePath: string) {
+  constructor(codebasePath: string, workers = 6) {
     this.codebasePath = codebasePath;
+    this.workers = workers;
   }
 
   run(filename?: string): TestResult {
     const testPath = filename ? `tests/${filename}` : "tests/";
-    const cmd = `npx playwright test ${testPath} --reporter=json,html`;
+    const cmd = `npx playwright test ${testPath} --reporter=json,html --workers=${this.workers}`;
 
     try {
       const output = execSync(cmd, {

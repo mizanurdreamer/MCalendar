@@ -46,6 +46,7 @@ export interface AppConfig {
   superAdminPassword?: string;
   playwrightMcpEnabled: boolean;
   playwrightMcpBrowser: string;
+  playwrightWorkers: number;
 }
 
 export function loadConfig(): AppConfig {
@@ -136,5 +137,6 @@ export function loadConfig(): AppConfig {
     superAdminPassword: process.env.SUPER_ADMIN_PASSWORD,
     playwrightMcpEnabled: (process.env.PLAYWRIGHT_MCP_ENABLED ?? "false").toLowerCase() === "true",
     playwrightMcpBrowser: process.env.PLAYWRIGHT_MCP_BROWSER ?? "chromium",
+    playwrightWorkers: parseInt(process.env.PLAYWRIGHT_WORKERS ?? "6", 10),
   };
 }

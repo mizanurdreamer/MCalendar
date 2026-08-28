@@ -133,6 +133,7 @@ export interface AgentState {
   maxPipelineSteps: number;
   commitAutoApprove: boolean;
   retries: number;
+  playwrightWorkers: number;
   
   planStepIndex: number;
   
@@ -231,6 +232,7 @@ export function createInitialAgentState(input: {
   commitAutoApprove?: boolean;
   baseBranch: string;
   branchName: string;
+  playwrightWorkers?: number;
 }): AgentState {
   const agentNames: AgentName[] = [
     CORE_AGENT_NAMES.SUPERVISOR,
@@ -265,6 +267,7 @@ export function createInitialAgentState(input: {
     maxPipelineSteps: input.maxPipelineSteps,
     commitAutoApprove: input.commitAutoApprove ?? true,
     retries: 0,
+    playwrightWorkers: input.playwrightWorkers ?? 6,
     planStepIndex: 0,
     baseBranch: input.baseBranch,
     branchName: input.branchName,

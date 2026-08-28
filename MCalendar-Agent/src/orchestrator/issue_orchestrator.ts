@@ -37,6 +37,7 @@ export interface OrchestratorConfig {
   commitAutoApprove?: boolean;
   playwrightMcpEnabled?: boolean;
   playwrightMcpBrowser?: string;
+  playwrightWorkers?: number;
 }
 
 export async function processIssue(
@@ -46,7 +47,7 @@ export async function processIssue(
   const { agentConfig, githubClient, codebasePath, testProjectPath, maxRetries, maxIterations, maxPipelineSteps, projectName } = config;
   const reader = new CodebaseReader(codebasePath);
   const testReader = new CodebaseReader(testProjectPath);
-  const runner = new PlaywrightRunner(testProjectPath);
+  const runner = new PlaywrightRunner(testProjectPath, config.playwrightWorkers ?? 6);
   const git = new GitBranch(codebasePath);
 
   const testOutputPath = path.join(testProjectPath, "tests");
@@ -96,6 +97,7 @@ export async function processIssue(
     commitAutoApprove: config.commitAutoApprove ?? true,
     baseBranch,
     branchName,
+    playwrightWorkers: config.playwrightWorkers ?? 6,
   });
 
   const graph = createAgenticGraph({

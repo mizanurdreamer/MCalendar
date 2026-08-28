@@ -260,6 +260,13 @@ Rules:
       canRunParallel: step.canRunParallel ?? false,
     }));
 
+    // Enforce dependency constraints: steps with dependsOn cannot run in parallel
+    for (const step of plan.steps) {
+      if (step.dependsOn && step.dependsOn.length > 0) {
+        step.canRunParallel = false;
+      }
+    }
+
     // Auto-detect parallel groups if not specified
     if (!plan.parallelGroups || plan.parallelGroups.length === 0) {
       plan.parallelGroups = this.detectParallelGroups(plan.steps);
@@ -280,6 +287,7 @@ Rules:
       const parallel = steps.filter((s: PlanStep) => 
         s.canRunParallel && 
         !visited.has(s.id) &&
+        (!s.dependsOn || s.dependsOn.length === 0) &&
         (s.dependsOn || []).length === stepDeps.length &&
         (s.dependsOn || []).every((d: string, i: number) => d === stepDeps[i])
       ).map((s: PlanStep) => {

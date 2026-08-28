@@ -4,7 +4,7 @@ import { formatTestReport } from "../test_runner/reporter.js";
 import { logger } from "../utils/logger.js";
 import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers/registry.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
-import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL } from "../utils/constants.js";
+import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL, MESSAGE_TYPE, AGENT_EVENT, CORE_AGENT_NAMES } from "../utils/constants.js";
 
 export class AgentSummarize extends BaseAgent {
   constructor(state: AgentState, taskContext: import("../core/base_agent.js").TaskContext) {
@@ -135,6 +135,13 @@ ${state.report ?? "(no report)"}`;
       state.error = `Summarize failed: ${err}`;
       this.updateStatus(AGENT_STATUS.FAILED);
     }
+
+    this.sendMessage(CORE_AGENT_NAMES.SUPERVISOR, MESSAGE_TYPE.NOTIFICATION, {
+      event: AGENT_EVENT.SUMMARY_CREATED,
+      issueNumber: state.issue?.number,
+      prUrl: state.prUrl,
+      testFilename: state.testFilename,
+    });
 
     return state;
   }

@@ -323,6 +323,7 @@ The API server binds to `127.0.0.1` on port `3002` by default — change via `WE
 | `SUPER_ADMIN_PASSWORD` | No | Super admin password for test credentials |
 | `PLAYWRIGHT_MCP_ENABLED` | No | Enable Playwright MCP browser automation (default: `false`). When enabled, agents can browse live apps to debug test failures |
 | `PLAYWRIGHT_MCP_BROWSER` | No | Browser for Playwright MCP (default: `chromium`). Options: `chromium`, `firefox`, `webkit` |
+| `PLAYWRIGHT_WORKERS` | No | Number of parallel workers for Playwright test runs (default: `6`) |
 | `WEB_PORT` | No | Web UI API server port (default: `3002`) |
 | `WEB_HOST` | No | Web UI bind address (default: `127.0.0.1`) |
 

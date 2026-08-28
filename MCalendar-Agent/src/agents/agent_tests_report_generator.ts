@@ -5,7 +5,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers/registry.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
-import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL } from "../utils/constants.js";
+import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL, MESSAGE_TYPE, AGENT_EVENT, CORE_AGENT_NAMES } from "../utils/constants.js";
 
 export class AgentTestsReportGenerator extends BaseAgent {
   constructor(state: AgentState, taskContext: import("../core/base_agent.js").TaskContext) {
@@ -85,6 +85,12 @@ Output a well-structured markdown report.`;
       state.error = `Report generation failed: ${err}`;
       this.updateStatus(AGENT_STATUS.FAILED);
     }
+
+    this.sendMessage(CORE_AGENT_NAMES.SUPERVISOR, MESSAGE_TYPE.NOTIFICATION, {
+      event: AGENT_EVENT.REPORT_GENERATED,
+      reportPath: state.reportPath,
+      testFilename: state.testFilename,
+    });
 
     return state;
   }

@@ -510,6 +510,12 @@ export class AgenticGraph {
     // Attach message bus to state for inter-agent communication
     initialState.messageBus = this.getMessageBus();
     
+    // Subscribe to all agent events for logging
+    this.messageBus.subscribeToBroadcast((msg) => {
+      const payload = msg.payload as Record<string, unknown>;
+      logger.info(`[MessageBus] ${msg.from} → ${msg.to}: ${msg.type} | event=${payload?.event ?? "unknown"} ${JSON.stringify(payload)}`);
+    });
+    
     // Generate initial master plan
     this.planner = new AdvancedPlanner(initialState);
     const availableAgents = Array.from(this.agents.keys());

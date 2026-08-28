@@ -6,7 +6,7 @@ import * as path from "node:path";
 import * as fs from "node:fs";
 import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers/registry.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
-import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL } from "../utils/constants.js";
+import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL, MESSAGE_TYPE, AGENT_EVENT, CORE_AGENT_NAMES } from "../utils/constants.js";
 import { createAgentTools, executeTool } from "../utils/tools.js";
 import type { ToolDefinition, ChatMessage, ContentBlock } from "../providers/types.js";
 
@@ -90,12 +90,6 @@ You MUST use the write_test_file tool to save your test.`;
 
   async run(inputState?: AgentState): Promise<AgentState> {
     const state = inputState || this.state;
-    if (!state.projectContext) {
-      logger.error(`[AgentTestsGenerator] Project context not available`);
-      state.error = "Project context not available";
-      this.updateStatus(AGENT_STATUS.FAILED);
-      return state;
-    }
 
     let testFilename: string;
     if (state.mode === MODE.ISSUE && state.issue) {
@@ -258,6 +252,14 @@ Use the write_test_file tool to save the test as "${testFilename}".`;
       state.error = `Test generation failed: ${err}`;
       this.updateStatus(AGENT_STATUS.FAILED);
     }
+
+    this.sendMessage(CORE_AGENT_NAMES.SUPERVISOR, MESSAGE_TYPE.NOTIFICATION, {
+      event: state.testResult?.success ? AGENT_EVENT.TESTS_GENERATED : AGENT_EVENT.TESTS_FAILED,
+      filename: testFilename,
+      passed: state.testResult?.passed ?? 0,
+      failed: state.testResult?.failed ?? 0,
+      total: state.testResult?.total ?? 0,
+    });
 
     return state;
   }
