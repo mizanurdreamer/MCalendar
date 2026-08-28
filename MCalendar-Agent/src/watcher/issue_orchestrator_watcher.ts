@@ -58,6 +58,7 @@ export async function startWatcher(config: WatcherConfig): Promise<void> {
     maxIterations,
     maxPipelineSteps,
     projectName,
+    baseBranch: watchBranch,
     databaseUrl: config.databaseUrl,
     apiBaseUrl: config.apiBaseUrl,
     commitAutoApprove: config.commitAutoApprove,

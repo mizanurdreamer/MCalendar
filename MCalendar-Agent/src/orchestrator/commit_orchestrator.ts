@@ -167,7 +167,7 @@ export async function processCommit(
   if (result.testResult?.success && result.testFilename) {
     try {
       const commitMsg = `test: add E2E tests for commit ${shortSha}`;
-      await git.commitAndPush(commitMsg, branchName);
+      await git.commitAndPush(commitMsg, branchName, testOutputPath);
       
       const pr = await git.createPR(githubClient, {
         title: `Test: Commit ${shortSha} — ${diff.message.split("\n")[0]}`,

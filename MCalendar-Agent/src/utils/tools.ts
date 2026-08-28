@@ -68,6 +68,27 @@ export function createAgentTools(
       },
     },
     {
+      name: "append_test_file",
+      description:
+        "Append additional test cases to an existing test file. " +
+        "Use this when you need to write more test cases than fit in a single response. " +
+        "The content will be appended before the closing of the file.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          filename: {
+            type: "string",
+            description: "Test filename or path ending in .spec.ts (same file as write_test_file)",
+          },
+          content: {
+            type: "string",
+            description: "Additional test code to append (test cases only, no imports/describe wrapper)",
+          },
+        },
+        required: ["filename", "content"],
+      },
+    },
+    {
       name: "run_playwright_test",
       description:
         "Execute Playwright tests in the test project and return the results (pass/fail, errors). " +
@@ -119,6 +140,25 @@ export async function executeTool(
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(fullPath, content, "utf-8");
       return `Test file written to: tests/${filename}`;
+    }
+    case "append_test_file": {
+      const filename = input.filename as string;
+      const content = input.content as string;
+      const fullPath = path.join(testOutputPath, filename);
+      if (!fs.existsSync(fullPath)) {
+        return `File not found: tests/${filename}. Use write_test_file first.`;
+      }
+      const existing = fs.readFileSync(fullPath, "utf-8");
+      // Find the last }); which closes the top-level describe block
+      const lastDescribeClose = existing.lastIndexOf("});");
+      if (lastDescribeClose === -1) {
+        // No describe block found, just append
+        fs.appendFileSync(fullPath, "\n" + content, "utf-8");
+      } else {
+        const updated = existing.slice(0, lastDescribeClose) + "\n" + content + "\n" + existing.slice(lastDescribeClose);
+        fs.writeFileSync(fullPath, updated, "utf-8");
+      }
+      return `Appended test cases to: tests/${filename}`;
     }
     case "run_playwright_test": {
       const filename = input.filename as string | undefined;

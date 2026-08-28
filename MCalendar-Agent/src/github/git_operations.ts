@@ -37,10 +37,11 @@ export class GitBranch {
     }
   }
 
-  async commit(message: string): Promise<void> {
+  async commit(message: string, testOutputPath?: string): Promise<void> {
     try {
-      logger.info(`Git: Staging E2ETests/`);
-      await this.git.add("E2ETests/");
+      const stagingPath = testOutputPath ?? "E2ETests/";
+      logger.info(`Git: Staging ${stagingPath}`);
+      await this.git.add(stagingPath);
       logger.info(`Git: Committing — "${message}"`);
       await this.git.commit(message);
       logger.success("Git: Committed");
@@ -61,9 +62,9 @@ export class GitBranch {
     }
   }
 
-  async commitAndPush(commitMessage: string, branchName: string): Promise<void> {
+  async commitAndPush(commitMessage: string, branchName: string, testOutputPath?: string): Promise<void> {
     logger.task("Git", `committing + pushing ${branchName}`);
-    await this.commit(commitMessage);
+    await this.commit(commitMessage, testOutputPath);
     await this.push(branchName);
   }
 

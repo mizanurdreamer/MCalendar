@@ -32,6 +32,7 @@ export interface OrchestratorConfig {
   maxIterations: number;
   maxPipelineSteps: number;
   projectName: string;
+  baseBranch?: string;
   databaseUrl?: string;
   apiBaseUrl?: string;
   commitAutoApprove?: boolean;
@@ -68,6 +69,7 @@ export async function processIssue(
   logger.info(`Fetching issue #${issue.number}: ${issue.title}`);
 
   const defaultBranch = await githubClient.getDefaultBranch();
+  //const baseBranch = config.baseBranch || defaultBranch;
   const baseBranch = "main-agentic-ai-v2";
   const branchName = GitBranch.branchName(issue.number, issue.title);
 
@@ -156,7 +158,7 @@ export async function processIssue(
   if (result.testResult?.success && result.testFilename) {
     try {
       const commitMsg = `test: add E2E tests for issue #${issue.number}`;
-      await git.commitAndPush(commitMsg, branchName);
+      await git.commitAndPush(commitMsg, branchName, testOutputPath);
       
       const pr = await git.createPR(githubClient, {
         title: `Test: Issue #${issue.number} — ${issue.title}`,

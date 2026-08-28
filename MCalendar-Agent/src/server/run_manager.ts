@@ -72,6 +72,7 @@ export class RunManager {
         maxIterations: this.config.maxIterations,
         maxPipelineSteps: this.config.maxPipelineSteps,
         projectName: this.config.projectName,
+        baseBranch: this.config.watchBranch,
         databaseUrl: this.config.databaseUrl,
         apiBaseUrl: this.config.apiBaseUrl,
         commitAutoApprove: this.config.commitAutoApprove,

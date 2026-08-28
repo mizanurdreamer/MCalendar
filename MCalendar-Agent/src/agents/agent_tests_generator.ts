@@ -25,12 +25,19 @@ You will receive:
 
 Your task:
 1. Read relevant source files to understand implementation
-2. Write a complete Playwright test file
+2. Write a complete Playwright test file covering ALL scenarios
 3. IMPORTANT: You MUST call the write_test_file tool to save the test file. Do NOT just return the content as text.
 
+CRITICAL RULES:
+- You MUST write a test case for EVERY SINGLE scenario provided. Do NOT skip any scenario.
+- Do NOT summarize, abbreviate, or group scenarios together. Each scenario gets its own test() block.
+- If there are many scenarios (15+), use this batching approach:
+  1. First call: write_test_file with the file header (imports, describe block) and the first 8-10 test cases
+  2. Subsequent calls: append_test_file to add remaining test cases in batches of 8-10
+- Do NOT generate empty placeholder tests. Every test must have real assertions.
+
 Follow existing test patterns in the project. Use the project's test utilities.
-Write one test case per scenario from the analysis.
-You MUST use the write_test_file tool to save your test.`;
+You MUST use the write_test_file and append_test_file tools to save your test.`;
   }
 
   getGoal(): string {
