@@ -7,6 +7,7 @@ import { checkForNewCommits } from "./commit_orchestrator_watcher.js";
 import { CommitStateManager } from "./commit_state_tracker.js";
 import { StateManager } from "./issue_state_tracker.js";
 import { logger } from "../utils/logger.js";
+import { PIPELINE_STATUS } from "../utils/constants.js";
 
 interface RunOutcome {
   ok: boolean;
@@ -68,7 +69,7 @@ export async function startWatcher(config: WatcherConfig): Promise<void> {
     try {
       const result = await processIssue(issue, orchestratorConfig);
       stateManager.updateAfterProcessing(issue.number, issue.title, {
-        status: result.success ? "completed" : "failed",
+        status: result.success ? PIPELINE_STATUS.COMPLETED : PIPELINE_STATUS.FAILED,
         testsPassed: result.testsPassed,
         testsFailed: result.testsFailed,
         retries: result.retries,
@@ -80,7 +81,7 @@ export async function startWatcher(config: WatcherConfig): Promise<void> {
       return { ok: true };
     } catch (err) {
       logger.error(`Failed to process issue #${issue.number}: ${err}`);
-      stateManager.updateAfterProcessing(issue.number, issue.title, { status: "failed" });
+      stateManager.updateAfterProcessing(issue.number, issue.title, { status: PIPELINE_STATUS.FAILED });
       return { ok: false, error: String(err) };
     }
   };
@@ -103,7 +104,7 @@ export async function startWatcher(config: WatcherConfig): Promise<void> {
       };
       const result = await processCommit(diff, commitConfig);
       commitState.updateAfterProcessing(diff.sha, {
-        status: result.success ? "completed" : "failed",
+        status: result.success ? PIPELINE_STATUS.COMPLETED : PIPELINE_STATUS.FAILED,
         retryHistory: result.retryHistory,
       });
       if (!result.success) {
@@ -112,7 +113,7 @@ export async function startWatcher(config: WatcherConfig): Promise<void> {
       return { ok: true };
     } catch (err) {
       logger.error(`Failed to process commit ${diff.sha.slice(0, 7)}: ${err}`);
-      commitState.updateAfterProcessing(diff.sha, { status: "failed" });
+      commitState.updateAfterProcessing(diff.sha, { status: PIPELINE_STATUS.FAILED });
       return { ok: false, error: String(err) };
     }
   };

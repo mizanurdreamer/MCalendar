@@ -9,6 +9,7 @@ import { StateManager } from "../watcher/issue_state_tracker.js";
 import { CommitStateManager } from "../watcher/commit_state_tracker.js";
 import { logger } from "../utils/logger.js";
 import { broadcast } from "./ws_hub.js";
+import { PIPELINE_STATUS, MODE } from "../utils/constants.js";
 
 export interface JobInfo {
   id: string;
@@ -53,10 +54,10 @@ export class RunManager {
 
     const job: JobInfo = {
       id: randomUUID(),
-      type: "issue",
+      type: MODE.ISSUE,
       label: `Issue #${issue.number}: ${truncate(issue.title, 60)}`,
       ref: String(issueNumber),
-      status: "running",
+      status: PIPELINE_STATUS.RUNNING,
       startedAt: Date.now(),
       source: opts.source,
     };
@@ -76,7 +77,7 @@ export class RunManager {
         commitAutoApprove: this.config.commitAutoApprove,
       })
     ).then((finished) => {
-      if (finished.status === "completed") {
+      if (finished.status === PIPELINE_STATUS.COMPLETED) {
         new StateManager("state").resolveIssueRetry(issueNumber);
       }
       return finished;
@@ -91,11 +92,11 @@ export class RunManager {
 
     const job: JobInfo = {
       id: randomUUID(),
-      type: "commit",
+      type: MODE.COMMIT,
       label: `Commit ${sha.slice(0, 7)}: ${truncate(diff.message.split("\n")[0] ?? "", 50)}`,
       ref: sha,
       branch: targetBranch,
-      status: "running",
+      status: PIPELINE_STATUS.RUNNING,
       startedAt: Date.now(),
       source: opts.source,
     };
@@ -116,7 +117,7 @@ export class RunManager {
         commitAutoApprove: this.config.commitAutoApprove,
       })
     ).then((finished) => {
-      if (finished.status === "completed") {
+      if (finished.status === PIPELINE_STATUS.COMPLETED) {
         new CommitStateManager("state").resolveCommitRetry(sha);
       }
       return finished;
@@ -149,11 +150,11 @@ export class RunManager {
     try {
       const result = await fn();
       job.result = result;
-      job.status = result.success ? "completed" : "failed";
+      job.status = result.success ? PIPELINE_STATUS.COMPLETED : PIPELINE_STATUS.FAILED;
       if (!result.success) job.error = truncate(result.output ?? "Unknown failure", 500);
-      logger.info(`[job:${job.type}] ${job.status === "completed" ? "Finished" : "Failed"} — ${job.label}`);
+      logger.info(`[job:${job.type}] ${job.status === PIPELINE_STATUS.COMPLETED ? "Finished" : "Failed"} — ${job.label}`);
     } catch (err) {
-      job.status = "failed";
+      job.status = PIPELINE_STATUS.FAILED;
       job.error = String(err instanceof Error ? err.message : err);
       logger.error(`[job:${job.type}] Failed — ${job.label}: ${job.error}`);
     } finally {
@@ -177,7 +178,7 @@ export class RunManager {
 
   private broadcastJob(job: JobInfo): void {
     broadcast({ type: "job:update", job: JSON.parse(JSON.stringify(job)) });
-    if (job.status !== "running") {
+    if (job.status !== PIPELINE_STATUS.RUNNING) {
       broadcast({ type: "job:result", job: JSON.parse(JSON.stringify(job)) });
     }
   }
@@ -189,7 +190,7 @@ export function formatJobResult(job: JobInfo): string {
     : null;
   const durationLine = durationSec !== null ? `\n_Duration: ${Math.floor(durationSec / 60)}m ${durationSec % 60}s_` : "";
 
-  if (job.status === "failed") {
+  if (job.status === PIPELINE_STATUS.FAILED) {
     return `❌ **Job failed:** ${job.label}${durationLine}\n\n\`${job.error ?? job.result?.output ?? "unknown error"}\``;
   }
   const r = job.result;

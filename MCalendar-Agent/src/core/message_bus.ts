@@ -1,5 +1,6 @@
 import type { AgentMessage, AgentName } from "./state.js";
 import { logger } from "../utils/logger.js";
+import { MESSAGE_TYPE } from "../utils/constants.js";
 
 type MessageHandler = (message: AgentMessage) => Promise<void> | void;
 
@@ -35,7 +36,7 @@ export class MessageBus {
 
     logger.debug(`[MessageBus] ${message.from} -> ${message.to}: ${message.type}`);
 
-    if (message.to === "broadcast") {
+    if (message.to === MESSAGE_TYPE.BROADCAST) {
       await Promise.all(
         Array.from(this.broadcastSubscribers).map(h => h(message))
       );
@@ -52,7 +53,7 @@ export class MessageBus {
   getHistory(agent?: AgentName, limit = 100): AgentMessage[] {
     let messages = this.messageHistory;
     if (agent) {
-      messages = messages.filter(m => m.from === agent || m.to === agent || m.to === "broadcast");
+      messages = messages.filter(m => m.from === agent || m.to === agent || m.to === MESSAGE_TYPE.BROADCAST);
     }
     return messages.slice(-limit);
   }

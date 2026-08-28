@@ -2,21 +2,22 @@ import type { AgentState, AgentName, AgentMessage, AgentPlan, PlanStep, HumanApp
 import { BaseAgent } from "./base_agent.js";
 import { logger } from "../utils/logger.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
+import { CORE_AGENT_NAMES, ROUTING_ACTION, PIPELINE_STATUS, MODE, APPROVAL_RESOLUTION, APPROVED_BY } from "../utils/constants.js";
 
 export type RoutingDecision = 
-  | { action: "route"; nextAgent: AgentName; reason: string; planStep?: PlanStep }
-  | { action: "parallel"; agents: AgentName[]; reason: string; planSteps?: PlanStep[] }
-  | { action: "wait"; reason: string }
-  | { action: "complete"; reason: string }
-  | { action: "fail"; reason: string }
-  | { action: "replan"; reason: string }
-  | { action: "request_approval"; request: HumanApprovalRequest };
+  | { action: typeof ROUTING_ACTION.ROUTE; nextAgent: AgentName; reason: string; planStep?: PlanStep }
+  | { action: typeof ROUTING_ACTION.PARALLEL; agents: AgentName[]; reason: string; planSteps?: PlanStep[] }
+  | { action: typeof ROUTING_ACTION.WAIT; reason: string }
+  | { action: typeof ROUTING_ACTION.COMPLETE; reason: string }
+  | { action: typeof ROUTING_ACTION.FAIL; reason: string }
+  | { action: typeof ROUTING_ACTION.REPLAN; reason: string }
+  | { action: typeof ROUTING_ACTION.REQUEST_APPROVAL; request: HumanApprovalRequest };
 
 export class Supervisor {
   private state: AgentState;
   private agents: Map<AgentName, BaseAgent> = new Map();
   private routingHistory: Array<{ from: AgentName; to: AgentName; decision: RoutingDecision; timestamp: number }> = [];
-  private currentPlanStepIndex = 0;
+  currentPlanStepIndex = 0;
 
   constructor(state: AgentState) {
     this.state = state;
@@ -35,13 +36,13 @@ export class Supervisor {
 
     logger.info(`[Supervisor] Routing from ${currentAgent} (mode: ${mode})`);
 
-    if (this.state.status === "awaiting_human") {
+    if (this.state.status === PIPELINE_STATUS.AWAITING_HUMAN) {
       return this.checkHumanApprovals();
     }
 
-    if (this.state.status === "failed") {
+    if (this.state.status === PIPELINE_STATUS.FAILED) {
       // Trigger replanning on failure
-      return { action: "replan", reason: `Agent failed: ${this.state.error || "Unknown failure"}` };
+      return { action: ROUTING_ACTION.REPLAN, reason: `Agent failed: ${this.state.error || "Unknown failure"}` };
     }
 
     const decision = await this.determineNextAgent();
@@ -59,7 +60,7 @@ export class Supervisor {
     // Fallback to hardcoded routing if no plan
     const { mode, currentAgent, agentStatus, issueAnalysis, commitAnalysis, testResult, retries, maxRetries } = this.state;
 
-    if (mode === "issue") {
+    if (mode === MODE.ISSUE) {
       return this.routeIssueMode(currentAgent, agentStatus, issueAnalysis, testResult, retries, maxRetries);
     } else {
       return this.routeCommitMode(currentAgent, agentStatus, commitAnalysis, testResult, retries, maxRetries);
@@ -71,21 +72,24 @@ export class Supervisor {
     const currentAgent = this.state.currentAgent;
     
     // If we're at supervisor, find the first pending step
-    if (currentAgent === "supervisor") {
+    if (currentAgent === CORE_AGENT_NAMES.SUPERVISOR) {
       const nextStep = masterPlan.steps.find((step, idx) => idx >= this.currentPlanStepIndex);
       if (nextStep) {
-        this.currentPlanStepIndex = masterPlan.steps.indexOf(nextStep);
+        const stepIndex = masterPlan.steps.indexOf(nextStep);
+        // Increment so next time we look for the step AFTER this one
+        this.currentPlanStepIndex = stepIndex + 1;
         this.state.planStepIndex = this.currentPlanStepIndex;
+        
         if (nextStep.canRunParallel) {
           // Find all parallel steps at this index
           const parallelSteps = masterPlan.steps.filter((s, idx) => 
-            idx >= this.currentPlanStepIndex && s.canRunParallel && s.dependsOn?.every(d => 
-              masterPlan.steps.some(ms => ms.id === d && masterPlan.steps.indexOf(ms) < this.currentPlanStepIndex)
+            idx >= stepIndex && s.canRunParallel && s.dependsOn?.every(d => 
+              masterPlan.steps.some(ms => ms.id === d && masterPlan.steps.indexOf(ms) < stepIndex)
             )
           );
           if (parallelSteps.length > 1) {
             return { 
-              action: "parallel", 
+              action: ROUTING_ACTION.PARALLEL, 
               agents: parallelSteps.map(s => s.agent!).filter((a): a is AgentName => !!a),
               reason: `Parallel execution: ${parallelSteps.map(s => s.id).join(", ")}`,
               planSteps: parallelSteps
@@ -93,23 +97,35 @@ export class Supervisor {
           }
         }
         return { 
-          action: "route", 
+          action: ROUTING_ACTION.ROUTE, 
           nextAgent: nextStep.agent!, 
           reason: nextStep.reasoning || nextStep.expectedOutcome,
           planStep: nextStep
         };
       }
       // All steps complete
-      return { action: "complete", reason: "Master plan completed" };
+      return { action: ROUTING_ACTION.COMPLETE, reason: "Master plan completed" };
     }
 
     // Check if current agent matches expected plan step
     const expectedStep = masterPlan.steps[this.currentPlanStepIndex];
     if (expectedStep && expectedStep.agent === currentAgent) {
-      // Current agent matches expected step, move to next
+      // Current agent completed its step, move to next
       this.currentPlanStepIndex++;
       this.state.planStepIndex = this.currentPlanStepIndex;
-      return this.followMasterPlan(masterPlan);
+      
+      // Find the next step after incrementing
+      const nextStep = masterPlan.steps[this.currentPlanStepIndex];
+      if (nextStep) {
+        return { 
+          action: ROUTING_ACTION.ROUTE, 
+          nextAgent: nextStep.agent!, 
+          reason: nextStep.reasoning || nextStep.expectedOutcome,
+          planStep: nextStep
+        };
+      }
+      // All steps complete
+      return { action: ROUTING_ACTION.COMPLETE, reason: "Master plan completed" };
     }
 
     // If current agent doesn't match, check if it completed a step
@@ -117,7 +133,7 @@ export class Supervisor {
       // Maybe we need to route to the expected agent
       if (expectedStep.agent) {
         return { 
-          action: "route", 
+          action: ROUTING_ACTION.ROUTE, 
           nextAgent: expectedStep.agent, 
           reason: `Following master plan: ${expectedStep.reasoning || expectedStep.expectedOutcome}`,
           planStep: expectedStep
@@ -126,7 +142,7 @@ export class Supervisor {
     }
 
     // Fallback
-    return { action: "complete", reason: "Master plan completed" };
+    return { action: ROUTING_ACTION.COMPLETE, reason: "Master plan completed" };
   }
 
   private routeIssueMode(
@@ -138,35 +154,37 @@ export class Supervisor {
     maxRetries: number
   ): RoutingDecision {
     switch (currentAgent) {
-      case "supervisor":
-        return { action: "route", nextAgent: AGENT_NAMES.AGENT_ISSUE_ANALYZER, reason: "Start issue analysis" };
+      case CORE_AGENT_NAMES.SUPERVISOR:
+        return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_ISSUE_ANALYZER, reason: "Start issue analysis" };
 
       case AGENT_NAMES.AGENT_ISSUE_ANALYZER:
         if (!issueAnalysis?.needs_tests) {
-          return { action: "route", nextAgent: AGENT_NAMES.AGENT_SUMMARIZE, reason: "No tests needed, summarize" };
+          return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_SUMMARIZE, reason: "No tests needed, summarize" };
         }
-        return { action: "route", nextAgent: AGENT_NAMES.AGENT_TESTS_GENERATOR, reason: "Generate tests from analysis" };
+        return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_GENERATOR, reason: "Generate tests from analysis" };
 
       case AGENT_NAMES.AGENT_TESTS_GENERATOR:
-        return { action: "route", nextAgent: AGENT_NAMES.AGENT_TESTS_REVIEWER, reason: "Review generated tests" };
+        return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_REVIEWER, reason: "Review generated tests" };
 
       case AGENT_NAMES.AGENT_TESTS_REVIEWER:
         if (testResult?.success) {
-          return { action: "parallel", agents: [AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, AGENT_NAMES.AGENT_SUMMARIZE], reason: "Tests passed, generate report and summarize in parallel" };
+          return { action: ROUTING_ACTION.PARALLEL, agents: [AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, AGENT_NAMES.AGENT_SUMMARIZE], reason: "Tests passed, generate report and summarize in parallel" };
         }
         if (retries < maxRetries) {
-          return { action: "route", nextAgent: AGENT_NAMES.AGENT_TESTS_GENERATOR, reason: "Tests failed, regenerate with fixes" };
+          this.state.retries = retries + 1;
+          logger.info(`[Supervisor] Retry ${this.state.retries}/${maxRetries}: routing back to generator with fixes`);
+          return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_GENERATOR, reason: `Tests failed, retry ${this.state.retries}/${maxRetries}` };
         }
-        return { action: "parallel", agents: [AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, AGENT_NAMES.AGENT_SUMMARIZE], reason: "Max retries reached, generate report and summarize in parallel" };
+        return { action: ROUTING_ACTION.PARALLEL, agents: [AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, AGENT_NAMES.AGENT_SUMMARIZE], reason: "Max retries reached, generate report and summarize in parallel" };
 
       case AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR:
-        return { action: "route", nextAgent: AGENT_NAMES.AGENT_SUMMARIZE, reason: "Report generated, summarize" };
+        return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_SUMMARIZE, reason: "Report generated, summarize" };
 
       case AGENT_NAMES.AGENT_SUMMARIZE:
-        return { action: "complete", reason: "Issue pipeline complete" };
+        return { action: ROUTING_ACTION.COMPLETE, reason: "Issue pipeline complete" };
 
       default:
-        return { action: "fail", reason: `Unknown agent in issue mode: ${currentAgent}` };
+        return { action: ROUTING_ACTION.FAIL, reason: `Unknown agent in issue mode: ${currentAgent}` };
     }
   }
 
@@ -179,80 +197,83 @@ export class Supervisor {
     maxRetries: number
   ): RoutingDecision {
     switch (currentAgent) {
-      case "supervisor":
-        return { action: "route", nextAgent: AGENT_NAMES.AGENT_COMMIT_ANALYZER, reason: "Start commit analysis" };
+      case CORE_AGENT_NAMES.SUPERVISOR:
+        return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_COMMIT_ANALYZER, reason: "Start commit analysis" };
 
       case AGENT_NAMES.AGENT_COMMIT_ANALYZER:
         if (!commitAnalysis?.needsTests) {
-          return { action: "route", nextAgent: AGENT_NAMES.AGENT_SUMMARIZE, reason: "No tests needed for this commit" };
+          return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_SUMMARIZE, reason: "No tests needed for this commit" };
         }
-        return { action: "route", nextAgent: AGENT_NAMES.AGENT_TESTS_GENERATOR, reason: "Generate tests for commit changes" };
+        return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_GENERATOR, reason: "Generate tests for commit changes" };
 
       case AGENT_NAMES.AGENT_TESTS_GENERATOR:
-        return { action: "route", nextAgent: AGENT_NAMES.AGENT_TESTS_REVIEWER, reason: "Review generated tests" };
+        return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_REVIEWER, reason: "Review generated tests" };
 
       case AGENT_NAMES.AGENT_TESTS_REVIEWER:
         if (testResult?.success) {
-          return { action: "parallel", agents: [AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, AGENT_NAMES.AGENT_SUMMARIZE], reason: "Tests passed, generate report and summarize in parallel" };
+          return { action: ROUTING_ACTION.PARALLEL, agents: [AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, AGENT_NAMES.AGENT_SUMMARIZE], reason: "Tests passed, generate report and summarize in parallel" };
         }
         if (retries < maxRetries) {
-          return { action: "route", nextAgent: AGENT_NAMES.AGENT_TESTS_GENERATOR, reason: "Tests failed, regenerate with fixes" };
+          this.state.retries = retries + 1;
+          logger.info(`[Supervisor] Retry ${this.state.retries}/${maxRetries}: routing back to generator with fixes`);
+          return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_GENERATOR, reason: `Tests failed, retry ${this.state.retries}/${maxRetries}` };
         }
-        return { action: "parallel", agents: [AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, AGENT_NAMES.AGENT_SUMMARIZE], reason: "Max retries reached, generate report and summarize in parallel" };
+        return { action: ROUTING_ACTION.PARALLEL, agents: [AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, AGENT_NAMES.AGENT_SUMMARIZE], reason: "Max retries reached, generate report and summarize in parallel" };
 
       case AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR:
-        return { action: "route", nextAgent: AGENT_NAMES.AGENT_SUMMARIZE, reason: "Report generated, summarize" };
+        return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_SUMMARIZE, reason: "Report generated, summarize" };
 
       case AGENT_NAMES.AGENT_SUMMARIZE:
-        return { action: "complete", reason: "Commit pipeline complete" };
+        return { action: ROUTING_ACTION.COMPLETE, reason: "Commit pipeline complete" };
 
       default:
-        return { action: "fail", reason: `Unknown agent in commit mode: ${currentAgent}` };
+        return { action: ROUTING_ACTION.FAIL, reason: `Unknown agent in commit mode: ${currentAgent}` };
     }
   }
 
   private checkHumanApprovals(): RoutingDecision {
     const pending = this.state.humanApprovals.find(a => !a.resolved);
     if (pending) {
-      return { action: "wait", reason: `Awaiting human approval: ${pending.title}` };
+      return { action: ROUTING_ACTION.WAIT, reason: `Awaiting human approval: ${pending.title}` };
     }
-    this.state.status = "running";
-    return { action: "route", nextAgent: this.state.currentAgent, reason: "Approval resolved, continuing" };
+    this.state.status = PIPELINE_STATUS.RUNNING;
+    return { action: ROUTING_ACTION.ROUTE, nextAgent: this.state.currentAgent, reason: "Approval resolved, continuing" };
   }
 
   async executeDecision(decision: RoutingDecision): Promise<AgentState> {
     switch (decision.action) {
-      case "route":
+      case ROUTING_ACTION.ROUTE:
         return this.executeAgent(decision.nextAgent);
 
-      case "parallel":
+      case ROUTING_ACTION.PARALLEL:
         return this.executeParallel(decision.agents);
 
-      case "wait":
+      case ROUTING_ACTION.WAIT:
         logger.info(`[Supervisor] Waiting: ${decision.reason}`);
         return this.state;
 
-      case "complete":
-        this.state.status = "completed";
+      case ROUTING_ACTION.COMPLETE:
+        this.state.status = PIPELINE_STATUS.COMPLETED;
+        this.state.currentAgent = CORE_AGENT_NAMES.SUPERVISOR as AgentName;
         logger.success(`[Supervisor] Pipeline complete: ${decision.reason}`);
         return this.state;
 
-      case "fail":
-        this.state.status = "failed";
+      case ROUTING_ACTION.FAIL:
+        this.state.status = PIPELINE_STATUS.FAILED;
         this.state.error = decision.reason;
         logger.error(`[Supervisor] Pipeline failed: ${decision.reason}`);
         return this.state;
 
-      case "request_approval":
+      case ROUTING_ACTION.REQUEST_APPROVAL:
         this.state.humanApprovals.push(decision.request);
-        this.state.status = "awaiting_human";
+        this.state.status = PIPELINE_STATUS.AWAITING_HUMAN;
         return this.state;
 
-      case "replan":
+      case ROUTING_ACTION.REPLAN:
         logger.warn(`[Supervisor] Replanning triggered: ${decision.reason}`);
-        this.state.status = "running";
+        this.state.status = PIPELINE_STATUS.RUNNING;
         // Reset to supervisor to trigger replanning
-        this.state.currentAgent = "supervisor";
+        this.state.currentAgent = CORE_AGENT_NAMES.SUPERVISOR;
         // The next route() call will trigger replanning via the master plan
         return this.state;
     }
@@ -261,7 +282,7 @@ export class Supervisor {
   private async executeAgent(agentName: AgentName): Promise<AgentState> {
     const agent = this.agents.get(agentName);
     if (!agent) {
-      this.state.status = "failed";
+      this.state.status = PIPELINE_STATUS.FAILED;
       this.state.error = `Agent not registered: ${agentName}`;
       return this.state;
     }
@@ -272,7 +293,7 @@ export class Supervisor {
     try {
       return await agent.run();
     } catch (err) {
-      this.state.status = "failed";
+      this.state.status = PIPELINE_STATUS.FAILED;
       this.state.error = `Agent ${agentName} failed: ${err}`;
       logger.error(`[Supervisor] Agent ${agentName} failed: ${err}`);
       return this.state;
@@ -282,12 +303,15 @@ export class Supervisor {
   private async executeParallel(agents: AgentName[]): Promise<AgentState> {
     logger.info(`[Supervisor] Executing parallel: ${agents.join(", ")}`);
     
-    const promises = agents.map(async (name) => {
+    // Create state copies for each agent to prevent race conditions
+    const stateCopies = agents.map(() => ({ ...this.state }));
+    
+    const promises = agents.map(async (name, index) => {
       const agent = this.agents.get(name);
       if (!agent) throw new Error(`Agent not registered: ${name}`);
       
-      // Run agent and capture its state changes
-      const agentState = await agent.run();
+      // Run agent with its own state copy
+      const agentState = await agent.run(stateCopies[index]);
       return { agentName: name, state: agentState };
     });
 
@@ -299,9 +323,12 @@ export class Supervisor {
         this.mergeAgentState(agentName, agentState);
       }
       
+      // Reset currentAgent to supervisor after parallel execution
+      this.state.currentAgent = CORE_AGENT_NAMES.SUPERVISOR;
+      
       return this.state;
     } catch (err) {
-      this.state.status = "failed";
+      this.state.status = PIPELINE_STATUS.FAILED;
       this.state.error = `Parallel execution failed: ${err}`;
       return this.state;
     }

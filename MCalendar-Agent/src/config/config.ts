@@ -44,8 +44,8 @@ export interface AppConfig {
   apiBaseUrl?: string;
   superAdminEmail?: string;
   superAdminPassword?: string;
-  mcpEnabled: boolean;
-  mcpBrowser: string;
+  playwrightMcpEnabled: boolean;
+  playwrightMcpBrowser: string;
 }
 
 export function loadConfig(): AppConfig {
@@ -134,7 +134,7 @@ export function loadConfig(): AppConfig {
     apiBaseUrl: process.env.API_BASE_URL,
     superAdminEmail: process.env.SUPER_ADMIN_EMAIL,
     superAdminPassword: process.env.SUPER_ADMIN_PASSWORD,
-    mcpEnabled: (process.env.MCP_ENABLED ?? "true").toLowerCase() === "true",
-    mcpBrowser: process.env.MCP_BROWSER ?? "chromium",
+    playwrightMcpEnabled: (process.env.PLAYWRIGHT_MCP_ENABLED ?? "false").toLowerCase() === "true",
+    playwrightMcpBrowser: process.env.PLAYWRIGHT_MCP_BROWSER ?? "chromium",
   };
 }

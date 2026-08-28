@@ -25,6 +25,10 @@ import { GitBranch } from "./github/git_operations.js";
 import path from "node:path";
 import { setDiagnosticConfig } from "./utils/diagnostic_tools.js";
 import { setDatabaseUrl } from "./utils/database_tools.js";
+import { setupGlobalErrorHandlers } from "./utils/errors.js";
+import { initMcpClient, shutdownMcpClient } from "./mcp/client.js";
+
+setupGlobalErrorHandlers();
 
 const program = new Command();
 
@@ -68,6 +72,8 @@ program
         databaseUrl: config.databaseUrl,
         apiBaseUrl: config.apiBaseUrl,
         commitAutoApprove: config.commitAutoApprove,
+        playwrightMcpEnabled: config.playwrightMcpEnabled,
+        playwrightMcpBrowser: config.playwrightMcpBrowser,
       };
 
       const result = await processIssue(issue, orchestratorConfig);
@@ -115,6 +121,8 @@ program
         databaseUrl: config.databaseUrl,
         apiBaseUrl: config.apiBaseUrl,
         commitAutoApprove: config.commitAutoApprove,
+        playwrightMcpEnabled: config.playwrightMcpEnabled,
+        playwrightMcpBrowser: config.playwrightMcpBrowser,
       };
 
       const result = await processCommit(diff, orchestratorConfig);
@@ -322,6 +330,8 @@ retryCmd
         databaseUrl: config.databaseUrl,
         apiBaseUrl: config.apiBaseUrl,
         commitAutoApprove: config.commitAutoApprove,
+        playwrightMcpEnabled: config.playwrightMcpEnabled,
+        playwrightMcpBrowser: config.playwrightMcpBrowser,
       };
 
       const result = await processIssue(issue, orchestratorConfig);
@@ -375,6 +385,8 @@ retryCmd
         databaseUrl: config.databaseUrl,
         apiBaseUrl: config.apiBaseUrl,
         commitAutoApprove: config.commitAutoApprove,
+        playwrightMcpEnabled: config.playwrightMcpEnabled,
+        playwrightMcpBrowser: config.playwrightMcpBrowser,
       };
 
       const result = await processCommit(diff, orchestratorConfig);

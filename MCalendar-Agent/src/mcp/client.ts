@@ -1,4 +1,3 @@
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { logger } from "../utils/logger.js";
 
@@ -12,7 +11,8 @@ interface McpToolDef {
   };
 }
 
-let client: Client | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let client: any = null;
 let transport: StdioClientTransport | null = null;
 let cachedTools: McpToolDef[] = [];
 let refCount = 0;
@@ -28,13 +28,14 @@ export async function initMcpClient(browser = "chromium"): Promise<void> {
     args: ["@playwright/mcp@latest", "--headless", `--browser=${browser}`],
   });
 
-  client = new Client({} as any);
-
   transport.onerror = (err: Error) => {
     logger.warn(`MCP transport error: ${err.message}`);
   };
 
-  await client.connect();
+  const sdk = await import("@modelcontextprotocol/sdk/client/index.js");
+  const ClientCtor = (sdk as any).Client;
+  client = new ClientCtor({ name: "mcalendar-agent", version: "1.0.0" });
+  await client.connect(transport);
   logger.success("Playwright MCP server connected");
 
   const { tools } = await client.listTools();

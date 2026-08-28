@@ -5,7 +5,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers/registry.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
-import { toSharedContext } from "../core/adapters.js";
+import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL } from "../utils/constants.js";
 
 export class AgentTestsReportGenerator extends BaseAgent {
   constructor(state: AgentState, taskContext: import("../core/base_agent.js").TaskContext) {
@@ -43,32 +43,50 @@ Output a well-structured markdown report.`;
         },
       ],
       estimatedIterations: 1,
-      riskLevel: "low",
+      riskLevel: RISK_LEVEL.LOW,
       createdAt: Date.now(),
     };
   }
 
-  async run(): Promise<AgentState> {
-    if (!this.state.testResult) {
+  async run(inputState?: AgentState): Promise<AgentState> {
+    const state = inputState || this.state;
+    if (!state.testResult) {
       logger.info(`[AgentTestsReportGenerator] No test results to report`);
-      this.updateStatus("completed");
-      return this.state;
+      this.updateStatus(AGENT_STATUS.COMPLETED);
+      return state;
     }
+
+    const testResult = state.testResult;
+    logger.info(`[AgentTestsReportGenerator] Generating report for ${state.testFilename}`);
+    logger.info(`[AgentTestsReportGenerator] Input: ${testResult.passed} passed, ${testResult.failed} failed, ${testResult.total} total`);
 
     try {
       const output = await this.runReportGeneration();
 
-      this.state.report = output;
-      this.state.reportPath = this.saveReportFile(output);
+      state.report = output;
+      state.reportPath = this.saveReportFile(output);
+      
+      if (state.reportPath) {
+        logger.success(`[AgentTestsReportGenerator] Report saved: ${state.reportPath}`);
+        logger.info(`[AgentTestsReportGenerator] Report size: ${output.length} chars`);
+        
+        // Log first few lines of report as preview
+        const lines = output.split('\n').slice(0, 10);
+        logger.info(`[AgentTestsReportGenerator] Report preview:`);
+        for (const line of lines) {
+          logger.info(`  ${line}`);
+        }
+      }
 
       this.recordStep("generate_report", "Report generated", "next");
-      this.updateStatus("completed");
+      this.updateStatus(AGENT_STATUS.COMPLETED);
     } catch (err) {
-      this.state.error = `Report generation failed: ${err}`;
-      this.updateStatus("failed");
+      logger.error(`[AgentTestsReportGenerator] Report generation failed: ${err}`);
+      state.error = `Report generation failed: ${err}`;
+      this.updateStatus(AGENT_STATUS.FAILED);
     }
 
-    return this.state;
+    return state;
   }
 
   private async runReportGeneration(): Promise<string> {
@@ -76,7 +94,6 @@ Output a well-structured markdown report.`;
     logger.task(AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, `${getTaskProviderName(AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, this.state.agentConfig)}/${getTaskModel(AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, this.state.agentConfig)}`);
 
     const systemPrompt = AgentTestsReportGenerator.buildSystemPrompt();
-    const sharedContext = toSharedContext(this.state);
 
     const testResult = this.state.testResult!;
     const userMessage = `Generate a comprehensive test report for: ${this.state.testFilename}
@@ -119,9 +136,9 @@ Generate a comprehensive markdown report with:
 
       const date = new Date().toISOString().slice(0, 10);
       let filename: string;
-      if (this.state.mode === "issue" && this.state.issue) {
+      if (this.state.mode === MODE.ISSUE && this.state.issue) {
         filename = `issue-${this.state.issue.number}-${date}.md`;
-      } else if (this.state.mode === "commit" && this.state.commitDiff) {
+      } else if (this.state.mode === MODE.COMMIT && this.state.commitDiff) {
         filename = `commit-${this.state.commitDiff.sha.slice(0, 7)}-${date}.md`;
       } else {
         filename = `report-${date}-${Date.now()}.md`;

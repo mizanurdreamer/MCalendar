@@ -1,11 +1,12 @@
 import type { AgentState } from "../core/state.js";
 import { BaseAgent } from "../core/base_agent.js";
 import { logger } from "../utils/logger.js";
-import { toSharedContext } from "../core/adapters.js";
 import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers/registry.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
+import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL } from "../utils/constants.js";
 import { createAgentTools, executeTool } from "../utils/tools.js";
-import type { ToolDefinition } from "../providers/types.js";
+import { isMcpTool, callMcpTool } from "../mcp/client.js";
+import type { ToolDefinition, ChatMessage, ContentBlock } from "../providers/types.js";
 
 export class AgentTestsReviewer extends BaseAgent {
   constructor(state: AgentState, taskContext: import("../core/base_agent.js").TaskContext) {
@@ -62,59 +63,120 @@ Return the fixed test file content via write_test_file tool.`;
         },
       ],
       estimatedIterations: 2,
-      riskLevel: "medium",
+      riskLevel: RISK_LEVEL.MEDIUM,
       createdAt: Date.now(),
     };
   }
 
-  async run(): Promise<AgentState> {
-    const testFilename = this.state.testFilename;
-    const testResult = this.state.testResult;
+  async run(inputState?: AgentState): Promise<AgentState> {
+    const state = inputState || this.state;
+    const testFilename = state.testFilename;
+    const testResult = state.testResult;
     
     if (!testFilename || !testResult) {
-      this.state.error = "Missing test filename or test result";
-      this.updateStatus("failed");
-      return this.state;
+      logger.error(`[AgentTestsReviewer] Missing test filename or test result`);
+      state.error = "Missing test filename or test result";
+      this.updateStatus(AGENT_STATUS.FAILED);
+      return state;
     }
 
     if (testResult.success) {
       logger.info(`[AgentTestsReviewer] Tests already passing, no review needed`);
-      this.updateStatus("completed");
-      return this.state;
+      this.updateStatus(AGENT_STATUS.COMPLETED);
+      return state;
     }
 
-    const testContent = this.state.testContent || "";
+    const testContent = state.testContent || "";
     
-    logger.info(`[AgentTestsReviewer] Starting review for ${testFilename} (attempt ${this.state.retries + 1})`);
-    logger.info(`[AgentTestsReviewer] Errors: ${testResult.errors.length}`);
+    logger.info(`[AgentTestsReviewer] Starting review for ${testFilename} (attempt ${state.retries + 1})`);
+    logger.info(`[AgentTestsReviewer] Test results: ${testResult.passed} passed, ${testResult.failed} failed (${testResult.total} total)`);
+    
+    // Log each error in detail
+    logger.info(`[AgentTestsReviewer] Failed tests (${testResult.errors.length} errors):`);
+    for (let i = 0; i < testResult.errors.length; i++) {
+      logger.error(`  ${i + 1}. ${testResult.errors[i].slice(0, 500)}`);
+    }
 
     try {
       const analysis = await this.runErrorAnalysis(testContent);
 
-      this.state.retryHistory.push({
-        attempt: this.state.retries,
+      state.retryHistory.push({
+        attempt: state.retries,
         errors: testResult.errors,
         analysis,
       });
 
-      logger.info(`[AgentTestsReviewer] Error analysis complete, applying fixes`);
-
-      await this.runFix(testContent, analysis);
-
-      const testFile = `${this.state.testOutputPath}/${testFilename}`;
-      const fs = await import("node:fs");
-      if (fs.existsSync(testFile)) {
-        this.state.testContent = fs.readFileSync(testFile, "utf-8");
+      // Log the error analysis result
+      logger.info(`[AgentTestsReviewer] Error analysis result:`);
+      try {
+        const parsed = JSON.parse(analysis);
+        if (parsed.root_cause) logger.info(`  Root cause: ${parsed.root_cause}`);
+        if (parsed.fixes_needed?.length) {
+          logger.info(`  Fixes needed:`);
+          for (const fix of parsed.fixes_needed) {
+            logger.info(`    - ${fix.issue} → ${fix.fix}`);
+          }
+        }
+        if (parsed.priority) logger.info(`  Priority: ${parsed.priority}`);
+      } catch {
+        // If not JSON, log raw analysis
+        logger.info(`  Analysis: ${analysis.slice(0, 1000)}`);
       }
 
-      this.recordStep("review_fix", `Fixed ${testFilename} (attempt ${this.state.retries})`, "goto:run_tests");
-      this.updateStatus("completed");
+      logger.info(`[AgentTestsReviewer] Applying fixes...`);
+      await this.runFix(testContent, analysis);
+
+      const path = await import("node:path");
+      const testFile = path.join(state.testOutputPath, testFilename);
+      const fs = await import("node:fs");
+      if (fs.existsSync(testFile)) {
+        state.testContent = fs.readFileSync(testFile, "utf-8");
+        logger.success(`[AgentTestsReviewer] Fix applied to ${testFilename}`);
+      }
+
+      this.recordStep("review_fix", `Fixed ${testFilename} (attempt ${state.retries})`, "goto:run_tests");
+      this.updateStatus(AGENT_STATUS.COMPLETED);
     } catch (err) {
-      this.state.error = `Test review failed: ${err}`;
-      this.updateStatus("failed");
+      logger.error(`[AgentTestsReviewer] Test review failed: ${err}`);
+      state.error = `Test review failed: ${err}`;
+      this.updateStatus(AGENT_STATUS.FAILED);
     }
 
-    return this.state;
+    return state;
+  }
+
+  private async debugAppWithMcp(): Promise<string> {
+    const debugInfo: string[] = [];
+    
+    try {
+      // Navigate to the app
+      logger.info(`[AgentTestsReviewer] Debugging app with Playwright MCP...`);
+      const navResult = await callMcpTool("browser_navigate", { url: "http://localhost:3000" });
+      debugInfo.push(`Navigation: ${navResult.slice(0, 200)}`);
+      
+      // Take a screenshot
+      const screenshotResult = await callMcpTool("browser_screenshot", {});
+      debugInfo.push(`Screenshot: ${screenshotResult.slice(0, 200)}`);
+      
+      // Get console messages
+      const consoleResult = await callMcpTool("browser_console_messages", {});
+      debugInfo.push(`Console: ${consoleResult.slice(0, 500)}`);
+      
+      // Get network requests
+      const networkResult = await callMcpTool("browser_network_requests", {});
+      debugInfo.push(`Network: ${networkResult.slice(0, 500)}`);
+      
+      // Get page snapshot (DOM structure)
+      const snapshotResult = await callMcpTool("browser_snapshot", {});
+      debugInfo.push(`DOM Snapshot: ${snapshotResult.slice(0, 1000)}`);
+      
+      logger.info(`[AgentTestsReviewer] MCP debug complete`);
+    } catch (err) {
+      logger.warn(`[AgentTestsReviewer] MCP debug failed: ${err}`);
+      debugInfo.push(`MCP Error: ${err}`);
+    }
+    
+    return debugInfo.join("\n\n");
   }
 
   private async runErrorAnalysis(testContent: string): Promise<string> {
@@ -125,10 +187,18 @@ Return the fixed test file content via write_test_file tool.`;
       return "Missing test filename or test result";
     }
     
+    // Use Playwright MCP to debug the app if available
+    let mcpDebugInfo = "";
+    try {
+      mcpDebugInfo = await this.debugAppWithMcp();
+    } catch (err) {
+      logger.warn(`[AgentTestsReviewer] MCP debug skipped: ${err}`);
+    }
+    
     const provider = getTaskProvider(AGENT_NAMES.AGENT_TESTS_REVIEWER, this.state.agentConfig);
     logger.task(AGENT_NAMES.AGENT_TESTS_REVIEWER, `${getTaskProviderName(AGENT_NAMES.AGENT_TESTS_REVIEWER, this.state.agentConfig)}/${getTaskModel(AGENT_NAMES.AGENT_TESTS_REVIEWER, this.state.agentConfig)}`);
 
-    const systemPrompt = `You are a test error analyzer. Given a failing test file and its error output, analyze the root cause and provide a detailed fix plan.
+    const systemPrompt = `You are a test error analyzer. Given a failing test file, its error output, and optionally live app debug info, analyze the root cause and provide a detailed fix plan.
 
 Output a JSON with this structure:
 {
@@ -149,6 +219,7 @@ ${testResult.errors.join("\n\n")}
 Retry history:
 ${this.state.retryHistory.map((r, i) => `Attempt ${i + 1}: ${r.errors.join("; ")}`).join("\n")}
 
+${mcpDebugInfo ? `Live App Debug Info:\n${mcpDebugInfo}\n` : ""}
 Analyze the errors and provide a fix plan.`;
 
     const response = await provider.chat({
@@ -174,21 +245,61 @@ Analyze the errors and provide a fix plan.`;
     logger.task(AGENT_NAMES.AGENT_TESTS_REVIEWER, `${getTaskProviderName(AGENT_NAMES.AGENT_TESTS_REVIEWER, this.state.agentConfig)}/${getTaskModel(AGENT_NAMES.AGENT_TESTS_REVIEWER, this.state.agentConfig)}`);
 
     const systemPrompt = AgentTestsReviewer.buildSystemPrompt();
-    const sharedContext = toSharedContext(this.state);
+    const tools = this.getAvailableTools();
 
     const userMessage = `Fix the test based on this analysis:\n\n${analysis}\n\nTest file: ${testFilename}\nCurrent content:\n${testContent}\n\nErrors:\n${testResult.errors.join("\n\n")}\n\nUse write_test_file to save the fixed test.`;
 
-    const response = await provider.chat({
-      system: systemPrompt,
-      messages: [{ role: "user", content: userMessage }],
-      tools: this.getAvailableTools(),
-      maxTokens: this.state.agentConfig[AGENT_NAMES.AGENT_TESTS_REVIEWER]?.maxTokens,
-      temperature: this.state.agentConfig[AGENT_NAMES.AGENT_TESTS_REVIEWER]?.temperature,
-    });
+    // Agentic tool-use loop
+    const messages: ChatMessage[] = [
+      { role: "user", content: userMessage },
+    ];
+    
+    const maxIterations = 10;
+    let iteration = 0;
+    
+    while (iteration < maxIterations) {
+      iteration++;
+      logger.debug(`[AgentTestsReviewer] Tool loop iteration ${iteration}`);
+      
+      const response = await provider.chat({
+        system: systemPrompt,
+        messages,
+        tools,
+        maxTokens: this.state.agentConfig[AGENT_NAMES.AGENT_TESTS_REVIEWER]?.maxTokens,
+        temperature: this.state.agentConfig[AGENT_NAMES.AGENT_TESTS_REVIEWER]?.temperature,
+      });
 
-    const toolBlocks = response.content.filter((b): b is { type: "tool_use"; id: string; name: string; input: Record<string, unknown> } => b.type === "tool_use");
-    for (const toolBlock of toolBlocks) {
-      await this.executeTool(toolBlock.name, toolBlock.input);
+      // Add assistant response to history
+      messages.push({ role: "assistant", content: response.content });
+
+      // Extract tool_use blocks
+      const toolBlocks = response.content.filter((b): b is { type: "tool_use"; id: string; name: string; input: Record<string, unknown> } => b.type === "tool_use");
+      
+      // If no tool calls, we're done
+      if (toolBlocks.length === 0 || response.stopReason !== "tool_use") {
+        logger.debug(`[AgentTestsReviewer] Tool loop completed after ${iteration} iterations`);
+        break;
+      }
+
+      // Execute tools and collect results
+      const toolResults: ContentBlock[] = [];
+      
+      for (const toolBlock of toolBlocks) {
+        logger.debug(`[AgentTestsReviewer] Executing tool: ${toolBlock.name}`);
+        const result = await this.executeTool(toolBlock.name, toolBlock.input);
+        toolResults.push({
+          type: "tool_result",
+          toolUseId: toolBlock.id,
+          content: result,
+        });
+      }
+
+      // Add tool results to messages
+      messages.push({ role: "user", content: toolResults });
+    }
+
+    if (iteration >= maxIterations) {
+      logger.warn(`[AgentTestsReviewer] Tool loop hit max iterations (${maxIterations})`);
     }
   }
 

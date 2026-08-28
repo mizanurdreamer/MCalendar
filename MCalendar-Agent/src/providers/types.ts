@@ -7,6 +7,7 @@ export interface ChatParams {
   system: string;
   messages: ChatMessage[];
   tools?: ToolDefinition[];
+  toolChoice?: { type: "auto" } | { type: "tool"; name: string } | { type: "any" };
   maxTokens?: number;
   temperature?: number;
 }

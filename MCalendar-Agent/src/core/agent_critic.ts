@@ -2,6 +2,7 @@ import type { ProviderInterface } from "../providers/types.js";
 import type { AgentState, AgentName, ReflectionResult } from "./state.js";
 import { BaseAgent } from "./base_agent.js";
 import { logger } from "../utils/logger.js";
+import { AGENT_STATUS, RISK_LEVEL, CORE_AGENT_NAMES } from "../utils/constants.js";
 
 export interface CriticConfig {
   enabled: boolean;
@@ -19,7 +20,7 @@ export class AgentCritic extends BaseAgent {
     targetAgent: AgentName,
     config: CriticConfig = { enabled: true, minScore: 70, maxRevisions: 2 }
   ) {
-    super("critic", state, AgentCritic.buildSystemPrompt(targetAgent), taskContext);
+    super(CORE_AGENT_NAMES.CRITIC, state, AgentCritic.buildSystemPrompt(targetAgent), taskContext);
     this.config = config;
     this.targetAgent = targetAgent;
   }
@@ -45,13 +46,21 @@ Output ONLY valid JSON.`;
 
   getDefaultPlan(): import("./state.js").AgentPlan {
     return {
-      agent: "critic",
+      agent: CORE_AGENT_NAMES.CRITIC,
       goal: this.getGoal(),
       steps: [],
       estimatedIterations: 1,
-      riskLevel: "low",
+      riskLevel: RISK_LEVEL.LOW,
       createdAt: Date.now(),
     };
+  }
+
+  async run(): Promise<AgentState> {
+    // Critic is used via critique() and critiqueWithRevision() methods, not run()
+    // This override prevents the base class from trying to execute tools
+    logger.debug(`[AgentCritic] run() called - critic uses critique() method instead`);
+    this.updateStatus(AGENT_STATUS.COMPLETED);
+    return this.state;
   }
 
   async critique(output: string, context: { goal: string; agent: AgentName; projectContext?: AgentState["projectContext"] }): Promise<ReflectionResult> {

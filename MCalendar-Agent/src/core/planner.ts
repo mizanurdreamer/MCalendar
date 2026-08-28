@@ -2,6 +2,7 @@ import type { AgentState, AgentName, AgentPlan, PlanStep, ReflectionResult } fro
 import { logger } from "../utils/logger.js";
 import type { ProviderInterface } from "../providers/types.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
+import { CORE_AGENT_NAMES, MODE, RISK_LEVEL } from "../utils/constants.js";
 
 export interface PlannerConfig {
   enabled: boolean;
@@ -141,7 +142,7 @@ export class AdvancedPlanner {
       [AGENT_NAMES.AGENT_TESTS_REVIEWER]: "Fixes failing tests based on error analysis",
       [AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR]: "Generates comprehensive test reports",
       [AGENT_NAMES.AGENT_SUMMARIZE]: "Creates concise summaries for GitHub comments",
-      critic: "Critiques agent outputs and suggests improvements",
+      [CORE_AGENT_NAMES.CRITIC]: "Critiques agent outputs and suggests improvements",
     };
 
     return `Create a REVISED execution plan for: ${goal}
@@ -153,12 +154,12 @@ ${availableAgents.map(a => `- ${a}: ${agentDescriptions[a] || "Unknown"}`).join(
 
 Current state:
 - Mode: ${this.state.mode}
-- ${this.state.mode === "issue" ? `Issue: #${this.state.issue?.number} - ${this.state.issue?.title}` : `Commit: ${this.state.commitDiff?.sha.slice(0,7)}`}
+- ${this.state.mode === MODE.ISSUE ? `Issue: #${this.state.issue?.number} - ${this.state.issue?.title}` : `Commit: ${this.state.commitDiff?.sha.slice(0,7)}`}
 - Retries: ${this.state.retries}/${this.state.maxRetries}
 
 Create a REVISED plan as JSON with this exact structure:
 {
-  "agent": "planner",
+  "agent": "${CORE_AGENT_NAMES.PLANNER}",
   "goal": "specific goal",
   "steps": [
     {
@@ -173,7 +174,7 @@ Create a REVISED plan as JSON with this exact structure:
     }
   ],
   "estimatedIterations": 3,
-  "riskLevel": "low|medium|high",
+  "riskLevel": "${RISK_LEVEL.LOW}|${RISK_LEVEL.MEDIUM}|${RISK_LEVEL.HIGH}",
   "parallelGroups": [
     ["step_id1", "step_id2"]
   ]
@@ -184,7 +185,7 @@ Rules:
 2. ${AGENT_NAMES.AGENT_TESTS_REVIEWER} depends on ${AGENT_NAMES.AGENT_TESTS_GENERATOR}
 3. ${AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR} depends on test results
 4. ${AGENT_NAMES.AGENT_SUMMARIZE} depends on ${AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR}
-5. critic can run after any agent produces output
+5. ${CORE_AGENT_NAMES.CRITIC} can run after any agent produces output
 6. Max ${this.config.maxPlanSteps} steps
 
 IMPORTANT: Address the critic feedback above. Focus on:
@@ -202,7 +203,7 @@ IMPORTANT: Address the critic feedback above. Focus on:
       [AGENT_NAMES.AGENT_TESTS_REVIEWER]: "Fixes failing tests based on error analysis",
       [AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR]: "Generates comprehensive test reports",
       [AGENT_NAMES.AGENT_SUMMARIZE]: "Creates concise summaries for GitHub comments",
-      critic: "Critiques agent outputs and suggests improvements",
+      [CORE_AGENT_NAMES.CRITIC]: "Critiques agent outputs and suggests improvements",
     };
 
     return `Create an execution plan for: ${goal}
@@ -212,12 +213,12 @@ ${availableAgents.map(a => `- ${a}: ${agentDescriptions[a] || "Unknown"}`).join(
 
 Current state:
 - Mode: ${this.state.mode}
-- ${this.state.mode === "issue" ? `Issue: #${this.state.issue?.number} - ${this.state.issue?.title}` : `Commit: ${this.state.commitDiff?.sha.slice(0,7)}`}
+- ${this.state.mode === MODE.ISSUE ? `Issue: #${this.state.issue?.number} - ${this.state.issue?.title}` : `Commit: ${this.state.commitDiff?.sha.slice(0,7)}`}
 - Retries: ${this.state.retries}/${this.state.maxRetries}
 
 Create a plan as JSON with this exact structure:
 {
-  "agent": "planner",
+  "agent": "${CORE_AGENT_NAMES.PLANNER}",
   "goal": "specific goal",
   "steps": [
     {
@@ -232,7 +233,7 @@ Create a plan as JSON with this exact structure:
     }
   ],
   "estimatedIterations": 3,
-  "riskLevel": "low|medium|high",
+  "riskLevel": "${RISK_LEVEL.LOW}|${RISK_LEVEL.MEDIUM}|${RISK_LEVEL.HIGH}",
   "parallelGroups": [
     ["step_id1", "step_id2"]
   ]
@@ -243,7 +244,7 @@ Rules:
 2. ${AGENT_NAMES.AGENT_TESTS_REVIEWER} depends on ${AGENT_NAMES.AGENT_TESTS_GENERATOR}
 3. ${AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR} depends on test results
 4. ${AGENT_NAMES.AGENT_SUMMARIZE} depends on ${AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR}
-5. critic can run after any agent produces output
+5. ${CORE_AGENT_NAMES.CRITIC} can run after any agent produces output
 6. Max ${this.config.maxPlanSteps} steps`;
   }
 
@@ -298,7 +299,7 @@ Rules:
     const mode = this.state.mode;
     const steps: PlanStep[] = [];
 
-    if (mode === "issue") {
+    if (mode === MODE.ISSUE) {
       steps.push(
         { id: "analyze", agent: AGENT_NAMES.AGENT_ISSUE_ANALYZER, tool: "analyze_issue", args: {}, expectedOutcome: "Issue analysis", reasoning: "Analyze issue", dependsOn: [], canRunParallel: false },
         { id: "generate", agent: AGENT_NAMES.AGENT_TESTS_GENERATOR, tool: "write_test_file", args: {}, expectedOutcome: "Test file", reasoning: "Generate tests", dependsOn: ["analyze"], canRunParallel: false },
@@ -317,11 +318,11 @@ Rules:
     }
 
     return {
-      agent: "planner",
+      agent: CORE_AGENT_NAMES.PLANNER,
       goal,
       steps,
       estimatedIterations: steps.length,
-      riskLevel: "medium",
+      riskLevel: RISK_LEVEL.MEDIUM,
       createdAt: Date.now(),
       parallelGroups: [["report", "summarize"]],
     };

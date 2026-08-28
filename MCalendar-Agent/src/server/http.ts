@@ -10,6 +10,7 @@ import { StateManager } from "../watcher/issue_state_tracker.js";
 import { CommitStateManager } from "../watcher/commit_state_tracker.js";
 import { logger } from "../utils/logger.js";
 import { RunManager } from "./run_manager.js";
+import { APPROVAL_TYPE } from "../utils/constants.js";
 import { runChatTurn } from "./chat_agent.js";
 import { attachWs, broadcast, connectedCount } from "./ws_hub.js";
 import { attachLogBroadcast } from "./log_transport.js";
@@ -18,7 +19,7 @@ import { getPendingApprovals as getStoredApprovals, resolveApproval as resolveSt
 export interface ApprovalRequest {
   id: string;
   agent: string;
-  type: "plan" | "test_generation" | "commit_push" | "pr_creation" | "architecture_decision";
+  type: typeof APPROVAL_TYPE[keyof typeof APPROVAL_TYPE];
   title: string;
   description: string;
   data: any;

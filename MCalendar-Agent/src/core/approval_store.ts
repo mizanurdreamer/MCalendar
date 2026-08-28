@@ -1,13 +1,14 @@
 import { readJson, writeJson } from "../utils/file.js";
 import path from "node:path";
 import type { AgentName } from "./state.js";
+import { APPROVAL_TYPE } from "../utils/constants.js";
 
 const APPROVAL_STORE_FILE = ".agent-context/approvals.json";
 
 export interface StoredApprovalRequest {
   id: string;
   agent: AgentName;
-  type: "plan" | "test_generation" | "commit_push" | "pr_creation" | "architecture_decision";
+  type: typeof APPROVAL_TYPE[keyof typeof APPROVAL_TYPE];
   title: string;
   description: string;
   data: any;

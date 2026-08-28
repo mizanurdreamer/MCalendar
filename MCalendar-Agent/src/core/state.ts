@@ -6,14 +6,31 @@ import type { GitBranch } from "../github/git_operations.js";
 import type { GitHubClient } from "../github/client.js";
 import type { ProviderInterface } from "../providers/types.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
+import {
+  CORE_AGENT_NAMES,
+  AGENT_STATUS,
+  RISK_LEVEL,
+  APPROVED_BY,
+  MESSAGE_TYPE,
+  APPROVAL_TYPE,
+  MODE,
+  PIPELINE_STATUS,
+} from "../utils/constants.js";
 
-export type AgentName = 
-  | "supervisor"
-  | "critic"
-  | "planner"
+export type AgentName =
+  | typeof CORE_AGENT_NAMES.SUPERVISOR
+  | typeof CORE_AGENT_NAMES.CRITIC
+  | typeof CORE_AGENT_NAMES.PLANNER
   | (typeof AGENT_NAMES)[keyof typeof AGENT_NAMES];
 
-export type AgentStatus = "idle" | "planning" | "executing" | "reflecting" | "awaiting_approval" | "completed" | "failed";
+export type AgentStatus =
+  | typeof AGENT_STATUS.IDLE
+  | typeof AGENT_STATUS.PLANNING
+  | typeof AGENT_STATUS.EXECUTING
+  | typeof AGENT_STATUS.REFLECTING
+  | typeof AGENT_STATUS.AWAITING_APPROVAL
+  | typeof AGENT_STATUS.COMPLETED
+  | typeof AGENT_STATUS.FAILED;
 
 export interface PlanStep {
   id: string;
@@ -31,18 +48,18 @@ export interface AgentPlan {
   goal: string;
   steps: PlanStep[];
   estimatedIterations: number;
-  riskLevel: "low" | "medium" | "high";
+  riskLevel: typeof RISK_LEVEL.LOW | typeof RISK_LEVEL.MEDIUM | typeof RISK_LEVEL.HIGH;
   createdAt: number;
   approved?: boolean;
-  approvedBy?: "human" | "supervisor";
+  approvedBy?: typeof APPROVED_BY.HUMAN | typeof APPROVED_BY.SUPERVISOR;
   parallelGroups?: string[][];
 }
 
 export interface AgentMessage {
   id: string;
   from: AgentName;
-  to: AgentName | "broadcast";
-  type: "request" | "response" | "notification" | "delegation";
+  to: AgentName | typeof MESSAGE_TYPE.BROADCAST;
+  type: typeof MESSAGE_TYPE.REQUEST | typeof MESSAGE_TYPE.RESPONSE | typeof MESSAGE_TYPE.NOTIFICATION | typeof MESSAGE_TYPE.DELEGATION;
   payload: unknown;
   timestamp: number;
   correlationId?: string;
@@ -76,7 +93,7 @@ export interface ReflectionResult {
 export interface HumanApprovalRequest {
   id: string;
   agent: AgentName;
-  type: "plan" | "test_generation" | "commit_push" | "pr_creation" | "architecture_decision";
+  type: typeof APPROVAL_TYPE.PLAN | typeof APPROVAL_TYPE.TEST_GENERATION | typeof APPROVAL_TYPE.COMMIT_PUSH | typeof APPROVAL_TYPE.PR_CREATION | typeof APPROVAL_TYPE.ARCHITECTURE_DECISION;
   title: string;
   description: string;
   data: unknown;
@@ -89,7 +106,7 @@ export interface HumanApprovalRequest {
 }
 
 export interface AgentState {
-  mode: "issue" | "commit";
+  mode: typeof MODE.ISSUE | typeof MODE.COMMIT;
   runId: string;
   
   issue?: GitHubIssue;
@@ -188,12 +205,12 @@ export interface AgentState {
     decision: string;
   }>;
   
-  status: "running" | "completed" | "failed" | "skipped" | "awaiting_human";
+  status: typeof PIPELINE_STATUS.RUNNING | typeof PIPELINE_STATUS.COMPLETED | typeof PIPELINE_STATUS.FAILED | typeof PIPELINE_STATUS.SKIPPED | typeof PIPELINE_STATUS.AWAITING_HUMAN;
   error?: string;
 }
 
 export function createInitialAgentState(input: {
-  mode: "issue" | "commit";
+  mode: typeof MODE.ISSUE | typeof MODE.COMMIT;
   runId: string;
   issue?: GitHubIssue;
   commitDiff?: CommitDiff;
@@ -216,9 +233,9 @@ export function createInitialAgentState(input: {
   branchName: string;
 }): AgentState {
   const agentNames: AgentName[] = [
-    "supervisor",
-    "critic",
-    "planner",
+    CORE_AGENT_NAMES.SUPERVISOR,
+    CORE_AGENT_NAMES.CRITIC,
+    CORE_AGENT_NAMES.PLANNER,
     AGENT_NAMES.AGENT_ISSUE_ANALYZER,
     AGENT_NAMES.AGENT_COMMIT_ANALYZER,
     AGENT_NAMES.AGENT_TESTS_GENERATOR,
@@ -252,14 +269,14 @@ export function createInitialAgentState(input: {
     baseBranch: input.baseBranch,
     branchName: input.branchName,
     retryHistory: [],
-    currentAgent: "supervisor",
-    agentStatus: agentNames.reduce((acc, name) => ({ ...acc, [name]: "idle" }), {} as Record<AgentName, AgentStatus> & { parallelQueue: [] }),
+    currentAgent: CORE_AGENT_NAMES.SUPERVISOR,
+    agentStatus: agentNames.reduce((acc, name) => ({ ...acc, [name]: AGENT_STATUS.IDLE }), {} as Record<AgentName, AgentStatus> & { parallelQueue: [] }),
     plans: {} as Record<AgentName, AgentPlan>,
     messages: [],
     memory: [],
     reflectionHistory: {} as Record<AgentName, ReflectionResult[]>,
     humanApprovals: [],
     stepHistory: [],
-    status: "running",
+    status: PIPELINE_STATUS.RUNNING,
   };
 }

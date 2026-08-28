@@ -4,7 +4,7 @@ import { formatTestReport } from "../test_runner/reporter.js";
 import { logger } from "../utils/logger.js";
 import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers/registry.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
-import { toSharedContext } from "../core/adapters.js";
+import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL } from "../utils/constants.js";
 
 export class AgentSummarize extends BaseAgent {
   constructor(state: AgentState, taskContext: import("../core/base_agent.js").TaskContext) {
@@ -25,9 +25,9 @@ Keep it concise and actionable for developers.`;
   }
 
   getGoal(): string {
-    if (this.state.mode === "issue" && this.state.issue) {
+    if (this.state.mode === MODE.ISSUE && this.state.issue) {
       return `Summarize test results for issue #${this.state.issue.number}`;
-    } else if (this.state.mode === "commit" && this.state.commitDiff) {
+    } else if (this.state.mode === MODE.COMMIT && this.state.commitDiff) {
       return `Summarize test results for commit ${this.state.commitDiff.sha.slice(0,7)}`;
     }
     return "Summarize test results";
@@ -47,63 +47,96 @@ Keep it concise and actionable for developers.`;
         },
       ],
       estimatedIterations: 1,
-      riskLevel: "low",
+      riskLevel: RISK_LEVEL.LOW,
       createdAt: Date.now(),
     };
   }
 
-  async run(): Promise<AgentState> {
+  async run(inputState?: AgentState): Promise<AgentState> {
+    const state = inputState || this.state;
     let userMessage: string;
 
-    if (this.state.mode === "issue" && this.state.issue) {
+    if (state.mode === MODE.ISSUE && state.issue) {
+      logger.info(`[AgentSummarize] Summarizing issue #${state.issue.number} pipeline results`);
+      logger.info(`  Issue: #${state.issue.number} — ${state.issue.title}`);
+      logger.info(`  Branch: ${state.branchName}`);
+      logger.info(`  Test file: ${state.testFilename}`);
+      
+      if (state.testResult) {
+        logger.info(`  Test results: ${state.testResult.passed} passed, ${state.testResult.failed} failed (${state.testResult.total} total)`);
+      }
+      
       userMessage = `Summarize these test results for a GitHub comment:
 
-Issue: #${this.state.issue.number} — ${this.state.issue.title}
-Branch: ${this.state.branchName}
-Test file: ${this.state.testFilename}
+Issue: #${state.issue.number} — ${state.issue.title}
+Branch: ${state.branchName}
+Test file: ${state.testFilename}
 
 Test Results:
-${this.state.testResult ? formatTestReport(this.state.testResult) : "(no results)"}
+${state.testResult ? formatTestReport(state.testResult) : "(no results)"}
 
 Report:
-${this.state.report ?? "(no report)"}`;
-    } else if (this.state.mode === "commit" && this.state.commitDiff) {
-      const shortSha = this.state.commitDiff.sha.slice(0, 7);
+${state.report ?? "(no report)"}`;
+    } else if (state.mode === MODE.COMMIT && state.commitDiff) {
+      const shortSha = state.commitDiff.sha.slice(0, 7);
+      logger.info(`[AgentSummarize] Summarizing commit ${shortSha} pipeline results`);
+      logger.info(`  Commit: ${shortSha} — ${state.commitDiff.message.split("\n")[0]}`);
+      logger.info(`  Branch: ${state.branchName}`);
+      logger.info(`  Test file: ${state.testFilename}`);
+      
+      if (state.testResult) {
+        logger.info(`  Test results: ${state.testResult.passed} passed, ${state.testResult.failed} failed (${state.testResult.total} total)`);
+      }
+      
       userMessage = `Summarize these test results for a GitHub comment:
 
-Commit: ${shortSha} — ${this.state.commitDiff.message.split("\n")[0]}
-Branch: ${this.state.branchName}
-Test file: ${this.state.testFilename}
+Commit: ${shortSha} — ${state.commitDiff.message.split("\n")[0]}
+Branch: ${state.branchName}
+Test file: ${state.testFilename}
 
 Test Results:
-${this.state.testResult ? formatTestReport(this.state.testResult) : "(no results)"}
+${state.testResult ? formatTestReport(state.testResult) : "(no results)"}
 
 Report:
-${this.state.report ?? "(no report)"}`;
+${state.report ?? "(no report)"}`;
     } else {
-      this.updateStatus("completed");
-      return this.state;
+      logger.warn(`[AgentSummarize] No mode/issue/commit to summarize, skipping`);
+      this.updateStatus(AGENT_STATUS.COMPLETED);
+      return state;
     }
 
     try {
       const output = await this.runSummarization(userMessage);
 
-      this.state.summary = output;
+      state.summary = output;
+      
+      // Log the generated summary
+      logger.info(`[AgentSummarize] Summary generated (${output.length} chars):`);
+      const summaryLines = output.split('\n').slice(0, 20);
+      for (const line of summaryLines) {
+        logger.info(`  ${line}`);
+      }
 
-      if (this.state.githubClient && this.state.issue) {
-        await this.state.githubClient.addComment(this.state.issue.number, output);
-      } else if (this.state.githubClient && this.state.mode === "commit" && this.state.prUrl) {
-        await this.state.githubClient.addPRComment(this.state.prUrl, output);
+      // Log GitHub comment posting
+      if (state.githubClient && state.issue) {
+        await state.githubClient.addComment(state.issue.number, output);
+        logger.success(`[AgentSummarize] Posted comment to issue #${state.issue.number}`);
+      } else if (state.githubClient && state.mode === MODE.COMMIT && state.prUrl) {
+        await state.githubClient.addPRComment(state.prUrl, output);
+        logger.success(`[AgentSummarize] Posted comment to PR ${state.prUrl}`);
+      } else {
+        logger.warn(`[AgentSummarize] No GitHub client available, skipping comment`);
       }
 
       this.recordStep("summarize", output, "done");
-      this.updateStatus("completed");
+      this.updateStatus(AGENT_STATUS.COMPLETED);
     } catch (err) {
-      this.state.error = `Summarize failed: ${err}`;
-      this.updateStatus("failed");
+      logger.error(`[AgentSummarize] Summarize failed: ${err}`);
+      state.error = `Summarize failed: ${err}`;
+      this.updateStatus(AGENT_STATUS.FAILED);
     }
 
-    return this.state;
+    return state;
   }
 
   private async runSummarization(userMessage: string): Promise<string> {
@@ -111,7 +144,6 @@ ${this.state.report ?? "(no report)"}`;
     logger.task(AGENT_NAMES.AGENT_SUMMARIZE, `${getTaskProviderName(AGENT_NAMES.AGENT_SUMMARIZE, this.state.agentConfig)}/${getTaskModel(AGENT_NAMES.AGENT_SUMMARIZE, this.state.agentConfig)}`);
 
     const systemPrompt = AgentSummarize.buildSystemPrompt();
-    const sharedContext = toSharedContext(this.state);
 
     const response = await provider.chat({
       system: systemPrompt,

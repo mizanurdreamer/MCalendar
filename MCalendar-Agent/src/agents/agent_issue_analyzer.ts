@@ -1,9 +1,42 @@
 import type { AgentState } from "../core/state.js";
+import type { ToolDefinition } from "../providers/types.js";
 import { BaseAgent } from "../core/base_agent.js";
 import { logger } from "../utils/logger.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
 import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers/registry.js";
-import { toSharedContext } from "../core/adapters.js";
+import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL } from "../utils/constants.js";
+
+const SUBMIT_ANALYSIS_TOOL: ToolDefinition = {
+  name: "submit_analysis",
+  description: "Submit the issue analysis with test scenarios. Use this tool to return your analysis.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      summary: { type: "string", description: "Brief summary of the issue" },
+      functionality_to_test: { type: "array", items: { type: "string" }, description: "List of features to test" },
+      relevant_files: { type: "array", items: { type: "string" }, description: "Files likely to be modified" },
+      test_scenarios: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            name: { type: "string", description: "Scenario name" },
+            type: { type: "string", enum: ["positive", "negative"], description: "Type of test" },
+            description: { type: "string", description: "What to test" },
+            acceptance_criterion: { type: "string", description: "Specific criterion" },
+          },
+          required: ["name", "type", "description", "acceptance_criterion"],
+        },
+        description: "Test scenarios to implement",
+      },
+      edge_cases: { type: "array", items: { type: "string" }, description: "Edge cases to consider" },
+      api_endpoints: { type: "array", items: { type: "string" }, description: "Affected API endpoints" },
+      role_checks: { type: "array", items: { type: "string" }, description: "Permission/role checks needed" },
+      needs_tests: { type: "boolean", description: "Whether tests are needed" },
+    },
+    required: ["summary", "functionality_to_test", "relevant_files", "test_scenarios", "edge_cases", "api_endpoints", "role_checks", "needs_tests"],
+  },
+};
 
 export class AgentIssueAnalyzer extends BaseAgent {
   constructor(state: AgentState, taskContext: import("../core/base_agent.js").TaskContext) {
@@ -19,21 +52,7 @@ Given an issue, you must:
 3. Define specific test scenarios with acceptance criteria
 4. Determine if tests are actually needed (some issues are docs, config, etc.)
 
-Output a JSON analysis with this exact structure:
-{
-  "summary": "brief summary of the issue",
-  "functionality_to_test": ["list of features to test"],
-  "relevant_files": ["files likely to be modified"],
-  "test_scenarios": [
-    {"name": "scenario name", "type": "positive|negative", "description": "what to test", "acceptance_criterion": "specific criterion"}
-  ],
-  "edge_cases": ["edge cases to consider"],
-  "api_endpoints": ["affected API endpoints"],
-  "role_checks": ["permission/role checks needed"],
-  "needs_tests": true/false
-}
-
-Return ONLY valid JSON.`;
+Use the submit_analysis tool to return your analysis with all required fields.`;
   }
 
   getGoal(): string {
@@ -55,19 +74,21 @@ Return ONLY valid JSON.`;
         },
       ],
       estimatedIterations: 1,
-      riskLevel: "low",
+      riskLevel: RISK_LEVEL.LOW,
       createdAt: Date.now(),
     };
   }
 
-  async run(): Promise<AgentState> {
-    if (!this.state.issue) {
-      this.state.error = "No issue provided";
-      this.updateStatus("failed");
-      return this.state;
+  async run(inputState?: AgentState): Promise<AgentState> {
+    const state = inputState || this.state;
+    if (!state.issue) {
+      logger.error(`[AgentIssueAnalyzer] No issue provided`);
+      state.error = "No issue provided";
+      this.updateStatus(AGENT_STATUS.FAILED);
+      return state;
     }
 
-    const issue = this.state.issue;
+    const issue = state.issue;
     const labels = issue.labels.map((l: { name: string }) => l.name).join(", ") || "none";
     const userMessage = `Issue #${issue.number}: ${issue.title}
 Labels: ${labels}
@@ -78,134 +99,113 @@ ${issue.body ?? "(no description)"}`;
     logger.info(`[AgentIssueAnalyzer] Analyzing issue #${issue.number}`);
 
     try {
-      const output = await this.runAnalysis(userMessage);
-
-      const analysis = this.parseIssueAnalysis(output);
-      this.state.issueAnalysis = analysis;
+      const analysis = await this.runAnalysis(userMessage);
+      state.issueAnalysis = analysis;
 
       if (!analysis.needs_tests) {
         logger.info(`[AgentIssueAnalyzer] Issue #${issue.number}: No tests needed - ${analysis.summary}`);
         this.recordStep("analyze_issue", analysis.summary, "goto:summarize");
       } else {
         logger.info(`[AgentIssueAnalyzer] Issue #${issue.number}: ${analysis.test_scenarios.length} test scenarios identified`);
+        
+        // Log functionality to test
+        if (analysis.functionality_to_test?.length) {
+          logger.info(`  Functionality to test: ${analysis.functionality_to_test.join(', ')}`);
+        }
+        
+        // Log relevant files
+        if (analysis.relevant_files?.length) {
+          logger.info(`  Relevant files:`);
+          for (const f of analysis.relevant_files) {
+            logger.info(`    - ${f}`);
+          }
+        }
+        
+        // Log each test scenario with acceptance criterion
+        for (let i = 0; i < analysis.test_scenarios.length; i++) {
+          const s = analysis.test_scenarios[i];
+          logger.info(`  [${i + 1}] ${s.name} (${s.type}): ${s.description}`);
+          if (s.acceptance_criterion) {
+            logger.info(`      Criteria: ${s.acceptance_criterion}`);
+          }
+        }
+        
+        // Log edge cases
+        if (analysis.edge_cases?.length) {
+          logger.info(`  Edge cases: ${analysis.edge_cases.join(', ')}`);
+        }
+        
+        // Log API endpoints
+        if (analysis.api_endpoints?.length) {
+          logger.info(`  API endpoints: ${analysis.api_endpoints.join(', ')}`);
+        }
+        
+        // Log role checks
+        if (analysis.role_checks?.length) {
+          logger.info(`  Role checks: ${analysis.role_checks.join(', ')}`);
+        }
+        
         this.recordStep("analyze_issue", analysis.summary, "next");
       }
 
-      this.updateStatus("completed");
+      this.updateStatus(AGENT_STATUS.COMPLETED);
     } catch (err) {
-      this.state.error = `Issue analysis failed: ${err}`;
-      this.updateStatus("failed");
+      logger.error(`[AgentIssueAnalyzer] Issue analysis failed: ${err}`);
+      state.error = `Issue analysis failed: ${err}`;
+      this.updateStatus(AGENT_STATUS.FAILED);
     }
 
-    return this.state;
+    return state;
   }
 
-  private async runAnalysis(userMessage: string): Promise<string> {
+  private async runAnalysis(userMessage: string): Promise<NonNullable<AgentState["issueAnalysis"]>> {
     const provider = getTaskProvider(AGENT_NAMES.AGENT_ISSUE_ANALYZER, this.state.agentConfig);
     logger.task(AGENT_NAMES.AGENT_ISSUE_ANALYZER, `${getTaskProviderName(AGENT_NAMES.AGENT_ISSUE_ANALYZER, this.state.agentConfig)}/${getTaskModel(AGENT_NAMES.AGENT_ISSUE_ANALYZER, this.state.agentConfig)}`);
 
     const systemPrompt = AgentIssueAnalyzer.buildSystemPrompt();
-    const sharedContext = toSharedContext(this.state);
 
     const response = await provider.chat({
       system: systemPrompt,
       messages: [{ role: "user", content: userMessage }],
+      tools: [SUBMIT_ANALYSIS_TOOL],
+      toolChoice: { type: "tool", name: "submit_analysis" },
       maxTokens: this.state.agentConfig[AGENT_NAMES.AGENT_ISSUE_ANALYZER]?.maxTokens,
       temperature: this.state.agentConfig[AGENT_NAMES.AGENT_ISSUE_ANALYZER]?.temperature,
     });
 
+    // Extract from tool_use block (structured output)
+    const toolBlocks = response.content.filter((b): b is { type: "tool_use"; id: string; name: string; input: Record<string, unknown> } => b.type === "tool_use");
+    if (toolBlocks.length > 0 && toolBlocks[0].name === "submit_analysis") {
+      const input = toolBlocks[0].input;
+      logger.debug(`[AgentIssueAnalyzer] Extracted analysis from tool_use block`);
+      return input as NonNullable<AgentState["issueAnalysis"]>;
+    }
+
+    // Fallback: try to parse text response (for providers that don't support tool use)
     const textBlocks = response.content.filter((b): b is { type: "text"; text: string } => b.type === "text");
-    const result = textBlocks.map((b) => b.text).join("\n");
-    
-    logger.debug(`[AgentIssueAnalyzer] Response received (${result.length} chars)`);
-    
-    return result;
+    const text = textBlocks.map((b) => b.text).join("\n");
+    logger.debug(`[AgentIssueAnalyzer] No tool_use block found, falling back to text parsing`);
+    return this.parseTextFallback(text);
   }
 
-  private parseIssueAnalysis(raw: string): NonNullable<AgentState["issueAnalysis"]> {
-    logger.debug(`[AgentIssueAnalyzer] Parsing response (${raw.length} chars)`);
-    
-    // Try multiple parsing strategies
-    const strategies = [
-      () => this.tryParseJson(raw),
-      () => this.tryParseJson(this.extractAndFixJson(raw)),
-      () => this.tryParseJson(this.fixCommonJsonIssues(raw)),
-    ];
-    
-    for (const strategy of strategies) {
+  private parseTextFallback(text: string): NonNullable<AgentState["issueAnalysis"]> {
+    const match = text.match(/\{[\s\S]*\}/);
+    if (match) {
       try {
-        const result = strategy();
-        if (result) {
-          return result;
-        }
-      } catch (err) {
-        // Continue to next strategy
-        logger.debug(`[AgentIssueAnalyzer] Strategy failed: ${err}`);
+        return JSON.parse(match[0]);
+      } catch {
+        logger.warn(`[AgentIssueAnalyzer] Failed to parse fallback JSON`);
       }
     }
-    
-    logger.warn(`[AgentIssueAnalyzer] All JSON parse strategies failed`);
     return {
-      summary: raw.slice(0, 500),
+      summary: text.slice(0, 500),
       functionality_to_test: [],
       relevant_files: [],
       test_scenarios: [],
       edge_cases: [],
       api_endpoints: [],
       role_checks: [],
-      needs_tests: !raw.toUpperCase().includes("NO_TESTS_NEEDED"),
+      needs_tests: !text.toUpperCase().includes("NO_TESTS_NEEDED"),
     };
-  }
-  
-  private tryParseJson(jsonStr: string): NonNullable<AgentState["issueAnalysis"]> | null {
-    const jsonMatch = jsonStr.match(/\{[\s\S]*?\}/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
-    }
-    return null;
-  }
-  
-  private extractAndFixJson(raw: string): string {
-    // Try to find the outermost JSON object
-    let braceCount = 0;
-    let startIdx = -1;
-    let endIdx = -1;
-    
-    for (let i = 0; i < raw.length; i++) {
-      if (raw[i] === '{') {
-        if (braceCount === 0) startIdx = i;
-        braceCount++;
-      } else if (raw[i] === '}') {
-        braceCount--;
-        if (braceCount === 0 && startIdx !== -1) {
-          endIdx = i;
-          break;
-        }
-      }
-    }
-    
-    if (startIdx !== -1 && endIdx !== -1) {
-      return raw.slice(startIdx, endIdx + 1);
-    }
-    return raw;
-  }
-  
-  private fixCommonJsonIssues(jsonStr: string): string {
-    let fixed = jsonStr;
-    
-    // Fix missing commas between array/object elements
-    // Pattern: "value"  "nextValue" or "value"  { or }
-    fixed = fixed.replace(/("|}|])\s*\n\s*(["{])/g, '$1,\n$2');
-    
-    // Fix missing commas between array elements on same line
-    fixed = fixed.replace(/("|}|])\s+(["{])/g, '$1, $2');
-    
-    // Remove trailing commas before } or ]
-    fixed = fixed.replace(/,(\s*[}\]])/g, '$1');
-    
-    // Fix missing commas between properties in objects
-    fixed = fixed.replace(/(":[^,{}\[\]]*)\s*\n\s*(")/g, '$1,\n$2');
-    
-    return fixed;
   }
 }

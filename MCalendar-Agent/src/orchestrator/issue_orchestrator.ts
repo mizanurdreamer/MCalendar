@@ -20,6 +20,8 @@ import { AgentSummarize } from "../agents/agent_summarize.js";
 import { AgentCritic } from "../core/agent_critic.js";
 import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers/registry.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
+import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL } from "../utils/constants.js";
+import { initMcpClient, shutdownMcpClient } from "../mcp/client.js";
 
 export interface OrchestratorConfig {
   agentConfig: AgentConfig;
@@ -33,6 +35,8 @@ export interface OrchestratorConfig {
   databaseUrl?: string;
   apiBaseUrl?: string;
   commitAutoApprove?: boolean;
+  playwrightMcpEnabled?: boolean;
+  playwrightMcpBrowser?: string;
 }
 
 export async function processIssue(
@@ -50,6 +54,16 @@ export async function processIssue(
   setDiagnosticConfig({ databaseUrl: config.databaseUrl, apiBaseUrl: config.apiBaseUrl });
   setDatabaseUrl(config.databaseUrl ?? "");
 
+  // Initialize Playwright MCP if enabled
+  if (config.playwrightMcpEnabled) {
+    try {
+      await initMcpClient(config.playwrightMcpBrowser ?? "chromium");
+      logger.info(`[Orchestrator] Playwright MCP initialized (browser: ${config.playwrightMcpBrowser ?? "chromium"})`);
+    } catch (err) {
+      logger.warn(`[Orchestrator] Failed to initialize Playwright MCP: ${err}`);
+    }
+  }
+
   logger.info(`Fetching issue #${issue.number}: ${issue.title}`);
 
   const defaultBranch = await githubClient.getDefaultBranch();
@@ -62,7 +76,7 @@ export async function processIssue(
   logger.task("orchestrator", `${getTaskProviderName(AGENT_NAMES.AGENT_ISSUE_ANALYZER, agentConfig)}/${getTaskModel(AGENT_NAMES.AGENT_ISSUE_ANALYZER, agentConfig)}`);
 
   const initialState = createInitialAgentState({
-    mode: "issue",
+    mode: MODE.ISSUE,
     runId,
     issue,
     agentConfig,
@@ -110,15 +124,15 @@ export async function processIssue(
   let result = await graph.invoke(initialState, { configurable: { thread_id: threadId } });
 
   // Handle human approval interrupts
-  while (result.status === "awaiting_human") {
+  while (result.status === PIPELINE_STATUS.AWAITING_HUMAN) {
     const pending = result.humanApprovals?.find(a => !a.resolved);
     if (!pending) break;
 
     logger.info(`[Orchestrator] Human approval required: ${pending.title}`);
     
-    // In a real implementation, this would wait for web UI or CLI input
-    // For now, auto-approve if commitAutoApprove is true
-    const resolution = config.commitAutoApprove ? "approve" : "approve"; // Default to approve
+    // Auto-approve if commitAutoApprove is true, otherwise reject
+    const resolution = config.commitAutoApprove ? "approve" : "reject";
+    logger.info(`[Orchestrator] Auto-approving: ${config.commitAutoApprove}`);
     
     result = await graph.resumeAfterApproval(threadId, resolution);
   }
@@ -129,8 +143,17 @@ export async function processIssue(
     );
   }
 
+  // Shutdown Playwright MCP if it was initialized
+  if (config.playwrightMcpEnabled) {
+    try {
+      await shutdownMcpClient();
+    } catch (err) {
+      logger.warn(`[Orchestrator] Failed to shutdown Playwright MCP: ${err}`);
+    }
+  }
+
   return {
-    success: result.status === "completed" && (result.testResult?.success ?? false),
+    success: result.status === PIPELINE_STATUS.COMPLETED && (result.testResult?.success ?? false),
     output: `Pushed to ${result.branchName} with ${result.testResult?.passed ?? 0} tests passed`,
     filesWritten: result.testFilename ? [result.testFilename] : [],
     testsPassed: result.testResult?.passed ?? 0,

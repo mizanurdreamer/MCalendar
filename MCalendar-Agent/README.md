@@ -17,19 +17,18 @@ src/
 │   ├── supervisor.ts               # Routes agents (route/parallel/wait/complete/fail/approval)
 │   ├── state.ts                    # AgentState, AgentPlan, memory, messages, approvals
 │   ├── planner.ts                  # AdvancedPlanner generates master plans with dependencies
-│   ├── critic.ts                   # CriticAgent for self-revision (score-based)
+│   ├── agent_critic.ts             # AgentCritic for self-revision (score-based)
 │   ├── memory.ts                   # InMemoryStore for cross-run learning
 │   ├── message_bus.ts              # Pub/sub for inter-agent communication
 │   ├── approval_store.ts           # File-based approval persistence
-│   ├── base_agent.ts               # BaseAgent with planning, execution, reflection
-│   └── adapters.ts                 # SharedContext for agent communication
+│   └── base_agent.ts               # BaseAgent with planning, execution, reflection
 ├── agents/                         # AI-powered sub-agents (single responsibility)
 │   ├── agent_issue_analyzer.ts     # Analyze issue → determine test scenarios
-│   ├── agent_tests_generator.ts    # Generate Playwright test code
-│   ├── agent_tests_reviewer.ts     # Review + fix failing tests
+│   ├── agent_commit_analyzer.ts    # Decide if commit needs tests
+│   ├── agent_tests_generator.ts    # Generate Playwright test code (agentic tool-use loop)
+│   ├── agent_tests_reviewer.ts     # Review + fix failing tests (agentic tool-use loop + MCP debug)
 │   ├── agent_tests_report_generator.ts  # Format test results
-│   ├── agent_summarize.ts          # Format GitHub comment
-│   └── agent_commit_analyzer.ts    # Decide if commit needs tests
+│   └── agent_summarize.ts          # Format GitHub comment
 ├── orchestrator/                   # Thin setup shells (delegate to agentic graph)
 │   ├── issue_orchestrator.ts       # Setup context → run issue pipeline
 │   └── commit_orchestrator.ts      # Setup context → run commit pipeline
@@ -38,22 +37,15 @@ src/
 │   ├── git_operations.ts           # Local git + commitAndPush + createPR
 │   └── types.ts                    # Issue, PR, Commit types
 ├── test_runner/                    # Test execution
-│   ├── playwright.ts               # Playwright runner
-│   ├── tests_runner.ts             # Run tests wrapper
-│   └── reporter.ts                 # Result formatting
+│   └── playwright.ts               # Playwright runner (synchronous, returns TestResult)
 ├── watcher/                        # Auto-detection
 │   ├── issue_orchestrator_watcher.ts  # Poll for new issues + commits
-│   ├── commit_orchestrator_watcher.ts     # Detect new commits on branch
+│   ├── commit_orchestrator_watcher.ts # Detect new commits on branch
 │   ├── issue_state_tracker.ts       # Processed issue tracking
 │   └── commit_state_tracker.ts      # Last-seen SHA per branch
-├── prompts/                        # System prompts (per AI task)
-│   ├── index.ts                    # Barrel re-export
-│   ├── issue_analyzer_prompt.ts
-│   ├── commit_analyzer_prompt.ts
-│   ├── tests_generator_prompt.ts
-│   ├── tests_reviewer_prompt.ts
-│   ├── tests_report_generator_prompt.ts
-│   └── summarize_prompt.ts
+├── mcp/                            # Playwright MCP integration
+│   ├── client.ts                   # MCP client lifecycle (init/shutdown)
+│   └── tools.ts                    # MCP tool definitions
 ├── providers/                      # AI provider abstraction
 │   ├── types.ts                    # ProviderInterface, TaskConfig
 │   ├── registry.ts                 # Provider factory (all providers enabled)
@@ -63,20 +55,19 @@ src/
 │   ├── ollama.ts                   # Local models
 │   └── openrouter.ts               # OpenRouter (100+ models, free-model auto-selection)
 ├── codebase/                       # Project analysis
-│   ├── reader.ts                   # Read MCalendar files
-│   └── structure.ts                # Build project map
+│   └── reader.ts                   # Read source files
 ├── config/                         # Configuration loading
 │   ├── index.ts                    # Barrel re-export
 │   └── config.ts                   # Env + agent.config.json loader
 ├── utils/                          # Shared utilities
-│   ├── logger.ts                   # Winston logger (console + file)
+│   ├── logger.ts                   # Winston logger (console + file, broadcasts to UI)
+│   ├── agent_names.ts              # Agent name constants
 │   ├── repo_resolver.ts            # URL detection, git clone, name extraction
-│   ├── file.ts                     # File I/O
 │   ├── tools.ts                    # Agent tool definitions
-│   ├── types.ts                    # TaskName, TaskResult
 │   ├── diagnostic_tools.ts         # Diagnostic tool definitions
 │   ├── dev_tools.ts                # Developer tool definitions
-│   └── database_tools.ts           # Database tool definitions
+│   ├── database_tools.ts           # Database tool definitions
+│   └── errors.ts                   # Global error handlers
 ├── server/                         # Web UI backend
 │   ├── http.ts                     # Express app (REST API + static UI serving)
 │   ├── main.ts                     # Standalone server entry point
@@ -94,23 +85,23 @@ src/
 |-------|------|---------|
 | `supervisor` | `src/core/supervisor.ts` | Routes agents through LangGraph state graph (route/parallel/wait/complete/fail/approval). |
 | `planner` | `src/core/planner.ts` | AdvancedPlanner generates master plans with dependencies & parallel groups. |
-| `critic` | `src/core/critic.ts` | CriticAgent for self-revision with scoring (0-100) and automated fixes. |
+| `critic` | `src/core/agent_critic.ts` | AgentCritic for self-revision with scoring (0-100) and automated fixes. |
 | `agent_issue_analyzer` | `src/agents/agent_issue_analyzer.ts` | Reads a GitHub issue, explores the codebase, and determines what E2E test scenarios to write. |
-| `agent_tests_generator` | `src/agents/agent_tests_generator.ts` | Generates Playwright test code based on analysis. Uses tools to write test files. |
-| `agent_tests_reviewer` | `src/agents/agent_tests_reviewer.ts` | Reviews generated tests and fixes failures. Runs in a retry loop (up to 3x). |
-| `agent_tests_report_generator` | `src/agents/agent_tests_report_generator.ts` | Formats test results into a structured report. |
-| `agent_summarize` | `src/agents/agent_summarize.ts` | Formats test results into a GitHub comment. |
 | `agent_commit_analyzer` | `src/agents/agent_commit_analyzer.ts` | Reads a commit diff and decides whether it needs new or updated E2E tests. |
+| `agent_tests_generator` | `src/agents/agent_tests_generator.ts` | Generates Playwright test code based on analysis. Uses agentic tool-use loop to write test files. On retry (after reviewer fixes), writes fixed content directly and re-runs tests. |
+| `agent_tests_reviewer` | `src/agents/agent_tests_reviewer.ts` | Reviews generated tests and fixes failures. Runs in an agentic tool-use loop (up to 10 iterations). Can debug live apps via Playwright MCP to diagnose failures. |
+| `agent_tests_report_generator` | `src/agents/agent_tests_report_generator.ts` | Formats test results into a structured report. |
+| `agent_summarize` | `src/agents/agent_summarize.ts` | Formats test results into a GitHub comment and posts it. |
 
 ### Non-AI Helpers
 
 | Module | File | Purpose |
 |--------|------|---------|
 | `GitBranch` | `src/github/git_operations.ts` | Local git operations + commitAndPush + createPR. |
-| `tests_runner` | `src/test_runner/tests_runner.ts` | Execute Playwright tests and return results. |
-| `shared_context` | `src/core/adapters.ts` | Shared context object for agent communication. |
+| `PlaywrightRunner` | `src/test_runner/playwright.ts` | Execute Playwright tests synchronously, return TestResult. |
 | `memory` | `src/core/memory.ts` | InMemoryStore for cross-run learning. |
 | `message_bus` | `src/core/message_bus.ts` | Pub/sub for inter-agent communication. |
+| `MCP Client` | `src/mcp/client.ts` | Playwright MCP browser automation for live app debugging. |
 
 ## How It Works
 
@@ -124,6 +115,7 @@ Both modes use the **LangGraph agentic framework** (`src/core/graph.ts`). The **
 | `complete` | Successful completion |
 | `fail` | Pipeline failed |
 | `request_approval` | Request human approval |
+| `replan` | Regenerate the master plan based on feedback |
 
 ### Issue Mode
 
@@ -138,17 +130,21 @@ Supervisor → agent_issue_analyzer (AgentIssueAnalyzer)
         |        → analyze issue, determine test scenarios
         v
 Supervisor → agent_tests_generator (AgentTestsGenerator)
-        |        → write Playwright test code
+        |        → write Playwright test code (agentic tool-use loop)
+        |        → run tests via PlaywrightRunner
         v
-Supervisor → run_tests (PlaywrightRunner via tools)
-        |        → if failures, Supervisor routes back to agent_tests_generator
-        v
-Supervisor → agent_tests_report_generator + agent_summarize (parallel)
-        |        → generate report & GitHub comment
-        v
-Supervisor → git commit + PR creation (via tools)
-        v
-        completed
+        |--- tests pass? --- yes ---> Supervisor → agent_tests_report_generator + agent_summarize (parallel)
+        |                                     → generate report & GitHub comment
+        |                                     → git commit + PR creation
+        |                                     → completed
+        |
+        |--- tests fail? --- no ---> Supervisor → agent_tests_reviewer (AgentTestsReviewer)
+                                        → analyze failures (optionally debug live app via MCP)
+                                        → fix test content
+                                        → retries++
+                                        → route back to agent_tests_generator
+                                        → (generator writes fixed content + re-runs tests)
+                                        → loop until pass or max retries
 ```
 
 ### Commit Mode
@@ -165,43 +161,47 @@ Supervisor → agent_commit_analyzer (AgentCommitAnalyzer)
         |        → if not needed, Supervisor routes to agent_summarize → completed
         v
 Supervisor → agent_tests_generator (AgentTestsGenerator)
-        |        → write test code
+        |        → write test code (agentic tool-use loop)
+        |        → run tests via PlaywrightRunner
         v
-Supervisor → run_tests (PlaywrightRunner via tools)
-        |        → if failures, Supervisor routes back to agent_tests_generator
-        v
-Supervisor → agent_tests_report_generator + agent_summarize (parallel)
-        |        → generate report & GitHub comment
-        v
-Supervisor → git commit + PR creation (via tools)
-        v
-        completed
-```
-        |        → post GitHub comment
-        v
-        done
+        |--- tests pass? --- yes ---> Supervisor → agent_tests_report_generator + agent_summarize (parallel)
+        |                                     → generate report & GitHub comment
+        |                                     → git commit + PR creation
+        |                                     → completed
+        |
+        |--- tests fail? --- no ---> Supervisor → agent_tests_reviewer (AgentTestsReviewer)
+                                        → analyze failures (optionally debug live app via MCP)
+                                        → fix test content
+                                        → retries++
+                                        → route back to agent_tests_generator
+                                        → loop until pass or max retries
 ```
 
 ## Features
 
 - **Auto-detect new GitHub issues** via configurable polling
 - **Auto-detect new commits** on a branch — triages diffs to decide if tests are needed
-- **Generate Playwright E2E tests** using AI (Claude, OpenAI, Gemini, Ollama)
+- **Generate Playwright E2E tests** using AI (Claude, OpenAI, Gemini, Ollama, OpenRouter)
 - **One-line provider switch** — change `PROVIDER` in `.env`, all tasks use it automatically
 - **Model auto-selection** — set `MODEL=auto` and the provider discovers available models from its API (first one wins), or specify an exact model for all tasks; new model releases need no code changes
 - **Auto-create branches, commits, and PRs** for generated tests
 - **Retry loop** for fixing failing tests (configurable max retries)
+- **Agentic tool-use loops** — Generator and Reviewer can iterate up to 10 times per step, calling tools and self-correcting
+- **Playwright MCP browser automation** — agents can navigate to live apps, take screenshots, inspect console/network errors, and read DOM to diagnose test failures
 - **Auto-retry failed runs** — crashed pipelines or runs ending with failing tests are requeued and retried on the next poll (`RUN_MAX_RETRIES`, default 1); inspect via `npm start -- retry list`
 - **Post results as GitHub comments** with test summaries
+- **Comprehensive logging** — every agent logs input analysis, decisions, tool calls, test results, and errors to both console/file and the Web UI via WebSocket
 - **Three modes**: Issue (manual), Watch (auto-detect issues + commits), Watch-branch (commits only)
 - **Web UI** — Claude-style chat console that can run any pipeline, answer questions about the project, and stream live agent logs (`npm run ui`)
+- **Circuit breakers** — max pipeline steps, max replans, max retries prevent runaway loops
+- **Parallel agent execution** — independent agents run simultaneously for faster pipelines
 
 ## Prerequisites
 
 - Node.js >= 20.0.0
 - npm
 - GitHub Personal Access Token (with `repo` scope)
-- AI provider API key (Anthropic, OpenAI, Google, or Ollama running locally)
+- AI provider API key (Anthropic, OpenAI, Google, Ollama, or OpenRouter)
 
 ## Quick Start
 
@@ -305,6 +305,7 @@ The API server binds to `127.0.0.1` on port `3002` by default — change via `WE
 | `ANTHROPIC_API_KEY` | If using Anthropic | Anthropic API key |
 | `OPENAI_API_KEY` | If using OpenAI | OpenAI API key |
 | `GOOGLE_API_KEY` | If using Google | Google Gemini API key |
+| `OPENROUTER_API_KEY` | If using OpenRouter | OpenRouter API key |
 | `GITHUB_TOKEN` | Yes | GitHub PAT with `repo` scope |
 | `REPO_OWNER` | If PROJECT_PATH is local | GitHub repo owner (auto-extracted if PROJECT_PATH is a URL) |
 | `REPO_NAME` | If PROJECT_PATH is local | GitHub repo name (auto-extracted if PROJECT_PATH is a URL) |
@@ -312,11 +313,16 @@ The API server binds to `127.0.0.1` on port `3002` by default — change via `WE
 | `TEST_PROJECT_PATH` | Yes | Local path or git URL to test project |
 | `POLL_INTERVAL_MIN` | No | Polling interval in minutes (default: 1) |
 | `AGENT_MAX_RETRIES` | No | Max test fix retries (default: 3) |
-| `AGENT_MAX_ITERATIONS` | No | Max agent loop iterations per step (default: 20) |
+| `AGENT_MAX_ITERATIONS` | No | Max agent loop iterations per step (default: 50) |
 | `MAX_PIPELINE_STEPS` | No | Max pipeline steps before abort (default: 50) |
 | `RUN_MAX_RETRIES` | No | Auto-retries of failed runs (crash or failing tests) by the watcher (default: 1; `0` disables) |
 | `AGENT_ENABLED` | No | Enable/disable agent (default: `true`). Set to `false` to stop all processing |
+| `COMMIT_AUTO_APPROVE` | No | Auto-approve human gates in pipeline (default: `true`). Set to `false` to require manual approval |
 | `WATCH_BRANCH` | No | Branch to watch for commits (alternative to `--branch` flag) |
+| `SUPER_ADMIN_EMAIL` | No | Super admin email for test credentials |
+| `SUPER_ADMIN_PASSWORD` | No | Super admin password for test credentials |
+| `PLAYWRIGHT_MCP_ENABLED` | No | Enable Playwright MCP browser automation (default: `false`). When enabled, agents can browse live apps to debug test failures |
+| `PLAYWRIGHT_MCP_BROWSER` | No | Browser for Playwright MCP (default: `chromium`). Options: `chromium`, `firefox`, `webkit` |
 | `WEB_PORT` | No | Web UI API server port (default: `3002`) |
 | `WEB_HOST` | No | Web UI bind address (default: `127.0.0.1`) |
 
@@ -377,7 +383,7 @@ Per-task tuning for `maxTokens` and `temperature`. Provider and model come from 
 }
 ```
 
-## Agent Tools (29 tools)
+## Agent Tools (29+ tools)
 
 All agents have access to these tools. The AI decides which tools to use based on context.
 
@@ -429,6 +435,10 @@ All agents have access to these tools. The AI decides which tools to use based o
 | `compare_files` | Compare two files |
 | `find_usage` | Find where code is used |
 | `find_definition` | Find where code is defined |
+
+### Playwright MCP Tools (when `PLAYWRIGHT_MCP_ENABLED=true`)
+
+When enabled, the agent also has access to browser automation tools (navigating, clicking, screenshots, reading console errors, etc.) provided by the Playwright MCP server.
 
 ### Tool Configuration
 
@@ -547,7 +557,7 @@ npx playwright test --debug                  # step through tests
 
 ## Logging
 
-Logs are written to both console and files using Winston:
+Logs are written to both console and files using Winston, and broadcast to the Web UI via WebSocket:
 
 | Log File | Content |
 |----------|---------|
@@ -556,10 +566,19 @@ Logs are written to both console and files using Winston:
 
 Log files rotate at 5MB with up to 5 files kept. Console output uses colored formatting.
 
+### What Gets Logged
+
+Every agent logs comprehensive details:
+- **Input analysis** — parsed issue/commit data, test scenarios, files to analyze
+- **Decisions** — routing choices, tool calls, retry counts
+- **Tool results** — file reads/writes, test execution output, git operations
+- **Test results** — pass/fail counts, error details, HTML report paths
+- **Errors** — stack traces, failed tool calls, MCP connection issues
+
 ## Troubleshooting
 
 ### "Missing required env var: PROVIDER"
-Ensure `.env` has `PROVIDER=anthropic` (or openai/google/ollama).
+Ensure `.env` has `PROVIDER=anthropic` (or openai/google/ollama/openrouter).
 
 ### "Missing env var: ANTHROPIC_API_KEY"
 Ensure `.env` has the API key for your chosen provider.
@@ -568,10 +587,13 @@ Ensure `.env` has the API key for your chosen provider.
 The agent needs git to create branches and commits. Ensure MCalendar is a git repo.
 
 ### "Playwright tests fail"
-Tests mock API responses, so no database is needed. If tests still fail, the agent will retry up to `AGENT_MAX_RETRIES` times.
+Tests mock API responses, so no database is needed. If tests still fail, the agent will retry up to `AGENT_MAX_RETRIES` times. With `PLAYWRIGHT_MCP_ENABLED=true`, the reviewer agent can debug live apps to diagnose failures.
 
 ### "Provider not found"
 Ensure the provider is uncommented in `src/providers/registry.ts` and the npm package is installed.
+
+### "MCP transport error"
+If using `PLAYWRIGHT_MCP_ENABLED=true`, ensure `npx` is available and the `@playwright/mcp` package can be downloaded. The first run may take longer as it downloads the MCP server.
 
 ## GitHub API
 

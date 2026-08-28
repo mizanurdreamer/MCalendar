@@ -4,11 +4,11 @@ import { GitBranch } from "../github/git_operations.js";
 import { logger } from "../utils/logger.js";
 import * as path from "node:path";
 import * as fs from "node:fs";
-import { toSharedContext } from "../core/adapters.js";
 import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers/registry.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
+import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL } from "../utils/constants.js";
 import { createAgentTools, executeTool } from "../utils/tools.js";
-import type { ToolDefinition } from "../providers/types.js";
+import type { ToolDefinition, ChatMessage, ContentBlock } from "../providers/types.js";
 
 export class AgentTestsGenerator extends BaseAgent {
   constructor(state: AgentState, taskContext: import("../core/base_agent.js").TaskContext) {
@@ -26,17 +26,17 @@ You will receive:
 Your task:
 1. Read relevant source files to understand implementation
 2. Write a complete Playwright test file
-3. Save it using the write_test_file tool
+3. IMPORTANT: You MUST call the write_test_file tool to save the test file. Do NOT just return the content as text.
 
 Follow existing test patterns in the project. Use the project's test utilities.
 Write one test case per scenario from the analysis.
-Return ONLY the test file content - the tool handles saving.`;
+You MUST use the write_test_file tool to save your test.`;
   }
 
   getGoal(): string {
-    if (this.state.mode === "issue" && this.state.issue) {
+    if (this.state.mode === MODE.ISSUE && this.state.issue) {
       return `Generate Playwright tests for issue #${this.state.issue.number}: ${this.state.issue.title}`;
-    } else if (this.state.mode === "commit" && this.state.commitDiff) {
+    } else if (this.state.mode === MODE.COMMIT && this.state.commitDiff) {
       return `Generate Playwright tests for commit ${this.state.commitDiff.sha.slice(0,7)}`;
     }
     return "Generate Playwright tests";
@@ -54,13 +54,13 @@ Return ONLY the test file content - the tool handles saving.`;
     ];
 
     let testFilename = "test.spec.ts";
-    if (this.state.mode === "issue" && this.state.issue) {
+    if (this.state.mode === MODE.ISSUE && this.state.issue) {
       testFilename = `issue-${this.state.issue.number}-${GitBranch.slugify(this.state.issue.title)}.spec.ts`;
-    } else if (this.state.mode === "commit" && this.state.commitDiff) {
+    } else if (this.state.mode === MODE.COMMIT && this.state.commitDiff) {
       testFilename = `commit-${this.state.commitDiff.sha.slice(0, 7)}.spec.ts`;
     }
 
-    if (this.state.mode === "issue" && this.state.issueAnalysis) {
+    if (this.state.mode === MODE.ISSUE && this.state.issueAnalysis) {
       steps.push({
         id: "generate_tests",
         tool: "write_test_file",
@@ -68,7 +68,7 @@ Return ONLY the test file content - the tool handles saving.`;
         expectedOutcome: "Complete test file with all scenarios",
         reasoning: "Generate tests based on issue analysis scenarios",
       });
-    } else if (this.state.mode === "commit" && this.state.commitDiff) {
+    } else if (this.state.mode === MODE.COMMIT && this.state.commitDiff) {
       steps.push({
         id: "generate_tests",
         tool: "write_test_file",
@@ -83,56 +83,97 @@ Return ONLY the test file content - the tool handles saving.`;
       goal: this.getGoal(),
       steps,
       estimatedIterations: 3,
-      riskLevel: "medium",
+      riskLevel: RISK_LEVEL.MEDIUM,
       createdAt: Date.now(),
     };
   }
 
-  async run(): Promise<AgentState> {
-    if (!this.state.projectContext) {
-      this.state.error = "Project context not available";
-      this.updateStatus("failed");
-      return this.state;
+  async run(inputState?: AgentState): Promise<AgentState> {
+    const state = inputState || this.state;
+    if (!state.projectContext) {
+      logger.error(`[AgentTestsGenerator] Project context not available`);
+      state.error = "Project context not available";
+      this.updateStatus(AGENT_STATUS.FAILED);
+      return state;
     }
 
     let testFilename: string;
-    if (this.state.mode === "issue" && this.state.issue) {
-      testFilename = `issue-${this.state.issue.number}-${GitBranch.slugify(this.state.issue.title)}.spec.ts`;
-    } else if (this.state.mode === "commit" && this.state.commitDiff) {
-      testFilename = `commit-${this.state.commitDiff.sha.slice(0, 7)}.spec.ts`;
+    if (state.mode === MODE.ISSUE && state.issue) {
+      testFilename = `issue-${state.issue.number}-${GitBranch.slugify(state.issue.title)}.spec.ts`;
+    } else if (state.mode === MODE.COMMIT && state.commitDiff) {
+      testFilename = `commit-${state.commitDiff.sha.slice(0, 7)}.spec.ts`;
     } else {
-      this.state.error = "Cannot determine test filename";
-      this.updateStatus("failed");
-      return this.state;
+      logger.error(`[AgentTestsGenerator] Cannot determine test filename (mode: ${state.mode})`);
+      state.error = "Cannot determine test filename";
+      this.updateStatus(AGENT_STATUS.FAILED);
+      return state;
     }
 
-    this.state.testFilename = testFilename;
+    state.testFilename = testFilename;
+
+    // RETRY CASE: If reviewer already fixed the test content, write it directly and run
+    if (state.retries > 0 && state.testContent) {
+      logger.info(`[AgentTestsGenerator] Retry ${state.retries}: Using fixed test content from reviewer`);
+      const fullPath = path.join(state.testOutputPath, testFilename);
+      const dir = path.dirname(fullPath);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(fullPath, state.testContent, "utf-8");
+      logger.success(`[AgentTestsGenerator] Fixed test file written: tests/${testFilename}`);
+      
+      // Run the fixed tests
+      logger.info(`[AgentTestsGenerator] Running fixed tests: ${testFilename}`);
+      const testResult = this.taskContext.runner.run(testFilename);
+      state.testResult = testResult;
+      
+      if (testResult.success) {
+        logger.success(`[AgentTestsGenerator] ✓ Fixed tests passed: ${testResult.passed}/${testResult.total}`);
+      } else {
+        logger.warn(`[AgentTestsGenerator] Fixed test results: ${testResult.passed} passed, ${testResult.failed} failed (${testResult.total} total)`);
+        if (testResult.errors.length > 0) {
+          logger.info(`[AgentTestsGenerator] Failed test details:`);
+          for (let i = 0; i < testResult.errors.length; i++) {
+            logger.error(`  ${i + 1}. ${testResult.errors[i].slice(0, 300)}`);
+          }
+        }
+      }
+      
+      this.recordStep("generate_tests", `Ran fixed tests: ${testFilename}`, "next");
+      this.updateStatus(AGENT_STATUS.COMPLETED);
+      return state;
+    }
 
     let userMessage: string;
-    if (this.state.mode === "issue" && this.state.issue && this.state.issueAnalysis) {
-      const scenarios = this.state.issueAnalysis.test_scenarios
+    if (state.mode === MODE.ISSUE && state.issue && state.issueAnalysis) {
+      const scenarios = state.issueAnalysis.test_scenarios
         .map((s, i) => `${i + 1}. ${s.name} (${s.type}): ${s.description}${s.acceptance_criterion ? ` [criteria: ${s.acceptance_criterion}]` : ""}`)
         .join("\n");
 
       userMessage = `Write a Playwright E2E test file for this issue.
 
-Issue #${this.state.issue.number}: ${this.state.issue.title}
-${this.state.issue.body ?? ""}
+Issue #${state.issue.number}: ${state.issue.title}
+${state.issue.body ?? ""}
 
 TEST SCENARIOS (write one test case per scenario):
 ${scenarios || "(no scenarios — generate based on the issue)"}
 
 Use read_file/list_directory to explore source files as needed.
 Use the write_test_file tool to save the test as "${testFilename}".`;
-    } else if (this.state.mode === "commit" && this.state.commitDiff) {
-      const diff = this.state.commitDiff;
+    } else if (state.mode === MODE.COMMIT && state.commitDiff) {
+      const diff = state.commitDiff;
       const shortSha = diff.sha.slice(0, 7);
       const changedFiles = diff.files.map((f) => `  ${f.filename} (${f.status})`).join("\n");
+
+      logger.info(`[AgentTestsGenerator] Commit mode: ${shortSha}`);
+      logger.info(`  Scope: ${state.commitAnalysis?.scope ?? "General E2E testing"}`);
+      logger.info(`  Changed files:`);
+      for (const f of diff.files) {
+        logger.info(`    - ${f.filename} (${f.status})`);
+      }
 
       userMessage = `Write a Playwright E2E test file for this commit.
 
 Commit ${shortSha}: ${diff.message}
-Scope: ${this.state.commitAnalysis?.scope ?? "General E2E testing"}
+Scope: ${state.commitAnalysis?.scope ?? "General E2E testing"}
 
 Files changed:
 ${changedFiles}
@@ -140,29 +181,85 @@ ${changedFiles}
 Use read_file/list_directory to explore source files as needed.
 Use the write_test_file tool to save the test as "${testFilename}".`;
     } else {
-      this.state.error = "No analysis data available for test generation";
-      this.updateStatus("failed");
-      return this.state;
+      logger.error(`[AgentTestsGenerator] No analysis data available (mode: ${state.mode})`);
+      state.error = "No analysis data available for test generation";
+      this.updateStatus(AGENT_STATUS.FAILED);
+      return state;
     }
 
     logger.info(`[AgentTestsGenerator] Generating test: ${testFilename}`);
+    
+    // Log scenarios used for generation
+    if (state.mode === MODE.ISSUE && state.issueAnalysis?.test_scenarios) {
+      logger.info(`  Scenarios to generate tests for:`);
+      for (const s of state.issueAnalysis.test_scenarios) {
+        logger.info(`    - ${s.name} (${s.type}): ${s.description}`);
+      }
+    }
 
     try {
       await this.runGeneration(userMessage);
 
-      const testFile = path.join(this.state.testOutputPath, testFilename);
+      // Check if file was created by tool loop, if not try fallback
+      let testFile = path.join(state.testOutputPath, testFilename);
+      if (!fs.existsSync(testFile)) {
+        logger.warn(`[AgentTestsGenerator] Test file not found after tool loop, attempting fallback extraction`);
+        await this.fallbackExtractAndWrite(testFilename);
+        testFile = path.join(state.testOutputPath, testFilename);
+      }
+
+      // If file exists (from tool loop or fallback), process it
       if (fs.existsSync(testFile)) {
-        this.state.testContent = fs.readFileSync(testFile, "utf-8");
+        state.testContent = fs.readFileSync(testFile, "utf-8");
+        logger.success(`[AgentTestsGenerator] Test file created: tests/${testFilename}`);
+        
+        // Log all test case names from file
+        const lines = state.testContent.split('\n');
+        const testNames = lines.filter(l => l.includes('test(') || l.includes('test.only(')).map(l => l.trim());
+        if (testNames.length > 0) {
+          logger.info(`[AgentTestsGenerator] Test cases in file (${testNames.length} total):`);
+          for (let i = 0; i < testNames.length; i++) {
+            logger.info(`    ${i + 1}. ${testNames[i]}`);
+          }
+        }
+        
+        // Run the tests
+        logger.info(`[AgentTestsGenerator] Running tests: ${testFilename}`);
+        const testResult = this.taskContext.runner.run(testFilename);
+        state.testResult = testResult;
+        
+        // Log detailed test results
+        if (testResult.success) {
+          logger.success(`[AgentTestsGenerator] ✓ All tests passed: ${testResult.passed}/${testResult.total}`);
+        } else {
+          logger.warn(`[AgentTestsGenerator] Test results: ${testResult.passed} passed, ${testResult.failed} failed (${testResult.total} total)`);
+          
+          // Log failed test details
+          if (testResult.errors.length > 0) {
+            logger.info(`[AgentTestsGenerator] Failed test details:`);
+            for (let i = 0; i < testResult.errors.length; i++) {
+              logger.error(`  ${i + 1}. ${testResult.errors[i].slice(0, 300)}`);
+            }
+          }
+        }
+        
+        // Log HTML report path
+        if (testResult.htmlReportPath) {
+          logger.info(`[AgentTestsGenerator] HTML report: ${testResult.htmlReportPath}`);
+        }
+      } else {
+        logger.error(`[AgentTestsGenerator] Failed to create test file: tests/${testFilename}`);
       }
 
       this.recordStep("generate_tests", `Generated ${testFilename}`, "next");
-      this.updateStatus("completed");
+      this.updateStatus(AGENT_STATUS.COMPLETED);
     } catch (err) {
-      this.state.error = `Test generation failed: ${err}`;
-      this.updateStatus("failed");
+      logger.error(`[AgentTestsGenerator] Test generation failed: ${err}`);
+      state.error = `Test generation failed: ${err}`;
+      this.updateStatus(AGENT_STATUS.FAILED);
     }
 
-    return this.state;
+    return state;
   }
 
   private async runGeneration(userMessage: string): Promise<void> {
@@ -170,20 +267,74 @@ Use the write_test_file tool to save the test as "${testFilename}".`;
     logger.task(AGENT_NAMES.AGENT_TESTS_GENERATOR, `${getTaskProviderName(AGENT_NAMES.AGENT_TESTS_GENERATOR, this.state.agentConfig)}/${getTaskModel(AGENT_NAMES.AGENT_TESTS_GENERATOR, this.state.agentConfig)}`);
 
     const systemPrompt = AgentTestsGenerator.buildSystemPrompt();
-    const sharedContext = toSharedContext(this.state);
+    const tools = this.getAvailableTools();
+    
+    logger.info(`[AgentTestsGenerator] Available tools: ${tools.map(t => t.name).join(', ')}`);
+    
+    // Agentic tool-use loop
+    const messages: ChatMessage[] = [
+      { role: "user", content: userMessage },
+    ];
+    
+    const maxIterations = 10;
+    let iteration = 0;
+    
+    while (iteration < maxIterations) {
+      iteration++;
+      logger.debug(`[AgentTestsGenerator] Tool loop iteration ${iteration}`);
+      
+      const response = await provider.chat({
+        system: systemPrompt,
+        messages,
+        tools,
+        maxTokens: this.state.agentConfig[AGENT_NAMES.AGENT_TESTS_GENERATOR]?.maxTokens,
+        temperature: this.state.agentConfig[AGENT_NAMES.AGENT_TESTS_GENERATOR]?.temperature,
+      });
 
-    const response = await provider.chat({
-      system: systemPrompt,
-      messages: [{ role: "user", content: userMessage }],
-      tools: this.getAvailableTools(),
-      maxTokens: this.state.agentConfig[AGENT_NAMES.AGENT_TESTS_GENERATOR]?.maxTokens,
-      temperature: this.state.agentConfig[AGENT_NAMES.AGENT_TESTS_GENERATOR]?.temperature,
-    });
+      // Add assistant response to history
+      messages.push({ role: "assistant", content: response.content });
 
-    const toolBlocks = response.content.filter((b): b is { type: "tool_use"; id: string; name: string; input: Record<string, unknown> } => b.type === "tool_use");
+      // Log response details
+      const textBlocks = response.content.filter((b): b is { type: "text"; text: string } => b.type === "text");
+      const toolBlocks = response.content.filter((b): b is { type: "tool_use"; id: string; name: string; input: Record<string, unknown> } => b.type === "tool_use");
+      
+      logger.info(`[AgentTestsGenerator] Response: ${textBlocks.length} text blocks, ${toolBlocks.length} tool blocks, stopReason: ${response.stopReason}`);
+      
+      if (textBlocks.length > 0) {
+        const textPreview = textBlocks.map(b => b.text).join('\n').slice(0, 500);
+        logger.debug(`[AgentTestsGenerator] Text preview: ${textPreview}`);
+      }
+      
+      if (toolBlocks.length > 0) {
+        logger.info(`[AgentTestsGenerator] Tool calls: ${toolBlocks.map(t => t.name).join(', ')}`);
+      }
+      
+      // If no tool calls, we're done
+      if (toolBlocks.length === 0 || response.stopReason !== "tool_use") {
+        logger.debug(`[AgentTestsGenerator] Tool loop completed after ${iteration} iterations`);
+        break;
+      }
 
-    for (const toolBlock of toolBlocks) {
-      await this.executeTool(toolBlock.name, toolBlock.input);
+      // Execute tools and collect results
+      const toolResults: ContentBlock[] = [];
+      
+      for (const toolBlock of toolBlocks) {
+        logger.info(`[AgentTestsGenerator] Executing tool: ${toolBlock.name}`);
+        const result = await this.executeTool(toolBlock.name, toolBlock.input);
+        logger.info(`[AgentTestsGenerator] Tool result: ${result.slice(0, 200)}`);
+        toolResults.push({
+          type: "tool_result",
+          toolUseId: toolBlock.id,
+          content: result,
+        });
+      }
+
+      // Add tool results to messages
+      messages.push({ role: "user", content: toolResults });
+    }
+
+    if (iteration >= maxIterations) {
+      logger.warn(`[AgentTestsGenerator] Tool loop hit max iterations (${maxIterations})`);
     }
   }
 
@@ -193,5 +344,45 @@ Use the write_test_file tool to save the test as "${testFilename}".`;
 
   private async executeTool(name: string, input: Record<string, unknown>): Promise<string> {
     return executeTool(name, input, this.taskContext.reader, this.taskContext.runner, this.taskContext.testOutputPath, this.taskContext.codebasePath);
+  }
+
+  private async fallbackExtractAndWrite(testFilename: string): Promise<boolean> {
+    try {
+      // Make one more LLM call asking specifically for the test content
+      const provider = getTaskProvider(AGENT_NAMES.AGENT_TESTS_GENERATOR, this.state.agentConfig);
+      const response = await provider.chat({
+        system: "You must return ONLY the Playwright test file content. No explanations, no markdown fences, just the raw TypeScript test code.",
+        messages: [{ role: "user", content: "Write the complete Playwright test file content now. Return ONLY the code." }],
+        maxTokens: this.state.agentConfig[AGENT_NAMES.AGENT_TESTS_GENERATOR]?.maxTokens,
+        temperature: this.state.agentConfig[AGENT_NAMES.AGENT_TESTS_GENERATOR]?.temperature,
+      });
+
+      const textBlocks = response.content.filter((b): b is { type: "text"; text: string } => b.type === "text");
+      const text = textBlocks.map(b => b.text).join('\n');
+      
+      // Try to extract test code from markdown fences or raw text
+      let testContent = text;
+      const fenceMatch = text.match(/```(?:typescript|ts|javascript|js)?\s*\n([\s\S]*?)```/);
+      if (fenceMatch) {
+        testContent = fenceMatch[1].trim();
+      }
+      
+      // Validate it looks like a test file
+      if (testContent.includes('test(') || testContent.includes('test.describe(') || testContent.includes('test.beforeEach(')) {
+        const fullPath = path.join(this.state.testOutputPath, testFilename);
+        const dir = path.dirname(fullPath);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(fullPath, testContent, "utf-8");
+        this.state.testContent = testContent;
+        logger.success(`[AgentTestsGenerator] Fallback: Test file written via text extraction: tests/${testFilename}`);
+        return true;
+      }
+      
+      logger.warn(`[AgentTestsGenerator] Fallback: Extracted text doesn't look like a test file`);
+      return false;
+    } catch (err) {
+      logger.error(`[AgentTestsGenerator] Fallback extraction failed: ${err}`);
+      return false;
+    }
   }
 }

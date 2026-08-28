@@ -1,5 +1,5 @@
 import { StateGraph, Annotation, START, END, Send, MemorySaver, BaseCheckpointSaver } from "@langchain/langgraph";
-import type { AgentState, AgentName, AgentPlan } from "./state.js";
+import type { AgentState, AgentName, AgentPlan, ReflectionResult } from "./state.js";
 import { Supervisor } from "./supervisor.js";
 import { BaseAgent } from "./base_agent.js";
 import { AgentCritic } from "./agent_critic.js";
@@ -9,6 +9,7 @@ import { MessageBus } from "./message_bus.js";
 import { logger } from "../utils/logger.js";
 import { Command, interrupt } from "@langchain/langgraph";
 import { AGENT_NAMES } from "../utils/agent_names.js";
+import { CORE_AGENT_NAMES, GRAPH_NODE, MODE, PIPELINE_STATUS } from "../utils/constants.js";
 
 export interface AgenticGraphConfig {
   memoryType: "local";
@@ -19,17 +20,14 @@ export interface AgenticGraphConfig {
 }
 
 const AgentStateAnnotation = Annotation.Root({
-  mode: Annotation<"issue" | "commit">(),
+  mode: Annotation<typeof MODE.ISSUE | typeof MODE.COMMIT>(),
   runId: Annotation<string>(),
   issue: Annotation<any>(),
   commitDiff: Annotation<any>(),
   agentConfig: Annotation<any>(),
-  reader: Annotation<any>(),
-  testReader: Annotation<any>(),
-  runner: Annotation<any>(),
-  git: Annotation<any>(),
-  githubClient: Annotation<any>(),
-  provider: Annotation<any>(),
+  // Heavy objects excluded from annotation to prevent V8 crash during checkpointing
+  // reader, testReader, runner, git, githubClient, provider, memoryStore, messageBus
+  // are passed via state but not serialized
   codebasePath: Annotation<string>(),
   testProjectPath: Annotation<string>(),
   testOutputPath: Annotation<string>(),
@@ -39,6 +37,7 @@ const AgentStateAnnotation = Annotation.Root({
   maxPipelineSteps: Annotation<number>(),
   commitAutoApprove: Annotation<boolean>(),
   retries: Annotation<number>(),
+  planStepIndex: Annotation<number>(),
   baseBranch: Annotation<string>(),
   branchName: Annotation<string>(),
   projectContext: Annotation<any>(),
@@ -60,7 +59,7 @@ const AgentStateAnnotation = Annotation.Root({
   reflectionHistory: Annotation<any>(),
   humanApprovals: Annotation<any[]>(),
   stepHistory: Annotation<any[]>(),
-  status: Annotation<"running" | "completed" | "failed" | "skipped" | "awaiting_human">(),
+  status: Annotation<typeof PIPELINE_STATUS.RUNNING | typeof PIPELINE_STATUS.COMPLETED | typeof PIPELINE_STATUS.FAILED | typeof PIPELINE_STATUS.SKIPPED | typeof PIPELINE_STATUS.AWAITING_HUMAN>(),
   error: Annotation<string>(),
 });
 
@@ -74,6 +73,8 @@ export class AgenticGraph {
   private critics: Map<AgentName, AgentCritic> = new Map();
   private config: AgenticGraphConfig;
   private stepCounter = 0;
+  private replanCounter = 0;
+  private maxReplans = 3;
 
   constructor(config: Partial<AgenticGraphConfig> = {}) {
     this.config = {
@@ -94,49 +95,55 @@ export class AgenticGraph {
     const workflow = new StateGraph(AgentStateAnnotation);
 
     // Core nodes
-    workflow.addNode("supervisor", this.supervisorNode.bind(this));
+    workflow.addNode(GRAPH_NODE.SUPERVISOR, this.supervisorNode.bind(this));
     workflow.addNode(AGENT_NAMES.AGENT_ISSUE_ANALYZER, this.agentNode(AGENT_NAMES.AGENT_ISSUE_ANALYZER));
     workflow.addNode(AGENT_NAMES.AGENT_COMMIT_ANALYZER, this.agentNode(AGENT_NAMES.AGENT_COMMIT_ANALYZER));
     workflow.addNode(AGENT_NAMES.AGENT_TESTS_GENERATOR, this.agentNode(AGENT_NAMES.AGENT_TESTS_GENERATOR));
     workflow.addNode(AGENT_NAMES.AGENT_TESTS_REVIEWER, this.agentNode(AGENT_NAMES.AGENT_TESTS_REVIEWER));
     workflow.addNode(AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, this.agentNode(AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR));
     workflow.addNode(AGENT_NAMES.AGENT_SUMMARIZE, this.agentNode(AGENT_NAMES.AGENT_SUMMARIZE));
-    workflow.addNode("critic", this.criticNode.bind(this));
-    workflow.addNode("human_approval", this.humanApprovalNode.bind(this));
+    workflow.addNode(GRAPH_NODE.CRITIC, this.criticNode.bind(this));
+    workflow.addNode(GRAPH_NODE.HUMAN_APPROVAL, this.humanApprovalNode.bind(this));
 
     // Entry point
-    workflow.addEdge(START, "supervisor" as any);
+    workflow.addEdge(START, GRAPH_NODE.SUPERVISOR as any);
 
     // Supervisor routes to agents
-    workflow.addConditionalEdges("supervisor" as any, (state: AgentState) => state.currentAgent, {
+    workflow.addConditionalEdges(GRAPH_NODE.SUPERVISOR as any, (state: AgentState) => {
+      // Handle undefined or unknown destinations gracefully
+      const agent = state.currentAgent;
+      if (!agent || agent === END) return END;
+      return agent;
+    }, {
+      [GRAPH_NODE.SUPERVISOR]: GRAPH_NODE.SUPERVISOR,
       [AGENT_NAMES.AGENT_ISSUE_ANALYZER]: AGENT_NAMES.AGENT_ISSUE_ANALYZER,
       [AGENT_NAMES.AGENT_COMMIT_ANALYZER]: AGENT_NAMES.AGENT_COMMIT_ANALYZER,
       [AGENT_NAMES.AGENT_TESTS_GENERATOR]: AGENT_NAMES.AGENT_TESTS_GENERATOR,
       [AGENT_NAMES.AGENT_TESTS_REVIEWER]: AGENT_NAMES.AGENT_TESTS_REVIEWER,
       [AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR]: AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR,
       [AGENT_NAMES.AGENT_SUMMARIZE]: AGENT_NAMES.AGENT_SUMMARIZE,
-      critic: "critic",
-      human_approval: "human_approval",
+      [GRAPH_NODE.CRITIC]: GRAPH_NODE.CRITIC,
+      [GRAPH_NODE.HUMAN_APPROVAL]: GRAPH_NODE.HUMAN_APPROVAL,
       [END]: END,
     } as any);
 
     // All agents return to supervisor
     for (const agentName of [
-      AGENT_NAMES.AGENT_ISSUE_ANALYZER, 
-      AGENT_NAMES.AGENT_COMMIT_ANALYZER, 
-      AGENT_NAMES.AGENT_TESTS_GENERATOR, 
-      AGENT_NAMES.AGENT_TESTS_REVIEWER, 
-      AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, 
+      AGENT_NAMES.AGENT_ISSUE_ANALYZER,
+      AGENT_NAMES.AGENT_COMMIT_ANALYZER,
+      AGENT_NAMES.AGENT_TESTS_GENERATOR,
+      AGENT_NAMES.AGENT_TESTS_REVIEWER,
+      AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR,
       AGENT_NAMES.AGENT_SUMMARIZE
     ] as AgentName[]) {
-      workflow.addEdge(agentName as any, "supervisor" as any);
+      workflow.addEdge(agentName as any, GRAPH_NODE.SUPERVISOR as any);
     }
 
     // Critic returns to supervisor
-    workflow.addEdge("critic" as any, "supervisor" as any);
+    workflow.addEdge(GRAPH_NODE.CRITIC as any, GRAPH_NODE.SUPERVISOR as any);
 
     // Human approval returns to supervisor
-    workflow.addEdge("human_approval" as any, "supervisor" as any);
+    workflow.addEdge(GRAPH_NODE.HUMAN_APPROVAL as any, GRAPH_NODE.SUPERVISOR as any);
 
     // Compile with checkpointer
     return workflow.compile({
@@ -145,26 +152,60 @@ export class AgenticGraph {
   }
 
   private async supervisorNode(state: AgentState): Promise<Partial<AgentState>> {
-    this.supervisor = new Supervisor(state);
-    
-    for (const [name, agent] of this.agents) {
-      this.supervisor.registerAgent(name, agent);
+    // Circuit breaker: check maxPipelineSteps
+    if (this.stepCounter >= (state.maxPipelineSteps ?? 50)) {
+      logger.error(`[AgenticGraph] Max pipeline steps (${state.maxPipelineSteps}) reached. Stopping.`);
+      return { 
+        status: PIPELINE_STATUS.FAILED, 
+        error: `Max pipeline steps (${state.maxPipelineSteps}) reached`,
+        currentAgent: CORE_AGENT_NAMES.SUPERVISOR
+      };
     }
+    
+    // Circuit breaker: check replan limit
+    if (this.replanCounter >= this.maxReplans) {
+      logger.error(`[AgenticGraph] Max replans (${this.maxReplans}) reached. Stopping.`);
+      return { 
+        status: PIPELINE_STATUS.FAILED, 
+        error: `Max replans (${this.maxReplans}) reached`,
+        currentAgent: CORE_AGENT_NAMES.SUPERVISOR
+      };
+    }
+    
+    try {
+      this.supervisor = new Supervisor(state);
+      
+      for (const [name, agent] of this.agents) {
+        this.supervisor.registerAgent(name, agent);
+      }
 
-    const decision = await this.supervisor.route();
-    
-    // Handle replan action
-    if (decision.action === "replan") {
-      return this.handleReplan(state, decision);
+      const decision = await this.supervisor.route();
+      
+      // Handle replan action
+      if (decision.action === "replan") {
+        return this.handleReplan(state, decision);
+      }
+      
+      const newState = await this.supervisor.executeDecision(decision);
+      
+      // Extract changes and include planStepIndex if it was updated
+      const changes = this.extractStateChanges(state, newState);
+      
+      // Persist planStepIndex so next supervisor invocation starts from correct step
+      if (this.supervisor.currentPlanStepIndex !== undefined) {
+        changes.planStepIndex = this.supervisor.currentPlanStepIndex;
+      }
+      
+      return changes;
+    } catch (err) {
+      logger.error(`[AgenticGraph] Supervisor node failed: ${err}`);
+      return { status: PIPELINE_STATUS.FAILED, error: `Supervisor failed: ${err}`, currentAgent: CORE_AGENT_NAMES.SUPERVISOR };
     }
-    
-    const newState = await this.supervisor.executeDecision(decision);
-    
-    return this.extractStateChanges(state, newState);
   }
 
   private async handleReplan(state: AgentState, decision: any): Promise<Partial<AgentState>> {
     logger.info(`[AgenticGraph] Handling replan: ${decision.reason}`);
+    this.replanCounter++;
     
     // Collect critic feedback from reflection history
     const criticFeedback: CriticFeedback[] = [];
@@ -184,11 +225,11 @@ export class AgenticGraph {
     }
     
     // Get the failed agent from the decision or state
-    const failedAgent = state.currentAgent !== "supervisor" ? state.currentAgent : undefined;
+    const failedAgent = state.currentAgent !== CORE_AGENT_NAMES.SUPERVISOR ? state.currentAgent : undefined;
     
     // Generate revised plan
     const availableAgents = Array.from(this.agents.keys());
-    const goal = state.mode === "issue" 
+    const goal = state.mode === MODE.ISSUE 
       ? `Process issue #${state.issue?.number}: ${state.issue?.title}`
       : `Process commit ${state.commitDiff?.sha.slice(0,7)}`;
     
@@ -199,34 +240,33 @@ export class AgenticGraph {
       failedAgent
     );
     
-    // Update state with revised plan
-    state.plans = {
-      ...state.plans,
-      planner: revisedPlan
-    };
-    
-    // Reset plan step index
-    state.planStepIndex = 0;
-    
-    // Reset current agent to supervisor to restart with new plan
-    state.currentAgent = "supervisor";
-    state.status = "running";
-    
     logger.success("[AgenticGraph] Replan complete - revised master plan generated");
     
-    return this.extractStateChanges(state, state);
+    // Return mutations (don't mutate the state parameter)
+    return {
+      plans: {
+        ...state.plans,
+        planner: revisedPlan
+      },
+      planStepIndex: 0,
+      currentAgent: CORE_AGENT_NAMES.SUPERVISOR as AgentName,
+      status: PIPELINE_STATUS.RUNNING,
+    };
   }
 
   private agentNode(agentName: AgentName) {
     return async (state: AgentState): Promise<Partial<AgentState>> => {
       const agent = this.agents.get(agentName);
       if (!agent) {
-        return { status: "failed", error: `Agent not found: ${agentName}`, currentAgent: "supervisor" };
+        return { status: PIPELINE_STATUS.FAILED, error: `Agent not found: ${agentName}`, currentAgent: CORE_AGENT_NAMES.SUPERVISOR };
       }
 
       try {
         this.stepCounter++;
-        const newState = await agent.run();
+        
+        // Create a safe copy of state to prevent mutation of original
+        const stateCopy = this.safeStateCopy(state);
+        const newState = await agent.run(stateCopy);
         
         if (this.config.enableCritic && this.critics.has(agentName)) {
           const critic = this.critics.get(agentName)!;
@@ -245,14 +285,74 @@ export class AgenticGraph {
           }
         }
 
-        return this.extractStateChanges(state, newState);
+        const changes = this.extractStateChanges(state, newState);
+        return { ...changes, currentAgent: CORE_AGENT_NAMES.SUPERVISOR };
       } catch (err) {
         return { 
-          status: "failed", 
+          status: PIPELINE_STATUS.FAILED, 
           error: `Agent ${agentName} failed: ${err}`,
-          currentAgent: "supervisor",
+          currentAgent: CORE_AGENT_NAMES.SUPERVISOR,
         };
       }
+    };
+  }
+
+  private safeStateCopy(state: AgentState): AgentState {
+    // Create a safe copy that avoids circular references
+    // Only copy primitive values and explicitly serialize complex objects
+    return {
+      ...state,
+      // Primitive/modifiable fields - safe to copy
+      testFilename: state.testFilename,
+      testContent: state.testContent,
+      testResult: state.testResult ? { ...state.testResult } : undefined,
+      report: state.report,
+      reportPath: state.reportPath,
+      summary: state.summary,
+      prUrl: state.prUrl,
+      branchName: state.branchName,
+      retries: state.retries,
+      retryHistory: state.retryHistory.map(r => ({ ...r })),
+      stepHistory: state.stepHistory.map(s => ({ ...s })),
+      status: state.status,
+      error: state.error,
+      // Preserve shared coordination data (deep copy to avoid cross-agent mutation)
+      plans: Object.fromEntries(
+        Object.entries(state.plans).map(([k, v]) => [k, { ...v, steps: v.steps.map(s => ({ ...s })) }])
+      ) as Record<AgentName, AgentPlan>,
+      messages: state.messages.map(m => ({ ...m })),
+      memory: state.memory.map(m => ({ ...m })),
+      reflectionHistory: Object.fromEntries(
+        Object.entries(state.reflectionHistory).map(([k, v]) => [k, v.map(r => ({ ...r }))])
+      ) as Record<AgentName, ReflectionResult[]>,
+      humanApprovals: state.humanApprovals.map(a => ({ ...a })),
+      agentStatus: { ...state.agentStatus },
+      // Preserve read-only fields
+      mode: state.mode,
+      runId: state.runId,
+      issue: state.issue,
+      commitDiff: state.commitDiff,
+      agentConfig: state.agentConfig,
+      reader: state.reader,
+      testReader: state.testReader,
+      runner: state.runner,
+      git: state.git,
+      githubClient: state.githubClient,
+      provider: state.provider,
+      codebasePath: state.codebasePath,
+      testProjectPath: state.testProjectPath,
+      testOutputPath: state.testOutputPath,
+      projectName: state.projectName,
+      maxRetries: state.maxRetries,
+      maxIterations: state.maxIterations,
+      maxPipelineSteps: state.maxPipelineSteps,
+      commitAutoApprove: state.commitAutoApprove,
+      baseBranch: state.baseBranch,
+      planStepIndex: state.planStepIndex,
+      projectContext: state.projectContext ? { ...state.projectContext } : undefined,
+      issueAnalysis: state.issueAnalysis ? { ...state.issueAnalysis } : undefined,
+      commitAnalysis: state.commitAnalysis ? { ...state.commitAnalysis } : undefined,
+      currentAgent: state.currentAgent,
     };
   }
 
@@ -261,34 +361,38 @@ export class AgenticGraph {
     const critic = this.critics.get(lastAgent);
     
     if (!critic) {
-      return { currentAgent: "supervisor" };
+      return { currentAgent: CORE_AGENT_NAMES.SUPERVISOR };
     }
 
     const output = state.testContent || state.report || state.summary || "";
     if (!output) {
-      return { currentAgent: "supervisor" };
+      return { currentAgent: CORE_AGENT_NAMES.SUPERVISOR };
     }
 
-    const { result, revised } = await critic.critiqueWithRevision(output, {
-      goal: this.agents.get(lastAgent)?.getGoal() || "",
-      agent: lastAgent,
-    });
+    try {
+      const { result, revised } = await critic.critiqueWithRevision(output, {
+        goal: this.agents.get(lastAgent)?.getGoal() || "",
+        agent: lastAgent,
+      });
 
-    if (revised && result.shouldRevise) {
-      const updates: Partial<AgentState> = { currentAgent: "supervisor" };
-      if (lastAgent === AGENT_NAMES.AGENT_TESTS_GENERATOR) updates.testContent = revised;
-      else if (lastAgent === AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR) updates.report = revised;
-      else if (lastAgent === AGENT_NAMES.AGENT_SUMMARIZE) updates.summary = revised;
-      return updates;
+      if (revised && result.shouldRevise) {
+        const updates: Partial<AgentState> = { currentAgent: CORE_AGENT_NAMES.SUPERVISOR };
+        if (lastAgent === AGENT_NAMES.AGENT_TESTS_GENERATOR) updates.testContent = revised;
+        else if (lastAgent === AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR) updates.report = revised;
+        else if (lastAgent === AGENT_NAMES.AGENT_SUMMARIZE) updates.summary = revised;
+        return updates;
+      }
+    } catch (err) {
+      logger.warn(`[AgenticGraph] Critic node failed: ${err}`);
     }
 
-    return { currentAgent: "supervisor" };
+    return { currentAgent: CORE_AGENT_NAMES.SUPERVISOR };
   }
 
   private async humanApprovalNode(state: AgentState): Promise<Partial<AgentState>> {
     const pending = state.humanApprovals.find(a => !a.resolved);
     if (!pending) {
-      return { currentAgent: "supervisor" };
+      return { currentAgent: CORE_AGENT_NAMES.SUPERVISOR };
     }
 
     logger.info(`[HumanApproval] Interrupting for approval: ${pending.title}`);
@@ -309,10 +413,10 @@ export class AgenticGraph {
     );
 
     if (resolution === "approve") {
-      return { status: "running", currentAgent: "supervisor", humanApprovals: updatedApprovals };
+      return { status: PIPELINE_STATUS.RUNNING, currentAgent: CORE_AGENT_NAMES.SUPERVISOR, humanApprovals: updatedApprovals };
     }
 
-    return { status: "failed", error: `Human rejected: ${pending.title}`, currentAgent: "supervisor", humanApprovals: updatedApprovals };
+    return { status: PIPELINE_STATUS.FAILED, error: `Human rejected: ${pending.title}`, currentAgent: CORE_AGENT_NAMES.SUPERVISOR, humanApprovals: updatedApprovals };
   }
 
   private extractStateChanges(oldState: AgentState, newState: AgentState): Partial<AgentState> {
@@ -327,7 +431,12 @@ export class AgenticGraph {
     ];
 
     for (const key of keys) {
-      if (!this.deepEqual(oldState[key], newState[key])) {
+      try {
+        if (!this.deepEqual(oldState[key], newState[key])) {
+          (changes as any)[key] = newState[key];
+        }
+      } catch {
+        // If comparison fails (e.g., circular refs), assume changed
         (changes as any)[key] = newState[key];
       }
     }
@@ -336,28 +445,48 @@ export class AgenticGraph {
   }
 
   private deepEqual(a: unknown, b: unknown): boolean {
+    return this.deepEqualWithVisited(a, b, new WeakSet());
+  }
+
+  private deepEqualWithVisited(a: unknown, b: unknown, visited: WeakSet<object>): boolean {
     if (a === b) return true;
     if (a === null || b === null) return a === b;
     if (typeof a !== "object" || typeof b !== "object") return a === b;
     
-    const arrA = Array.isArray(a);
-    const arrB = Array.isArray(b);
-    if (arrA !== arrB) return false;
-    
-    if (arrA) {
-      const arrA_ = a as unknown[];
-      const arrB_ = b as unknown[];
-      if (arrA_.length !== arrB_.length) return false;
-      return arrA_.every((val, idx) => this.deepEqual(val, arrB_[idx]));
+    // Check for circular references
+    if (visited.has(a as object) || visited.has(b as object)) {
+      return a === b;
     }
     
-    const keysA = Object.keys(a as Record<string, unknown>);
-    const keysB = Object.keys(b as Record<string, unknown>);
-    if (keysA.length !== keysB.length) return false;
+    visited.add(a as object);
+    visited.add(b as object);
     
-    const objA = a as Record<string, unknown>;
-    const objB = b as Record<string, unknown>;
-    return keysA.every(key => this.deepEqual(objA[key], objB[key]));
+    try {
+      const arrA = Array.isArray(a);
+      const arrB = Array.isArray(b);
+      if (arrA !== arrB) return false;
+      
+      if (arrA) {
+        const arrA_ = a as unknown[];
+        const arrB_ = b as unknown[];
+        if (arrA_.length !== arrB_.length) return false;
+        return arrA_.every((val, idx) => this.deepEqualWithVisited(val, arrB_[idx], visited));
+      }
+      
+      const keysA = Object.keys(a as Record<string, unknown>);
+      const keysB = Object.keys(b as Record<string, unknown>);
+      if (keysA.length !== keysB.length) return false;
+      
+      const objA = a as Record<string, unknown>;
+      const objB = b as Record<string, unknown>;
+      return keysA.every(key => this.deepEqualWithVisited(objA[key], objB[key], visited));
+    } catch {
+      // Fallback to reference equality on any error (e.g., circular refs, getters throwing)
+      return a === b;
+    } finally {
+      visited.delete(a as object);
+      visited.delete(b as object);
+    }
   }
 
   registerAgent(name: AgentName, agent: BaseAgent): void {
@@ -385,7 +514,7 @@ export class AgenticGraph {
     this.planner = new AdvancedPlanner(initialState);
     const availableAgents = Array.from(this.agents.keys());
     const masterPlan = await this.planner.generateMasterPlan(
-      initialState.mode === "issue" 
+      initialState.mode === MODE.ISSUE 
         ? `Process issue #${initialState.issue?.number}: ${initialState.issue?.title}`
         : `Process commit ${initialState.commitDiff?.sha.slice(0,7)}`,
       availableAgents

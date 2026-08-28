@@ -43,6 +43,7 @@ export class AnthropicProvider implements ProviderInterface {
     system,
     messages,
     tools,
+    toolChoice,
     maxTokens = 4096,
     temperature = 0.3,
   }: ChatParams): Promise<ChatResponse> {
@@ -51,6 +52,18 @@ export class AnthropicProvider implements ProviderInterface {
         ? await this.resolveAutoModel()
         : this.defaultModel;
     const anthropicTools = tools?.map(this.convertTool);
+
+    // Convert toolChoice to Anthropic format
+    let anthropicToolChoice: Anthropic.ToolChoice | undefined;
+    if (toolChoice) {
+      if (toolChoice.type === "auto") {
+        anthropicToolChoice = { type: "auto" };
+      } else if (toolChoice.type === "any") {
+        anthropicToolChoice = { type: "any" };
+      } else if (toolChoice.type === "tool") {
+        anthropicToolChoice = { type: "tool", name: toolChoice.name };
+      }
+    }
 
     const apiMessages: Anthropic.MessageParam[] = messages.map((m) => ({
       role: m.role,
@@ -81,6 +94,7 @@ export class AnthropicProvider implements ProviderInterface {
       max_tokens: maxTokens,
       system,
       tools: anthropicTools,
+      tool_choice: anthropicToolChoice,
       temperature,
       messages: apiMessages,
     });

@@ -5,6 +5,7 @@ import { createAgentTools, executeTool } from "../utils/tools.js";
 import { logger } from "../utils/logger.js";
 import type { AgentState, AgentName, AgentPlan, PlanStep, AgentMessage, ReflectionResult, MemoryEntry, HumanApprovalRequest } from "./state.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
+import { CORE_AGENT_NAMES, AGENT_STATUS, PIPELINE_STATUS, RISK_LEVEL, APPROVED_BY, APPROVAL_RESOLUTION, APPROVAL_TYPE, MESSAGE_TYPE, MODE } from "../utils/constants.js";
 
 export interface TaskContext {
   provider: ProviderInterface;
@@ -38,39 +39,42 @@ export abstract class BaseAgent {
   abstract getGoal(): string;
   abstract getDefaultPlan(): AgentPlan;
 
-  async run(): Promise<AgentState> {
-    this.updateStatus("planning");
+  async run(inputState?: AgentState): Promise<AgentState> {
+    // Use provided state or fall back to internal state (for backwards compatibility)
+    const state = inputState || this.state;
     
-    const plan = await this.generatePlan();
-    this.state.plans[this.agentName] = plan;
+    this.updateStatus(AGENT_STATUS.PLANNING, state);
     
-    if (plan.riskLevel === "high" || plan.riskLevel === "medium") {
-      const approved = await this.requestHumanApproval(plan);
+    const plan = await this.generatePlan(state);
+    state.plans[this.agentName] = plan;
+    
+    if (plan.riskLevel === RISK_LEVEL.HIGH || plan.riskLevel === RISK_LEVEL.MEDIUM) {
+      const approved = await this.requestHumanApproval(plan, state);
       if (!approved) {
         // Approval pending - return early with awaiting_human status
         // The graph will interrupt and resume after approval
-        this.state.status = "awaiting_human";
-        this.updateStatus("awaiting_approval");
-        return this.state;
+        state.status = PIPELINE_STATUS.AWAITING_HUMAN;
+        this.updateStatus(AGENT_STATUS.AWAITING_APPROVAL, state);
+        return state;
       }
     }
 
-    this.updateStatus("executing");
-    const result = await this.executePlan(plan);
+    this.updateStatus(AGENT_STATUS.EXECUTING, state);
+    const result = await this.executePlan(plan, state);
     
-    this.updateStatus("reflecting");
+    this.updateStatus(AGENT_STATUS.REFLECTING, state);
     const reflection = await this.reflect(result);
-    this.recordReflection(reflection);
+    this.recordReflection(reflection, state);
     
     if (reflection.shouldRevise && reflection.revisedOutput) {
       logger.info(`[${this.agentName}] Self-correction applied`);
     }
 
-    this.updateStatus("completed");
-    return this.state;
+    this.updateStatus(AGENT_STATUS.COMPLETED, state);
+    return state;
   }
 
-  protected async generatePlan(): Promise<AgentPlan> {
+  protected async generatePlan(state: AgentState): Promise<AgentPlan> {
     const defaultPlan = this.getDefaultPlan();
     
     const tools = await this.getAvailableTools();
@@ -79,10 +83,10 @@ export abstract class BaseAgent {
 Goal: ${this.getGoal()}
 
 Current context:
-- Mode: ${this.state.mode}
-- Project: ${this.state.projectName}
-- ${this.state.mode === "issue" ? `Issue: #${this.state.issue?.number} - ${this.state.issue?.title}` : `Commit: ${this.state.commitDiff?.sha.slice(0,7)}`}
-- Retries so far: ${this.state.retries}/${this.state.maxRetries}
+- Mode: ${state.mode}
+- Project: ${state.projectName}
+- ${state.mode === MODE.ISSUE ? `Issue: #${state.issue?.number} - ${state.issue?.title}` : `Commit: ${state.commitDiff?.sha.slice(0,7)}`}
+- Retries so far: ${state.retries}/${state.maxRetries}
 
 Available tools: ${tools.map(t => t.name).join(", ")}
 
@@ -131,7 +135,7 @@ Return ONLY valid JSON.`;
     return defaultPlan;
   }
 
-  protected async executePlan(plan: AgentPlan): Promise<string> {
+  protected async executePlan(plan: AgentPlan, state: AgentState): Promise<string> {
     const messages: ChatMessage[] = [{ role: "user", content: this.getGoal() }];
     let lastOutput = "";
 
@@ -168,11 +172,11 @@ Return ONLY valid JSON.`;
         });
         
         lastOutput = result;
-        this.recordStep(step.id, result, "next");
+        this.recordStep(step.id, result, "next", state);
         
       } catch (err) {
         logger.error(`[${this.agentName}] Step ${step.id} failed: ${err}`);
-        this.recordStep(step.id, String(err), "stop");
+        this.recordStep(step.id, String(err), "stop", state);
         throw err;
       }
     }
@@ -230,37 +234,39 @@ Return ONLY valid JSON:
     };
   }
 
-  protected recordReflection(reflection: ReflectionResult): void {
-    if (!this.state.reflectionHistory[this.agentName]) {
-      this.state.reflectionHistory[this.agentName] = [];
+  protected recordReflection(reflection: ReflectionResult, state?: AgentState): void {
+    const s = state || this.state;
+    if (!s.reflectionHistory[this.agentName]) {
+      s.reflectionHistory[this.agentName] = [];
     }
-    this.state.reflectionHistory[this.agentName].push(reflection);
+    s.reflectionHistory[this.agentName].push(reflection);
     
     logger.info(`[${this.agentName}] Reflection: ${reflection.score}/100, revise: ${reflection.shouldRevise}`);
   }
 
-  protected async requestHumanApproval(plan: AgentPlan): Promise<boolean> {
-    if (this.state.commitAutoApprove) {
+  protected async requestHumanApproval(plan: AgentPlan, state?: AgentState): Promise<boolean> {
+    const s = state || this.state;
+    if (s.commitAutoApprove) {
       plan.approved = true;
-      plan.approvedBy = "supervisor";
+      plan.approvedBy = APPROVED_BY.SUPERVISOR;
       return true;
     }
 
     // Check if there's already a pending approval for this plan
-    const existingApproval = this.state.humanApprovals.find(
-      a => a.agent === this.agentName && a.type === "plan" && !a.resolved
+    const existingApproval = s.humanApprovals.find(
+      a => a.agent === this.agentName && a.type === APPROVAL_TYPE.PLAN && !a.resolved
     );
     
     if (existingApproval) {
       // If already resolved, return the result
       if (existingApproval.resolved) {
-        plan.approved = existingApproval.resolution === "approve";
-        plan.approvedBy = existingApproval.resolution === "approve" ? "human" : "supervisor";
+        plan.approved = existingApproval.resolution === APPROVAL_RESOLUTION.APPROVE;
+        plan.approvedBy = existingApproval.resolution === APPROVAL_RESOLUTION.APPROVE ? APPROVED_BY.HUMAN : APPROVED_BY.SUPERVISOR;
         return plan.approved;
       }
       // If pending but not resolved, signal to graph to wait
-      this.state.status = "awaiting_human";
-      this.updateStatus("awaiting_approval");
+      s.status = PIPELINE_STATUS.AWAITING_HUMAN;
+      this.updateStatus(AGENT_STATUS.AWAITING_APPROVAL, s);
       return false;
     }
 
@@ -268,23 +274,23 @@ Return ONLY valid JSON:
     const request: HumanApprovalRequest = {
       id: `approval-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       agent: this.agentName,
-      type: "plan",
+      type: APPROVAL_TYPE.PLAN,
       title: `Approve plan for ${this.agentName}`,
       description: `Goal: ${plan.goal}\nSteps: ${plan.steps.length}\nRisk: ${plan.riskLevel}`,
       data: plan,
       options: [
-        { label: "Approve", value: "approve" },
-        { label: "Reject", value: "reject" },
+        { label: "Approve", value: APPROVAL_RESOLUTION.APPROVE },
+        { label: "Reject", value: APPROVAL_RESOLUTION.REJECT },
         { label: "Modify", value: "modify" },
       ],
-      defaultOption: "approve",
+      defaultOption: APPROVAL_RESOLUTION.APPROVE,
       createdAt: Date.now(),
       resolved: false,
     };
 
-    this.state.humanApprovals.push(request);
-    this.state.status = "awaiting_human";
-    this.updateStatus("awaiting_approval");
+    s.humanApprovals.push(request);
+    s.status = PIPELINE_STATUS.AWAITING_HUMAN;
+    this.updateStatus(AGENT_STATUS.AWAITING_APPROVAL, s);
     
     logger.warn(`[${this.agentName}] Awaiting human approval for plan (${request.id})`);
     
@@ -297,13 +303,15 @@ Return ONLY valid JSON:
     return createAgentTools(this.taskContext.reader, this.taskContext.runner, this.taskContext.codebasePath);
   }
 
-  protected updateStatus(status: AgentState["agentStatus"][AgentName]): void {
-    this.state.agentStatus[this.agentName] = status;
-    this.state.currentAgent = this.agentName;
+  protected updateStatus(status: AgentState["agentStatus"][AgentName], state?: AgentState): void {
+    const s = state || this.state;
+    s.agentStatus[this.agentName] = status;
+    s.currentAgent = this.agentName;
   }
 
-  protected recordStep(name: string, output: string, decision: string): void {
-    this.state.stepHistory.push({
+  protected recordStep(name: string, output: string, decision: string, state?: AgentState): void {
+    const s = state || this.state;
+    s.stepHistory.push({
       name,
       timestamp: Date.now(),
       agent: this.agentName,
@@ -312,7 +320,7 @@ Return ONLY valid JSON:
     });
   }
 
-  protected sendMessage(to: AgentName | "broadcast", type: AgentMessage["type"], payload: unknown, correlationId?: string): void {
+  protected sendMessage(to: AgentName | typeof MESSAGE_TYPE.BROADCAST, type: AgentMessage["type"], payload: unknown, correlationId?: string): void {
     const message: AgentMessage = {
       id: `msg-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       from: this.agentName,

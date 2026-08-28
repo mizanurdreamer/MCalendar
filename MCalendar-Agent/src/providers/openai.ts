@@ -43,6 +43,7 @@ export class OpenAIProvider implements ProviderInterface {
     system,
     messages,
     tools,
+    toolChoice,
     maxTokens = 4096,
     temperature = 0.3,
   }: ChatParams): Promise<ChatResponse> {
@@ -51,6 +52,18 @@ export class OpenAIProvider implements ProviderInterface {
         ? await this.resolveAutoModel()
         : this.defaultModel;
     const openaiTools = tools?.map(this.convertTool);
+
+    // Convert toolChoice to OpenAI format
+    let openaiToolChoice: OpenAI.ChatCompletionToolChoiceOption | undefined;
+    if (toolChoice) {
+      if (toolChoice.type === "auto") {
+        openaiToolChoice = "auto";
+      } else if (toolChoice.type === "any") {
+        openaiToolChoice = "required";
+      } else if (toolChoice.type === "tool") {
+        openaiToolChoice = { type: "function", function: { name: toolChoice.name } };
+      }
+    }
 
     const apiMessages: OpenAI.ChatCompletionMessageParam[] = [
       { role: "system", content: system },
@@ -70,6 +83,7 @@ export class OpenAIProvider implements ProviderInterface {
       model: effectiveModel,
       messages: apiMessages,
       tools: openaiTools,
+      tool_choice: openaiToolChoice,
       max_tokens: maxTokens,
       temperature,
     });
