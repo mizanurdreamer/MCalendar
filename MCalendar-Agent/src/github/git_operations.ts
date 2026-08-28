@@ -17,41 +17,69 @@ export class GitBranch {
     return status.current ?? "main";
   }
 
-async createAndCheckout(branchName: string, baseBranch: string): Promise<void> {
-    await this.git.fetch("origin", baseBranch);
-    const branches = await this.git.branch();
-    if (branches.all.includes(branchName)) {
-      await this.git.checkout(branchName);
-    } else {
-      await this.git.checkout(branchName, ["-b"]);
+  async createAndCheckout(branchName: string, baseBranch: string): Promise<void> {
+    try {
+      logger.task("Git", `fetching origin/${baseBranch}`);
+      await this.git.fetch("origin", baseBranch);
+
+      const branches = await this.git.branch();
+      if (branches.all.includes(branchName)) {
+        logger.info(`Git: Branch "${branchName}" exists, checking out`);
+        await this.git.checkout(branchName);
+      } else {
+        logger.info(`Git: Creating and checking out branch "${branchName}" from "${baseBranch}"`);
+        await this.git.checkoutLocalBranch(branchName);
+      }
+      logger.success(`Git: On branch "${branchName}"`);
+    } catch (err) {
+      logger.error(`Git: Failed to create/checkout branch "${branchName}": ${err}`);
+      throw err;
     }
   }
 
   async commit(message: string): Promise<void> {
-    await this.git.add("E2ETests/");
-    await this.git.commit(message);
+    try {
+      logger.info(`Git: Staging E2ETests/`);
+      await this.git.add("E2ETests/");
+      logger.info(`Git: Committing — "${message}"`);
+      await this.git.commit(message);
+      logger.success("Git: Committed");
+    } catch (err) {
+      logger.error(`Git: Commit failed: ${err}`);
+      throw err;
+    }
   }
 
   async push(branchName: string): Promise<void> {
-    await this.git.push("origin", branchName, ["--set-upstream"]);
+    try {
+      logger.info(`Git: Pushing "${branchName}" to origin`);
+      await this.git.push("origin", branchName, ["--set-upstream"]);
+      logger.success("Git: Pushed");
+    } catch (err) {
+      logger.error(`Git: Push failed: ${err}`);
+      throw err;
+    }
   }
 
   async commitAndPush(commitMessage: string, branchName: string): Promise<void> {
     logger.task("Git", `committing + pushing ${branchName}`);
     await this.commit(commitMessage);
-    logger.success("Committed");
     await this.push(branchName);
-    logger.success("Pushed");
   }
 
   async createPR(
     githubClient: GitHubClient,
     params: { title: string; body: string; head: string; base: string }
   ): Promise<GitHubPR> {
-    logger.task("Git", `creating PR ${params.head} → ${params.base}`);
-    const pr = await githubClient.createPR(params);
-    logger.success(`PR #${pr.number} created → ${params.base}`);
-    return pr;
+    try {
+      logger.task("Git", `creating PR ${params.head} → ${params.base}`);
+      const pr = await githubClient.createPR(params);
+      logger.success(`PR #${pr.number} created → ${params.base}`);
+      return pr;
+    } catch (err) {
+      logger.error(`Git: PR creation failed: ${err}`);
+      throw err;
+    }
   }
 
   static slugify(text: string): string {

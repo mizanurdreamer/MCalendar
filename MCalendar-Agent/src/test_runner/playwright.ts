@@ -106,7 +106,7 @@ export class PlaywrightRunner {
 
       logger.info(`[playwright] Parsed: ${passed} passed, ${failed} failed, ${errors.length} errors`);
       if (output) {
-        logger.info(`[playwright] Full output:\n${output}`);
+        //logger.info(`[playwright] Full output:\n${output}`);
       }
       return {
         success: failed === 0,

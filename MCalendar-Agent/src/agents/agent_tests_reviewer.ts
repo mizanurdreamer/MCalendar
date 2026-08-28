@@ -261,7 +261,7 @@ Analyze the errors and provide a fix plan.`;
       { role: "user", content: userMessage },
     ];
     
-    const maxIterations = 10;
+    const maxIterations = this.state.maxIterations ?? 50;
     let iteration = 0;
     
     while (iteration < maxIterations) {

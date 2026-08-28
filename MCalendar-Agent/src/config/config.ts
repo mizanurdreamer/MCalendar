@@ -123,7 +123,7 @@ export function loadConfig(): AppConfig {
     projectName: project.projectName,
     pollIntervalMin: parseInt(process.env.POLL_INTERVAL_MIN ?? "1", 10),
     maxRetries: parseInt(process.env.AGENT_MAX_RETRIES ?? "3", 10),
-    maxIterations: parseInt(process.env.AGENT_MAX_ITERATIONS ?? "20", 10),
+    maxIterations: parseInt(process.env.AGENT_MAX_ITERATIONS ?? "50", 10),
     maxPipelineSteps: parseInt(process.env.MAX_PIPELINE_STEPS ?? "50", 10),
     runMaxRetries: parseInt(process.env.RUN_MAX_RETRIES ?? "1", 10),
     githubMaxRetries: parseInt(process.env.GITHUB_MAX_RETRIES ?? "3", 10),

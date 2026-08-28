@@ -122,6 +122,13 @@ export async function processIssue(
 
   // Run with thread_id for checkpointing
   const threadId = runId;
+
+  // Create and checkout the test branch before running the pipeline
+  try {
+    await git.createAndCheckout(branchName, baseBranch);
+  } catch (err) {
+    logger.warn(`[Orchestrator] Branch creation failed, continuing on current branch: ${err}`);
+  }
   
   let result = await graph.invoke(initialState, { configurable: { thread_id: threadId } });
 
@@ -141,8 +148,27 @@ export async function processIssue(
 
   if (result.testResult) {
     logger.success(
-      `Issue #${issue.number} complete — pushed to ${result.branchName}, ${result.testResult.passed} passed, ${result.testResult.failed} failed`
+      `Issue #${issue.number} complete — ${result.testResult.passed} passed, ${result.testResult.failed} failed`
     );
+  }
+
+  // Commit, push, and create PR if tests passed
+  if (result.testResult?.success && result.testFilename) {
+    try {
+      const commitMsg = `test: add E2E tests for issue #${issue.number}`;
+      await git.commitAndPush(commitMsg, branchName);
+      
+      const pr = await git.createPR(githubClient, {
+        title: `Test: Issue #${issue.number} — ${issue.title}`,
+        body: result.summary ?? `Automated E2E tests for issue #${issue.number}\n\n${result.testResult.passed} tests passed.`,
+        head: branchName,
+        base: baseBranch,
+      });
+      result.prUrl = pr.html_url;
+      logger.success(`[Orchestrator] PR created: ${pr.html_url}`);
+    } catch (err) {
+      logger.error(`[Orchestrator] Failed to commit/push/create PR: ${err}`);
+    }
   }
 
   // Shutdown Playwright MCP if it was initialized

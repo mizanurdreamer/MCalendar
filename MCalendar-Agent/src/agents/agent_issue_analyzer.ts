@@ -91,10 +91,10 @@ Use the submit_analysis tool to return your analysis with all required fields.`;
     const issue = state.issue;
     const labels = issue.labels.map((l: { name: string }) => l.name).join(", ") || "none";
     const userMessage = `Issue #${issue.number}: ${issue.title}
-Labels: ${labels}
-Created: ${issue.created_at}
+    Labels: ${labels}
+    Created: ${issue.created_at}
 
-${issue.body ?? "(no description)"}`;
+    ${issue.body ?? "(no description)"}`;
 
     logger.info(`[AgentIssueAnalyzer] Analyzing issue #${issue.number}`);
 
@@ -114,16 +114,17 @@ ${issue.body ?? "(no description)"}`;
         }
         
         // Log relevant files
-        if (analysis.relevant_files?.length) {
-          logger.info(`  Relevant files:`);
-          for (const f of analysis.relevant_files) {
-            logger.info(`    - ${f}`);
-          }
-        }
+        // if (analysis.relevant_files?.length) {
+        //   logger.info(`  Relevant files:`);
+        //   for (const f of analysis.relevant_files) {
+        //     logger.info(`    - ${f}`);
+        //   }
+        // }
         
         // Log each test scenario with acceptance criterion
         for (let i = 0; i < analysis.test_scenarios.length; i++) {
           const s = analysis.test_scenarios[i];
+          logger.info(`Generated Test Scenario List: `);
           logger.info(`  [${i + 1}] ${s.name} (${s.type}): ${s.description}`);
           if (s.acceptance_criterion) {
             logger.info(`      Criteria: ${s.acceptance_criterion}`);
@@ -137,7 +138,7 @@ ${issue.body ?? "(no description)"}`;
         
         // Log API endpoints
         if (analysis.api_endpoints?.length) {
-          logger.info(`  API endpoints: ${analysis.api_endpoints.join(', ')}`);
+          //logger.info(`  API endpoints: ${analysis.api_endpoints.join(', ')}`);
         }
         
         // Log role checks

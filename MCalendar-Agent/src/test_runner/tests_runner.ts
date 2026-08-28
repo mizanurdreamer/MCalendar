@@ -18,7 +18,7 @@ export async function runTests(
         logger.error(`Tests_Runner error: ${err.slice(0, 500)}`);
       }
     }
-    logger.debug(`Full output: ${result.output.slice(0, 500)}`);
+    //logger.debug(`Full output: ${result.output.slice(0, 500)}`);
   }
 
   return result;

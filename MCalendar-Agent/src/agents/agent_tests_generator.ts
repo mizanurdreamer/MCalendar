@@ -278,7 +278,7 @@ Use the write_test_file tool to save the test as "${testFilename}".`;
       { role: "user", content: userMessage },
     ];
     
-    const maxIterations = 10;
+    const maxIterations = this.state.maxIterations ?? 50;
     let iteration = 0;
     
     while (iteration < maxIterations) {
@@ -323,7 +323,7 @@ Use the write_test_file tool to save the test as "${testFilename}".`;
       for (const toolBlock of toolBlocks) {
         logger.info(`[AgentTestsGenerator] Executing tool: ${toolBlock.name}`);
         const result = await this.executeTool(toolBlock.name, toolBlock.input);
-        logger.info(`[AgentTestsGenerator] Tool result: ${result.slice(0, 200)}`);
+        //logger.info(`[AgentTestsGenerator] Tool result: ${result.slice(0, 200)}`);
         toolResults.push({
           type: "tool_result",
           toolUseId: toolBlock.id,

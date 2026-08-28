@@ -49,6 +49,7 @@ export async function processCommit(
   const reader = new CodebaseReader(codebasePath);
   const testReader = new CodebaseReader(testProjectPath);
   const runner = new PlaywrightRunner(testProjectPath, config.playwrightWorkers ?? 6);
+  const git = new GitBranch(codebasePath);
   const testOutputPath = path.join(testProjectPath, "tests");
 
   setDiagnosticConfig({ databaseUrl: config.databaseUrl, apiBaseUrl: config.apiBaseUrl });
@@ -82,7 +83,7 @@ export async function processCommit(
     reader,
     testReader,
     runner,
-    git: new GitBranch(codebasePath),
+    git,
     githubClient,
     provider,
     codebasePath,
@@ -119,6 +120,13 @@ export async function processCommit(
 
   // Run with thread_id for checkpointing
   const threadId = runId;
+
+  // Create and checkout the test branch before running the pipeline
+  try {
+    await git.createAndCheckout(branchName, targetBranch);
+  } catch (err) {
+    logger.warn(`[Orchestrator] Branch creation failed, continuing on current branch: ${err}`);
+  }
   
   let result = await graph.invoke(initialState, { configurable: { thread_id: threadId } });
 
@@ -151,8 +159,27 @@ export async function processCommit(
 
   if (result.testResult) {
     logger.success(
-      `Commit ${shortSha} complete — pushed to ${result.branchName}, ${result.testResult.passed} passed, ${result.testResult.failed} failed`
+      `Commit ${shortSha} complete — ${result.testResult.passed} passed, ${result.testResult.failed} failed`
     );
+  }
+
+  // Commit, push, and create PR if tests passed
+  if (result.testResult?.success && result.testFilename) {
+    try {
+      const commitMsg = `test: add E2E tests for commit ${shortSha}`;
+      await git.commitAndPush(commitMsg, branchName);
+      
+      const pr = await git.createPR(githubClient, {
+        title: `Test: Commit ${shortSha} — ${diff.message.split("\n")[0]}`,
+        body: result.summary ?? `Automated E2E tests for commit ${shortSha}\n\n${result.testResult.passed} tests passed.`,
+        head: branchName,
+        base: targetBranch,
+      });
+      result.prUrl = pr.html_url;
+      logger.success(`[Orchestrator] PR created: ${pr.html_url}`);
+    } catch (err) {
+      logger.error(`[Orchestrator] Failed to commit/push/create PR: ${err}`);
+    }
   }
 
   // Shutdown Playwright MCP if it was initialized
