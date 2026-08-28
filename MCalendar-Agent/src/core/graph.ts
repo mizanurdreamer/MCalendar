@@ -152,6 +152,12 @@ export class AgenticGraph {
   }
 
   private async supervisorNode(state: AgentState): Promise<Partial<AgentState>> {
+    // If pipeline already completed or failed, stop the graph
+    if (state.status === PIPELINE_STATUS.COMPLETED || state.status === PIPELINE_STATUS.FAILED) {
+      logger.info(`[AgenticGraph] Pipeline ${state.status}, stopping`);
+      return { currentAgent: END as AgentName };
+    }
+
     // Circuit breaker: check maxPipelineSteps
     if (this.stepCounter >= (state.maxPipelineSteps ?? 50)) {
       logger.error(`[AgenticGraph] Max pipeline steps (${state.maxPipelineSteps}) reached. Stopping.`);

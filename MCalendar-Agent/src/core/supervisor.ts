@@ -40,6 +40,10 @@ export class Supervisor {
       return this.checkHumanApprovals();
     }
 
+    if (this.state.status === PIPELINE_STATUS.COMPLETED) {
+      return { action: ROUTING_ACTION.COMPLETE, reason: "Pipeline already completed" };
+    }
+
     if (this.state.status === PIPELINE_STATUS.FAILED) {
       // Trigger replanning on failure
       return { action: ROUTING_ACTION.REPLAN, reason: `Agent failed: ${this.state.error || "Unknown failure"}` };

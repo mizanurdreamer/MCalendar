@@ -117,15 +117,19 @@ ${state.report ?? "(no report)"}`;
         logger.info(`  ${line}`);
       }
 
-      // Log GitHub comment posting
-      if (state.githubClient && state.issue) {
-        await state.githubClient.addComment(state.issue.number, output);
-        logger.success(`[AgentSummarize] Posted comment to issue #${state.issue.number}`);
-      } else if (state.githubClient && state.mode === MODE.COMMIT && state.prUrl) {
-        await state.githubClient.addPRComment(state.prUrl, output);
-        logger.success(`[AgentSummarize] Posted comment to PR ${state.prUrl}`);
-      } else {
-        logger.warn(`[AgentSummarize] No GitHub client available, skipping comment`);
+      // Post GitHub comment (non-fatal — summary is still valid)
+      try {
+        if (state.githubClient && state.issue) {
+          await state.githubClient.addComment(state.issue.number, output);
+          logger.success(`[AgentSummarize] Posted comment to issue #${state.issue.number}`);
+        } else if (state.githubClient && state.mode === MODE.COMMIT && state.prUrl) {
+          await state.githubClient.addPRComment(state.prUrl, output);
+          logger.success(`[AgentSummarize] Posted comment to PR ${state.prUrl}`);
+        } else {
+          logger.warn(`[AgentSummarize] No GitHub client available, skipping comment`);
+        }
+      } catch (commentErr) {
+        logger.warn(`[AgentSummarize] Failed to post GitHub comment (non-fatal): ${commentErr}`);
       }
 
       this.recordStep("summarize", output, "done");
