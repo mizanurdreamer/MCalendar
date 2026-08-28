@@ -9,7 +9,7 @@ import { MessageBus } from "./message_bus.js";
 import { logger } from "../utils/logger.js";
 import { Command, interrupt } from "@langchain/langgraph";
 import { AGENT_NAMES } from "../utils/agent_names.js";
-import { CORE_AGENT_NAMES, GRAPH_NODE, MODE, PIPELINE_STATUS } from "../utils/constants.js";
+import { CORE_AGENT_NAMES, GRAPH_NODE, MODE, PIPELINE_STATUS, ROUTING_ACTION } from "../utils/constants.js";
 
 export interface AgenticGraphConfig {
   memoryType: "local";
@@ -110,6 +110,10 @@ export class AgenticGraph {
 
     // Supervisor routes to agents
     workflow.addConditionalEdges(GRAPH_NODE.SUPERVISOR as any, (state: AgentState) => {
+      // Stop immediately if pipeline is terminal
+      if (state.status === PIPELINE_STATUS.COMPLETED || state.status === PIPELINE_STATUS.FAILED) {
+        return END;
+      }
       // Handle undefined or unknown destinations gracefully
       const agent = state.currentAgent;
       if (!agent || agent === END) return END;
@@ -148,6 +152,7 @@ export class AgenticGraph {
     // Compile with checkpointer
     return workflow.compile({
       checkpointer: this.config.checkpointer,
+      recursionLimit: 100,
     });
   }
 
@@ -186,6 +191,24 @@ export class AgenticGraph {
       }
 
       const decision = await this.supervisor.route();
+      
+      // Handle terminal decisions IMMEDIATELY — do NOT go through executeDecision()
+      // which mutates state in-place and causes extractStateChanges to be a no-op
+      if (decision.action === ROUTING_ACTION.COMPLETE) {
+        logger.success(`[Supervisor] Pipeline complete: ${decision.reason}`);
+        return {
+          status: PIPELINE_STATUS.COMPLETED,
+          currentAgent: END as AgentName,
+        };
+      }
+      if (decision.action === ROUTING_ACTION.FAIL) {
+        logger.error(`[Supervisor] Pipeline failed: ${decision.reason}`);
+        return {
+          status: PIPELINE_STATUS.FAILED,
+          error: decision.reason,
+          currentAgent: END as AgentName,
+        };
+      }
       
       // Handle replan action
       if (decision.action === "replan") {

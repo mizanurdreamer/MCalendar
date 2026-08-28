@@ -9,7 +9,7 @@ export type TestUser = {
 };
 
 const ACCESS_SECRET = new TextEncoder().encode(
-  process.env.JWT_ACCESS_SECRET ?? "dev-access-secret-change-me-please-32chars"
+  process.env.JWT_ACCESS_SECRET ?? "dev-access-secret-change-me-in-production-please-32chars"
 );
 
 export async function signAccessToken(user: TestUser): Promise<string> {

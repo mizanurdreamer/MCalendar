@@ -152,13 +152,31 @@ Return the fixed test file content via write_test_file tool.`;
     return state;
   }
 
-  private async debugAppWithMcp(): Promise<string> {
+  private async debugAppWithMcp(testContent?: string): Promise<string> {
     const debugInfo: string[] = [];
     
     try {
+      // Use API_BASE_URL from .env (via state) instead of hardcoding
+      const baseUrl = this.state.apiBaseUrl || "http://localhost:3000";
+      
+      // Extract target URL from test code
+      let targetUrl = baseUrl;
+      if (testContent) {
+        const gotoMatch = testContent.match(/page\.goto\(['"](.*?)['"]\)/);
+        if (gotoMatch) {
+          // Handle relative URLs by prepending base URL
+          const url = gotoMatch[1];
+          if (url.startsWith("/")) {
+            targetUrl = `${baseUrl}${url}`;
+          } else if (url.startsWith("http")) {
+            targetUrl = url;
+          }
+        }
+      }
+      
       // Navigate to the app
-      logger.info(`[AgentTestsReviewer] Debugging app with Playwright MCP...`);
-      const navResult = await callMcpTool("browser_navigate", { url: "http://localhost:3000" });
+      logger.info(`[AgentTestsReviewer] Debugging app with Playwright MCP at ${targetUrl}...`);
+      const navResult = await callMcpTool("browser_navigate", { url: targetUrl });
       debugInfo.push(`Navigation: ${navResult.slice(0, 200)}`);
       
       // Take a screenshot
@@ -173,9 +191,9 @@ Return the fixed test file content via write_test_file tool.`;
       const networkResult = await callMcpTool("browser_network_requests", {});
       debugInfo.push(`Network: ${networkResult.slice(0, 500)}`);
       
-      // Get page snapshot (DOM structure)
+      // Get page snapshot (DOM structure) - increased from 1000 to 5000 chars
       const snapshotResult = await callMcpTool("browser_snapshot", {});
-      debugInfo.push(`DOM Snapshot: ${snapshotResult.slice(0, 1000)}`);
+      debugInfo.push(`DOM Snapshot: ${snapshotResult.slice(0, 5000)}`);
       
       logger.info(`[AgentTestsReviewer] MCP debug complete`);
     } catch (err) {
@@ -197,7 +215,7 @@ Return the fixed test file content via write_test_file tool.`;
     // Use Playwright MCP to debug the app if available
     let mcpDebugInfo = "";
     try {
-      mcpDebugInfo = await this.debugAppWithMcp();
+      mcpDebugInfo = await this.debugAppWithMcp(testContent);
     } catch (err) {
       logger.warn(`[AgentTestsReviewer] MCP debug skipped: ${err}`);
     }

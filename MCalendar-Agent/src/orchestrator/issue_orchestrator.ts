@@ -100,6 +100,7 @@ export async function processIssue(
     baseBranch,
     branchName,
     playwrightWorkers: config.playwrightWorkers ?? 6,
+    apiBaseUrl: config.apiBaseUrl,
   });
 
   const graph = createAgenticGraph({

@@ -24,9 +24,25 @@ You will receive:
 - Access to read files and explore the codebase
 
 Your task:
-1. Read relevant source files to understand implementation
-2. Write a complete Playwright test file covering ALL scenarios
-3. IMPORTANT: You MUST call the write_test_file tool to save the test file. Do NOT just return the content as text.
+1. EXPLORE the live app using browser tools to understand the actual DOM structure
+2. Read relevant source files to understand implementation
+3. Write a complete Playwright test file covering ALL scenarios
+4. IMPORTANT: You MUST call the write_test_file tool to save the test file. Do NOT just return the content as text.
+
+CRITICAL: MCP APP EXPLORATION (MANDATORY)
+Before writing any test code, you MUST explore the live application:
+1. Use browser_navigate to visit the pages you need to test
+2. Use browser_snapshot to understand the actual DOM structure (element IDs, classes, labels, data attributes)
+3. Use browser_click and browser_type to verify your selectors work
+4. Note the real form field names, button labels, and page layout
+Do NOT guess selectors from source code — the rendered DOM may differ from React components.
+If browser tools are not available, read the HTML source or component files carefully.
+
+AUTH UTILITIES:
+The project has auth utilities you MUST use:
+- utils/token.ts: signAccessToken() for JWT cookie injection (fast, reliable)
+- auth.setup.ts: stored authentication states (admin.json, client.json, attendant.json)
+Use JWT cookie injection for authentication instead of UI login flows. It is faster and more reliable.
 
 CRITICAL RULES:
 - You MUST write a test case for EVERY SINGLE scenario provided. Do NOT skip any scenario.
@@ -35,6 +51,7 @@ CRITICAL RULES:
   1. First call: write_test_file with the file header (imports, describe block) and the first 8-10 test cases
   2. Subsequent calls: append_test_file to add remaining test cases in batches of 8-10
 - Do NOT generate empty placeholder tests. Every test must have real assertions.
+- Use relative URLs (e.g., '/admin/clients') with baseURL from Playwright config, NOT hardcoded http://localhost:3000.
 
 Follow existing test patterns in the project. Use the project's test utilities.
 You MUST use the write_test_file and append_test_file tools to save your test.`;
@@ -115,9 +132,19 @@ You MUST use the write_test_file and append_test_file tools to save your test.`;
     // RETRY CASE: If reviewer already fixed the test content, write it directly and run
     if (state.retries > 0 && state.testContent) {
       logger.info(`[AgentTestsGenerator] Retry ${state.retries}: Using fixed test content from reviewer`);
+      logger.info(`[AgentTestsGenerator] Previous test file: ${testFilename}`);
       const fullPath = path.join(state.testOutputPath, testFilename);
       const dir = path.dirname(fullPath);
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      
+      // Log what changed between retries
+      if (fs.existsSync(fullPath)) {
+        const oldContent = fs.readFileSync(fullPath, "utf-8");
+        const oldLines = oldContent.split("\n").length;
+        const newLines = state.testContent.split("\n").length;
+        logger.info(`[AgentTestsGenerator] Content change: ${oldLines} → ${newLines} lines`);
+      }
+      
       fs.writeFileSync(fullPath, state.testContent, "utf-8");
       logger.success(`[AgentTestsGenerator] Fixed test file written: tests/${testFilename}`);
       

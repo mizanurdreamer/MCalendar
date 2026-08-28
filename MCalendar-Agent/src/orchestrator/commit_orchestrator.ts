@@ -96,6 +96,7 @@ export async function processCommit(
     commitAutoApprove: config.commitAutoApprove ?? true,
     baseBranch: targetBranch,
     branchName,
+    apiBaseUrl: config.apiBaseUrl,
   });
 
   const graph = createAgenticGraph({

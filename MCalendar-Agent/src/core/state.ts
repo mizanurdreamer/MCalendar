@@ -139,6 +139,7 @@ export interface AgentState {
   
   baseBranch?: string;
   branchName?: string;
+  apiBaseUrl?: string;
   
   projectContext?: {
     framework: string;
@@ -233,6 +234,7 @@ export function createInitialAgentState(input: {
   baseBranch: string;
   branchName: string;
   playwrightWorkers?: number;
+  apiBaseUrl?: string;
 }): AgentState {
   const agentNames: AgentName[] = [
     CORE_AGENT_NAMES.SUPERVISOR,
@@ -271,6 +273,7 @@ export function createInitialAgentState(input: {
     planStepIndex: 0,
     baseBranch: input.baseBranch,
     branchName: input.branchName,
+    apiBaseUrl: input.apiBaseUrl,
     retryHistory: [],
     currentAgent: CORE_AGENT_NAMES.SUPERVISOR,
     agentStatus: agentNames.reduce((acc, name) => ({ ...acc, [name]: AGENT_STATUS.IDLE }), {} as Record<AgentName, AgentStatus> & { parallelQueue: [] }),

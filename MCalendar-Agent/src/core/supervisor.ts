@@ -20,7 +20,9 @@ export class Supervisor {
   currentPlanStepIndex = 0;
 
   constructor(state: AgentState) {
-    this.state = state;
+    // Clone state to prevent reference aliasing — executeDecision() mutates state in-place,
+    // and if we hold the same reference, extractStateChanges() becomes a no-op
+    this.state = { ...state };
     // Initialize plan step index from state
     this.currentPlanStepIndex = state.planStepIndex ?? 0;
   }
