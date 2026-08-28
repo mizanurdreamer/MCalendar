@@ -172,6 +172,8 @@ program
         databaseUrl: config.databaseUrl,
         apiBaseUrl: config.apiBaseUrl,
         commitAutoApprove: config.commitAutoApprove,
+        playwrightMcpEnabled: config.playwrightMcpEnabled,
+        playwrightMcpBrowser: config.playwrightMcpBrowser,
       });
     } catch (err) {
       logger.error(`Error: ${err}`);
@@ -216,6 +218,8 @@ program
         databaseUrl: config.databaseUrl,
         apiBaseUrl: config.apiBaseUrl,
         commitAutoApprove: config.commitAutoApprove,
+        playwrightMcpEnabled: config.playwrightMcpEnabled,
+        playwrightMcpBrowser: config.playwrightMcpBrowser,
       });
     } catch (err) {
       logger.error(`Error: ${err}`);

@@ -30,6 +30,8 @@ export interface WatcherConfig {
   databaseUrl?: string;
   apiBaseUrl?: string;
   commitAutoApprove?: boolean;
+  playwrightMcpEnabled?: boolean;
+  playwrightMcpBrowser?: string;
 }
 
 export async function startWatcher(config: WatcherConfig): Promise<void> {
@@ -62,6 +64,8 @@ export async function startWatcher(config: WatcherConfig): Promise<void> {
     databaseUrl: config.databaseUrl,
     apiBaseUrl: config.apiBaseUrl,
     commitAutoApprove: config.commitAutoApprove,
+    playwrightMcpEnabled: config.playwrightMcpEnabled,
+    playwrightMcpBrowser: config.playwrightMcpBrowser,
   };
 
   let targetBranch = watchBranch ?? "";
