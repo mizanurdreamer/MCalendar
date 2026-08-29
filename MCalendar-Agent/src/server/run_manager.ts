@@ -76,6 +76,7 @@ export class RunManager {
         databaseUrl: this.config.databaseUrl,
         apiBaseUrl: this.config.apiBaseUrl,
         commitAutoApprove: this.config.commitAutoApprove,
+        memoryType: this.config.memoryType,
       })
     ).then((finished) => {
       if (finished.status === PIPELINE_STATUS.COMPLETED) {
@@ -116,6 +117,7 @@ export class RunManager {
         databaseUrl: this.config.databaseUrl,
         apiBaseUrl: this.config.apiBaseUrl,
         commitAutoApprove: this.config.commitAutoApprove,
+        memoryType: this.config.memoryType,
       })
     ).then((finished) => {
       if (finished.status === PIPELINE_STATUS.COMPLETED) {

@@ -3,6 +3,7 @@ import type { CodebaseReader } from "../codebase/reader.js";
 import type { PlaywrightRunner } from "../test_runner/playwright.js";
 import { createAgentTools, executeTool } from "../utils/tools.js";
 import { logger } from "../utils/logger.js";
+import { metrics } from "./metrics.js";
 import type { AgentState, AgentName, AgentPlan, PlanStep, AgentMessage, ReflectionResult, MemoryEntry, HumanApprovalRequest } from "./state.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
 import { CORE_AGENT_NAMES, AGENT_STATUS, PIPELINE_STATUS, RISK_LEVEL, APPROVED_BY, APPROVAL_RESOLUTION, APPROVAL_TYPE, MESSAGE_TYPE, MODE } from "../utils/constants.js";
@@ -98,6 +99,24 @@ Return ONLY valid JSON:
     s.reflectionHistory[this.agentName].push(reflection);
     
     logger.info(`[${this.agentName}] Reflection: ${reflection.score}/100, revise: ${reflection.shouldRevise}`);
+
+    // Store reflection in memory for cross-run learning
+    this.remember({
+      type: "lesson_learned",
+      content: JSON.stringify({
+        score: reflection.score,
+        strengths: reflection.strengths,
+        weaknesses: reflection.weaknesses,
+        suggestions: reflection.suggestions,
+      }),
+      metadata: {
+        project: this.state.projectName || "unknown",
+        agent: this.agentName,
+        success: reflection.score >= 70,
+        tags: ["reflection", this.agentName, reflection.shouldRevise ? "needs-revision" : "accepted"],
+        source: "self-reflection",
+      },
+    });
   }
 
   protected async requestHumanApproval(plan: AgentPlan, state?: AgentState): Promise<boolean> {
@@ -239,5 +258,100 @@ Return ONLY valid JSON:
       return this.recall(type, tags, limit);
     }
     return this.state.memoryStore.retrieve(type, tags, limit);
+  }
+
+  /**
+   * Shared agentic tool-use loop. All agents follow the same pattern:
+   * 1. Send messages to LLM with tools
+   * 2. If LLM calls tools → execute them, append results, loop
+   * 3. If LLM stops → return final messages
+   *
+   * Subclasses can pass `onToolCall` to intercept specific tool calls (e.g., submit_analysis)
+   * and return early with their parsed result.
+   */
+  protected async runToolLoop(params: {
+    systemPrompt: string;
+    userMessage: string;
+    tools: ToolDefinition[];
+    onToolCall?: (toolBlocks: { id: string; name: string; input: Record<string, unknown> }[]) => { intercept: true; result: unknown } | { intercept: false } | null;
+    maxIterations?: number;
+    agentName?: string;
+  }): Promise<{ messages: ChatMessage[]; iterations: number; lastResponse?: ContentBlock[] }> {
+    const { systemPrompt, userMessage, tools, onToolCall, agentName } = params;
+    const maxIterations = params.maxIterations ?? this.state.maxIterations ?? 50;
+    const tag = agentName ?? this.agentName;
+
+    const messages: ChatMessage[] = [
+      { role: "user", content: userMessage },
+    ];
+
+    let iteration = 0;
+    while (iteration < maxIterations) {
+      iteration++;
+      metrics.recordIteration();
+      logger.debug(`[${tag}] Tool loop iteration ${iteration}`);
+
+      const provider = this.taskContext.provider;
+      const response = await provider.chat({
+        system: systemPrompt,
+        messages,
+        tools,
+        maxTokens: this.state.agentConfig[tag]?.maxTokens,
+        temperature: this.state.agentConfig[tag]?.temperature,
+      });
+
+      // Record token usage
+      if (response.usage) {
+        metrics.recordTokens(response.usage.inputTokens, response.usage.outputTokens);
+      }
+
+      messages.push({ role: "assistant", content: response.content });
+
+      const toolBlocks = response.content.filter(
+        (b): b is { type: "tool_use"; id: string; name: string; input: Record<string, unknown> } =>
+          b.type === "tool_use"
+      );
+
+      if (toolBlocks.length === 0 || response.stopReason !== "tool_use") {
+        logger.debug(`[${tag}] Tool loop completed after ${iteration} iterations`);
+        break;
+      }
+
+      // Let subclass intercept specific tool calls (e.g., submit_analysis)
+      if (onToolCall) {
+        const intercept = onToolCall(toolBlocks);
+        if (intercept && intercept.intercept) {
+          return { messages, iterations: iteration, lastResponse: response.content };
+        }
+      }
+
+      // Execute remaining tools
+      const toolResults: ContentBlock[] = [];
+      for (const toolBlock of toolBlocks) {
+        metrics.recordToolCall();
+        logger.info(`[${tag}] Executing tool: ${toolBlock.name}`);
+        const result = await executeTool(
+          toolBlock.name,
+          toolBlock.input,
+          this.taskContext.reader,
+          this.taskContext.runner,
+          this.taskContext.testOutputPath,
+          this.taskContext.codebasePath,
+        );
+        toolResults.push({
+          type: "tool_result",
+          toolUseId: toolBlock.id,
+          content: result,
+        });
+      }
+
+      messages.push({ role: "user", content: toolResults });
+    }
+
+    if (iteration >= maxIterations) {
+      logger.warn(`[${tag}] Tool loop hit max iterations (${maxIterations})`);
+    }
+
+    return { messages, iterations: iteration };
   }
 }

@@ -8,7 +8,7 @@ import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers
 import { AGENT_NAMES } from "../utils/agent_names.js";
 import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL, MESSAGE_TYPE, AGENT_EVENT, CORE_AGENT_NAMES } from "../utils/constants.js";
 import { createAgentTools, executeTool } from "../utils/tools.js";
-import type { ToolDefinition, ChatMessage, ContentBlock } from "../providers/types.js";
+import type { ToolDefinition } from "../providers/types.js";
 
 export class AgentTestsGenerator extends BaseAgent {
   constructor(state: AgentState, taskContext: import("../core/base_agent.js").TaskContext) {
@@ -238,6 +238,17 @@ Use the write_test_file tool to save the test as "${testFilename}".`;
       }
 
       this.recordStep("generate_tests", `Generated ${testFilename}`, "next");
+
+      // Self-reflect on the generated tests
+      if (state.testContent) {
+        const reflection = await this.reflect(state.testContent);
+        this.recordReflection(reflection, state);
+
+        if (reflection.shouldRevise) {
+          logger.warn(`[AgentTestsGenerator] Reflection suggests revision (score: ${reflection.score}): ${reflection.weaknesses.join(", ")}`);
+        }
+      }
+
       this.updateStatus(AGENT_STATUS.COMPLETED);
     } catch (err) {
       logger.error(`[AgentTestsGenerator] Test generation failed: ${err}`);
@@ -254,7 +265,6 @@ Use the write_test_file tool to save the test as "${testFilename}".`;
   }
 
   private async runGeneration(userMessage: string): Promise<void> {
-    const provider = getTaskProvider(AGENT_NAMES.AGENT_TESTS_GENERATOR, this.state.agentConfig);
     logger.task(AGENT_NAMES.AGENT_TESTS_GENERATOR, `${getTaskProviderName(AGENT_NAMES.AGENT_TESTS_GENERATOR, this.state.agentConfig)}/${getTaskModel(AGENT_NAMES.AGENT_TESTS_GENERATOR, this.state.agentConfig)}`);
 
     const systemPrompt = AgentTestsGenerator.buildSystemPrompt();
@@ -262,71 +272,12 @@ Use the write_test_file tool to save the test as "${testFilename}".`;
     
     logger.info(`[AgentTestsGenerator] Available tools: ${tools.map(t => t.name).join(', ')}`);
     
-    // Agentic tool-use loop
-    const messages: ChatMessage[] = [
-      { role: "user", content: userMessage },
-    ];
-    
-    const maxIterations = this.state.maxIterations ?? 50;
-    let iteration = 0;
-    
-    while (iteration < maxIterations) {
-      iteration++;
-      logger.debug(`[AgentTestsGenerator] Tool loop iteration ${iteration}`);
-      
-      const response = await provider.chat({
-        system: systemPrompt,
-        messages,
-        tools,
-        maxTokens: this.state.agentConfig[AGENT_NAMES.AGENT_TESTS_GENERATOR]?.maxTokens,
-        temperature: this.state.agentConfig[AGENT_NAMES.AGENT_TESTS_GENERATOR]?.temperature,
-      });
-
-      // Add assistant response to history
-      messages.push({ role: "assistant", content: response.content });
-
-      // Log response details
-      const textBlocks = response.content.filter((b): b is { type: "text"; text: string } => b.type === "text");
-      const toolBlocks = response.content.filter((b): b is { type: "tool_use"; id: string; name: string; input: Record<string, unknown> } => b.type === "tool_use");
-      
-      logger.info(`[AgentTestsGenerator] Response: ${textBlocks.length} text blocks, ${toolBlocks.length} tool blocks, stopReason: ${response.stopReason}`);
-      
-      if (textBlocks.length > 0) {
-        const textPreview = textBlocks.map(b => b.text).join('\n').slice(0, 500);
-        logger.debug(`[AgentTestsGenerator] Text preview: ${textPreview}`);
-      }
-      
-      if (toolBlocks.length > 0) {
-        logger.info(`[AgentTestsGenerator] Tool calls: ${toolBlocks.map(t => t.name).join(', ')}`);
-      }
-      
-      // If no tool calls, we're done
-      if (toolBlocks.length === 0 || response.stopReason !== "tool_use") {
-        logger.debug(`[AgentTestsGenerator] Tool loop completed after ${iteration} iterations`);
-        break;
-      }
-
-      // Execute tools and collect results
-      const toolResults: ContentBlock[] = [];
-      
-      for (const toolBlock of toolBlocks) {
-        logger.info(`[AgentTestsGenerator] Executing tool: ${toolBlock.name}`);
-        const result = await this.executeTool(toolBlock.name, toolBlock.input);
-        //logger.info(`[AgentTestsGenerator] Tool result: ${result.slice(0, 200)}`);
-        toolResults.push({
-          type: "tool_result",
-          toolUseId: toolBlock.id,
-          content: result,
-        });
-      }
-
-      // Add tool results to messages
-      messages.push({ role: "user", content: toolResults });
-    }
-
-    if (iteration >= maxIterations) {
-      logger.warn(`[AgentTestsGenerator] Tool loop hit max iterations (${maxIterations})`);
-    }
+    await this.runToolLoop({
+      systemPrompt,
+      userMessage,
+      tools,
+      agentName: AGENT_NAMES.AGENT_TESTS_GENERATOR,
+    });
   }
 
   protected getAvailableTools(): ToolDefinition[] {

@@ -1,6 +1,7 @@
 import type { AgentState, AgentName, AgentMessage, AgentPlan, PlanStep, HumanApprovalRequest } from "./state.js";
 import { BaseAgent } from "./base_agent.js";
 import { logger } from "../utils/logger.js";
+import { metrics } from "./metrics.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
 import { CORE_AGENT_NAMES, GRAPH_NODE, ROUTING_ACTION, PIPELINE_STATUS, MODE, APPROVAL_RESOLUTION, APPROVED_BY } from "../utils/constants.js";
 
@@ -51,9 +52,46 @@ export class Supervisor {
       return { action: ROUTING_ACTION.REPLAN, reason: `Agent failed: ${this.state.error || "Unknown failure"}` };
     }
 
+    // Check for replanning triggers based on reflection quality
+    const replanDecision = this.checkReplanTriggers();
+    if (replanDecision) {
+      return replanDecision;
+    }
+
     const decision = await this.determineNextAgent();
     this.recordRouting(currentAgent, decision);
     return decision;
+  }
+
+  private checkReplanTriggers(): RoutingDecision | null {
+    // Trigger replanning if average reflection score is too low
+    const allReflections = Object.values(this.state.reflectionHistory).flat();
+    if (allReflections.length >= 3) {
+      const avgScore = allReflections.reduce((sum, r) => sum + r.score, 0) / allReflections.length;
+      if (avgScore < 50) {
+        logger.warn(`[Supervisor] Low average reflection score (${avgScore.toFixed(0)}), triggering replan`);
+        return { action: ROUTING_ACTION.REPLAN, reason: `Average reflection score too low: ${avgScore.toFixed(0)}/100` };
+      }
+    }
+
+    // Trigger replanning if same error pattern repeats
+    const recentErrors = this.state.retryHistory.slice(-3).map(r => r.errors[0]?.slice(0, 100));
+    if (recentErrors.length >= 3 && new Set(recentErrors).size === 1) {
+      logger.warn(`[Supervisor] Repeated error pattern detected, triggering replan`);
+      return { action: ROUTING_ACTION.REPLAN, reason: "Same error pattern repeating across retries" };
+    }
+
+    // Trigger replanning if too many steps without progress
+    if (this.state.stepHistory.length > 10) {
+      const recentSteps = this.state.stepHistory.slice(-5);
+      const uniqueDecisions = new Set(recentSteps.map(s => s.decision));
+      if (uniqueDecisions.size === 1 && recentSteps[0].decision !== "next") {
+        logger.warn(`[Supervisor] Pipeline appears stuck, triggering replan`);
+        return { action: ROUTING_ACTION.REPLAN, reason: "Pipeline stuck in same decision pattern" };
+      }
+    }
+
+    return null;
   }
 
   private async determineNextAgent(): Promise<RoutingDecision> {
@@ -181,6 +219,7 @@ export class Supervisor {
         }
         if (retries < maxRetries) {
           this.state.retries = retries + 1;
+          metrics.recordRetry();
           logger.info(`[Supervisor] Retry ${this.state.retries}/${maxRetries}: routing back to generator with fixes`);
           return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_GENERATOR, reason: `Tests failed, retry ${this.state.retries}/${maxRetries}` };
         }
@@ -227,6 +266,7 @@ export class Supervisor {
         }
         if (retries < maxRetries) {
           this.state.retries = retries + 1;
+          metrics.recordRetry();
           logger.info(`[Supervisor] Retry ${this.state.retries}/${maxRetries}: routing back to generator with fixes`);
           return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_GENERATOR, reason: `Tests failed, retry ${this.state.retries}/${maxRetries}` };
         }

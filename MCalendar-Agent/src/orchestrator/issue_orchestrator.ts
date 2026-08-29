@@ -11,6 +11,7 @@ import { logger } from "../utils/logger.js";
 import { setDiagnosticConfig } from "../utils/diagnostic_tools.js";
 import { setDatabaseUrl } from "../utils/database_tools.js";
 import { createAgenticGraph } from "../core/graph.js";
+import { metrics } from "../core/metrics.js";
 import { createInitialAgentState } from "../core/state.js";
 import { AgentIssueAnalyzer } from "../agents/agent_issue_analyzer.js";
 import { AgentTestsGenerator } from "../agents/agent_tests_generator.js";
@@ -41,6 +42,7 @@ export interface OrchestratorConfig {
   playwrightMcpBrowser?: string;
   playwrightWorkers?: number;
   pipelineTimeoutMs?: number;
+  memoryType?: "local" | "postgres";
 }
 
 export async function processIssue(
@@ -54,6 +56,9 @@ export async function processIssue(
   const git = new GitBranch(codebasePath);
 
   const testOutputPath = path.join(testProjectPath, "tests");
+  const metricsRunId = uuidv4();
+
+  metrics.startPipeline(metricsRunId, "issue");
 
   setDiagnosticConfig({ databaseUrl: config.databaseUrl, apiBaseUrl: config.apiBaseUrl });
   setDatabaseUrl(config.databaseUrl ?? "");
@@ -114,7 +119,8 @@ export async function processIssue(
   });
 
   const graph = createAgenticGraph({
-    memoryType: "local",
+    memoryType: config.memoryType || "local",
+    databaseUrl: config.databaseUrl,
     enableCritic: true,
     enableHumanGates: !config.commitAutoApprove,
     maxParallelAgents: 3,
@@ -216,6 +222,11 @@ export async function processIssue(
   if (appServer) {
     await appServer.stop();
   }
+
+  metrics.endPipeline(
+    result.status === PIPELINE_STATUS.COMPLETED && (result.testResult?.success ?? false) ? "completed" : "failed",
+    result.error
+  );
 
   return {
     success: result.status === PIPELINE_STATUS.COMPLETED && (result.testResult?.success ?? false),

@@ -1,9 +1,9 @@
 import type { AgentState } from "../core/state.js";
-import type { ToolDefinition, ChatMessage, ContentBlock } from "../providers/types.js";
+import type { ToolDefinition } from "../providers/types.js";
 import { BaseAgent } from "../core/base_agent.js";
 import { logger } from "../utils/logger.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
-import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers/registry.js";
+import { getTaskProviderName, getTaskModel } from "../providers/registry.js";
 import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL, MESSAGE_TYPE, AGENT_EVENT, CORE_AGENT_NAMES } from "../utils/constants.js";
 import { createAgentTools, executeTool } from "../utils/tools.js";
 import { exploreAppWithMcp } from "../mcp/explore.js";
@@ -228,6 +228,14 @@ ${fileList}`;
         this.recordStep("triage_commit", analysis.scope || "tests needed", "next");
       }
 
+      // Self-reflect on the analysis quality
+      const reflection = await this.reflect(JSON.stringify(state.commitAnalysis, null, 2));
+      this.recordReflection(reflection, state);
+
+      if (reflection.shouldRevise) {
+        logger.warn(`[AgentCommitAnalyzer] Reflection suggests revision (score: ${reflection.score}): ${reflection.weaknesses.join(", ")}`);
+      }
+
       this.updateStatus(AGENT_STATUS.COMPLETED);
     } catch (err) {
       logger.error(`[AgentCommitAnalyzer] Commit analysis failed: ${err}`);
@@ -246,7 +254,6 @@ ${fileList}`;
   }
 
   private async runAnalysis(userMessage: string, mcpExploration?: string, fileExploration?: string, projectExploration?: string): Promise<NonNullable<AgentState["commitAnalysis"]>> {
-    const provider = getTaskProvider(AGENT_NAMES.AGENT_COMMIT_ANALYZER, this.state.agentConfig);
     logger.task(AGENT_NAMES.AGENT_COMMIT_ANALYZER, `${getTaskProviderName(AGENT_NAMES.AGENT_COMMIT_ANALYZER, this.state.agentConfig)}/${getTaskModel(AGENT_NAMES.AGENT_COMMIT_ANALYZER, this.state.agentConfig)}`);
 
     const systemPrompt = AgentCommitAnalyzer.buildSystemPrompt();
@@ -265,51 +272,30 @@ ${fileList}`;
     sections.push(`\nYou have baseline context above. Use tools to investigate further if needed. Call submit_commit_analysis when ready.`);
     const fullMessage = sections.join("\n");
 
-    const messages: ChatMessage[] = [{ role: "user", content: fullMessage }];
-    const maxIterations = this.state.maxIterations ?? 50;
-    let iteration = 0;
+    const { messages } = await this.runToolLoop({
+      systemPrompt,
+      userMessage: fullMessage,
+      tools,
+      agentName: AGENT_NAMES.AGENT_COMMIT_ANALYZER,
+      onToolCall: (toolBlocks) => {
+        const submitBlock = toolBlocks.find(t => t.name === "submit_commit_analysis");
+        if (submitBlock) {
+          return { intercept: true, result: submitBlock.input };
+        }
+        return { intercept: false };
+      },
+    });
 
-    while (iteration < maxIterations) {
-      iteration++;
-      logger.debug(`[AgentCommitAnalyzer] Tool loop iteration ${iteration}`);
-
-      const response = await provider.chat({
-        system: systemPrompt,
-        messages,
-        tools,
-        maxTokens: this.state.agentConfig[AGENT_NAMES.AGENT_COMMIT_ANALYZER]?.maxTokens,
-        temperature: this.state.agentConfig[AGENT_NAMES.AGENT_COMMIT_ANALYZER]?.temperature,
-      });
-
-      messages.push({ role: "assistant", content: response.content });
-
-      const toolBlocks = response.content.filter((b): b is { type: "tool_use"; id: string; name: string; input: Record<string, unknown> } => b.type === "tool_use");
-
-      if (toolBlocks.length === 0 || response.stopReason !== "tool_use") {
-        logger.debug(`[AgentCommitAnalyzer] Tool loop completed after ${iteration} iterations`);
-        break;
+    // Check if submit_commit_analysis was intercepted
+    for (const msg of messages) {
+      if (msg.role === "assistant") {
+        const toolBlocks = (Array.isArray(msg.content) ? msg.content : [])
+          .filter((b): b is { type: "tool_use"; id: string; name: string; input: Record<string, unknown> } => b.type === "tool_use");
+        const submitBlock = toolBlocks.find(t => t.name === "submit_commit_analysis");
+        if (submitBlock) {
+          return submitBlock.input as NonNullable<AgentState["commitAnalysis"]>;
+        }
       }
-
-      // Check for submit_commit_analysis call
-      const submitBlock = toolBlocks.find(t => t.name === "submit_commit_analysis");
-      if (submitBlock) {
-        logger.debug(`[AgentCommitAnalyzer] Extracted analysis from tool_use block`);
-        return submitBlock.input as NonNullable<AgentState["commitAnalysis"]>;
-      }
-
-      // Execute other tools
-      const toolResults: ContentBlock[] = [];
-      for (const toolBlock of toolBlocks) {
-        logger.info(`[AgentCommitAnalyzer] Executing tool: ${toolBlock.name}`);
-        const result = await this.executeTool(toolBlock.name, toolBlock.input);
-        toolResults.push({
-          type: "tool_result",
-          toolUseId: toolBlock.id,
-          content: result,
-        });
-      }
-
-      messages.push({ role: "user", content: toolResults });
     }
 
     // Fallback: extract from last assistant text message

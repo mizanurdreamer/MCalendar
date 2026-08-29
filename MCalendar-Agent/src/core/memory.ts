@@ -55,6 +55,10 @@ export class InMemoryStore implements MemoryStore {
   }
 }
 
-export function createMemoryStore(type: "local" = "local"): MemoryStore {
+export function createMemoryStore(type: "local" | "postgres" = "local", databaseUrl?: string): MemoryStore {
+  if (type === "postgres") {
+    const { PostgresMemoryStore } = require("./postgres_memory.js");
+    return new PostgresMemoryStore(databaseUrl);
+  }
   return new InMemoryStore();
 }

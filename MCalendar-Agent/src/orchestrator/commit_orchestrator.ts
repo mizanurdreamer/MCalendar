@@ -11,6 +11,7 @@ import { logger } from "../utils/logger.js";
 import { setDiagnosticConfig } from "../utils/diagnostic_tools.js";
 import { setDatabaseUrl } from "../utils/database_tools.js";
 import { createAgenticGraph } from "../core/graph.js";
+import { metrics } from "../core/metrics.js";
 import { createInitialAgentState } from "../core/state.js";
 import { AgentCommitAnalyzer } from "../agents/agent_commit_analyzer.js";
 import { AgentTestsGenerator } from "../agents/agent_tests_generator.js";
@@ -41,6 +42,7 @@ export interface CommitOrchestratorConfig {
   playwrightMcpBrowser?: string;
   playwrightWorkers?: number;
   pipelineTimeoutMs?: number;
+  memoryType?: "local" | "postgres";
 }
 
 export async function processCommit(
@@ -53,6 +55,9 @@ export async function processCommit(
   const runner = new PlaywrightRunner(testProjectPath, config.playwrightWorkers ?? 6);
   const git = new GitBranch(codebasePath);
   const testOutputPath = path.join(testProjectPath, "tests");
+  const metricsRunId = uuidv4();
+
+  metrics.startPipeline(metricsRunId, "commit");
 
   setDiagnosticConfig({ databaseUrl: config.databaseUrl, apiBaseUrl: config.apiBaseUrl });
   setDatabaseUrl(config.databaseUrl ?? "");
@@ -110,7 +115,8 @@ export async function processCommit(
   });
 
   const graph = createAgenticGraph({
-    memoryType: "local",
+    memoryType: config.memoryType || "local",
+    databaseUrl: config.databaseUrl,
     enableCritic: true,
     enableHumanGates: !config.commitAutoApprove,
     maxParallelAgents: 3,
@@ -225,6 +231,11 @@ export async function processCommit(
   if (appServer) {
     await appServer.stop();
   }
+
+  metrics.endPipeline(
+    result.status === PIPELINE_STATUS.COMPLETED && (result.testResult?.success ?? false) ? "completed" : "failed",
+    result.error
+  );
 
   return {
     success: result.status === PIPELINE_STATUS.COMPLETED && (result.testResult?.success ?? false),

@@ -47,6 +47,7 @@ export interface AppConfig {
   playwrightMcpEnabled: boolean;
   playwrightMcpBrowser: string;
   playwrightWorkers: number;
+  memoryType: "local" | "postgres";
 }
 
 export function loadConfig(): AppConfig {
@@ -138,5 +139,6 @@ export function loadConfig(): AppConfig {
     playwrightMcpEnabled: (process.env.PLAYWRIGHT_MCP_ENABLED ?? "false").toLowerCase() === "true",
     playwrightMcpBrowser: process.env.PLAYWRIGHT_MCP_BROWSER ?? "chromium",
     playwrightWorkers: parseInt(process.env.PLAYWRIGHT_WORKERS ?? "6", 10),
+    memoryType: (process.env.MEMORY_TYPE ?? "local") as "local" | "postgres",
   };
 }

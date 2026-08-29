@@ -75,6 +75,7 @@ program
         commitAutoApprove: config.commitAutoApprove,
         playwrightMcpEnabled: config.playwrightMcpEnabled,
         playwrightMcpBrowser: config.playwrightMcpBrowser,
+        memoryType: config.memoryType,
       };
 
       const result = await processIssue(issue, orchestratorConfig);
@@ -124,6 +125,7 @@ program
         commitAutoApprove: config.commitAutoApprove,
         playwrightMcpEnabled: config.playwrightMcpEnabled,
         playwrightMcpBrowser: config.playwrightMcpBrowser,
+        memoryType: config.memoryType,
       };
 
       const result = await processCommit(diff, orchestratorConfig);
@@ -338,6 +340,7 @@ retryCmd
         commitAutoApprove: config.commitAutoApprove,
         playwrightMcpEnabled: config.playwrightMcpEnabled,
         playwrightMcpBrowser: config.playwrightMcpBrowser,
+        memoryType: config.memoryType,
       };
 
       const result = await processIssue(issue, orchestratorConfig);
@@ -393,6 +396,7 @@ retryCmd
         commitAutoApprove: config.commitAutoApprove,
         playwrightMcpEnabled: config.playwrightMcpEnabled,
         playwrightMcpBrowser: config.playwrightMcpBrowser,
+        memoryType: config.memoryType,
       };
 
       const result = await processCommit(diff, orchestratorConfig);

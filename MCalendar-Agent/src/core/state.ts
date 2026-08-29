@@ -67,7 +67,7 @@ export interface AgentMessage {
 
 export interface MemoryEntry {
   id: string;
-  type: "code_pattern" | "test_pattern" | "issue_solution" | "error_fix" | "project_context" | "decision";
+  type: "code_pattern" | "test_pattern" | "issue_solution" | "error_fix" | "project_context" | "decision" | "lesson_learned";
   embedding?: number[];
   content: string;
   metadata: {
@@ -78,6 +78,7 @@ export interface MemoryEntry {
     timestamp: number;
     relatedIssue?: number;
     relatedCommit?: string;
+    source?: string;
   };
 }
 

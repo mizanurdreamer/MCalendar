@@ -3,6 +3,7 @@ import type { AgentState, AgentName, AgentPlan, ReflectionResult } from "./state
 import { Supervisor } from "./supervisor.js";
 import { BaseAgent } from "./base_agent.js";
 import { AgentCritic } from "./agent_critic.js";
+import { metrics } from "./metrics.js";
 import { AdvancedPlanner, type CriticFeedback } from "./planner.js";
 import { createMemoryStore, type MemoryStore } from "./memory.js";
 import { MessageBus } from "./message_bus.js";
@@ -12,7 +13,8 @@ import { AGENT_NAMES } from "../utils/agent_names.js";
 import { CORE_AGENT_NAMES, GRAPH_NODE, MODE, PIPELINE_STATUS, ROUTING_ACTION } from "../utils/constants.js";
 
 export interface AgenticGraphConfig {
-  memoryType: "local";
+  memoryType: "local" | "postgres";
+  databaseUrl?: string;
   enableCritic: boolean;
   enableHumanGates: boolean;
   maxParallelAgents: number;
@@ -86,7 +88,7 @@ export class AgenticGraph {
       ...config,
     };
     
-    this.memoryStore = createMemoryStore(this.config.memoryType);
+    this.memoryStore = createMemoryStore(this.config.memoryType, this.config.databaseUrl);
     this.messageBus = new MessageBus();
     this.graph = this.buildGraph();
   }
@@ -295,6 +297,8 @@ export class AgenticGraph {
         return { status: PIPELINE_STATUS.FAILED, error: `Agent not found: ${agentName}`, currentAgent: CORE_AGENT_NAMES.SUPERVISOR };
       }
 
+      metrics.startAgent(agentName);
+
       try {
         this.stepCounter++;
         
@@ -312,16 +316,30 @@ export class AgenticGraph {
             });
             
             if (revised && result.shouldRevise) {
-              if (agentName === AGENT_NAMES.AGENT_TESTS_GENERATOR) newState.testContent = revised;
+              if (agentName === AGENT_NAMES.AGENT_TESTS_GENERATOR) {
+                newState.testContent = revised;
+                // Write verified revision to disk
+                if (newState.testFilename && newState.testOutputPath) {
+                  const fs = await import("node:fs");
+                  const path = await import("node:path");
+                  const fullPath = path.join(newState.testOutputPath, newState.testFilename);
+                  const dir = path.dirname(fullPath);
+                  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+                  fs.writeFileSync(fullPath, revised, "utf-8");
+                  logger.info(`[Graph] Critic revision written to tests/${newState.testFilename}`);
+                }
+              }
               else if (agentName === AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR) newState.report = revised;
               else if (agentName === AGENT_NAMES.AGENT_SUMMARIZE) newState.summary = revised;
             }
           }
         }
 
+        metrics.endAgent(true);
         const changes = this.extractStateChanges(state, newState);
         return { ...changes, currentAgent: CORE_AGENT_NAMES.SUPERVISOR };
       } catch (err) {
+        metrics.endAgent(false, String(err));
         return { 
           status: PIPELINE_STATUS.FAILED, 
           error: `Agent ${agentName} failed: ${err}`,

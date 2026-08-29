@@ -32,6 +32,7 @@ export interface WatcherConfig {
   commitAutoApprove?: boolean;
   playwrightMcpEnabled?: boolean;
   playwrightMcpBrowser?: string;
+  memoryType?: "local" | "postgres";
 }
 
 export async function startWatcher(config: WatcherConfig): Promise<void> {
@@ -66,6 +67,7 @@ export async function startWatcher(config: WatcherConfig): Promise<void> {
     commitAutoApprove: config.commitAutoApprove,
     playwrightMcpEnabled: config.playwrightMcpEnabled,
     playwrightMcpBrowser: config.playwrightMcpBrowser,
+    memoryType: config.memoryType,
   };
 
   let targetBranch = watchBranch ?? "";
@@ -106,6 +108,7 @@ export async function startWatcher(config: WatcherConfig): Promise<void> {
         databaseUrl: config.databaseUrl,
         apiBaseUrl: config.apiBaseUrl,
         commitAutoApprove: config.commitAutoApprove,
+        memoryType: config.memoryType,
       };
       const result = await processCommit(diff, commitConfig);
       commitState.updateAfterProcessing(diff.sha, {

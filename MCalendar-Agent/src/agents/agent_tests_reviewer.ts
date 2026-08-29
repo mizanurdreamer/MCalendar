@@ -6,7 +6,7 @@ import { AGENT_NAMES } from "../utils/agent_names.js";
 import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL, MESSAGE_TYPE, AGENT_EVENT, CORE_AGENT_NAMES } from "../utils/constants.js";
 import { createAgentTools, executeTool } from "../utils/tools.js";
 import { isMcpTool, callMcpTool, isMcpAlive } from "../mcp/client.js";
-import type { ToolDefinition, ChatMessage, ContentBlock } from "../providers/types.js";
+import type { ToolDefinition } from "../providers/types.js";
 
 export class AgentTestsReviewer extends BaseAgent {
   constructor(state: AgentState, taskContext: import("../core/base_agent.js").TaskContext) {
@@ -151,6 +151,16 @@ Return the fixed test file content via write_test_file tool.`;
       }
 
       this.recordStep("review_fix", `Fixed ${testFilename} (attempt ${state.retries}), re-run: ${newTestResult.success ? "passed" : "failed"}`, "next");
+
+      // Self-reflect on the fix quality
+      const reflectionOutput = `Fixed test: ${testFilename}\nAttempt: ${state.retries}\nResult: ${newTestResult.success ? "PASSING" : "FAILING"}\nErrors remaining: ${newTestResult.errors.length}`;
+      const reflection = await this.reflect(reflectionOutput);
+      this.recordReflection(reflection, state);
+
+      if (reflection.shouldRevise) {
+        logger.warn(`[AgentTestsReviewer] Reflection suggests revision (score: ${reflection.score}): ${reflection.weaknesses.join(", ")}`);
+      }
+
       this.updateStatus(AGENT_STATUS.COMPLETED);
     } catch (err) {
       logger.error(`[AgentTestsReviewer] Test review failed: ${err}`);
@@ -353,7 +363,6 @@ Analyze the errors and provide a fix plan.`;
       return;
     }
     
-    const provider = getTaskProvider(AGENT_NAMES.AGENT_TESTS_REVIEWER, this.state.agentConfig);
     logger.task(AGENT_NAMES.AGENT_TESTS_REVIEWER, `${getTaskProviderName(AGENT_NAMES.AGENT_TESTS_REVIEWER, this.state.agentConfig)}/${getTaskModel(AGENT_NAMES.AGENT_TESTS_REVIEWER, this.state.agentConfig)}`);
 
     const systemPrompt = AgentTestsReviewer.buildSystemPrompt();
@@ -361,58 +370,12 @@ Analyze the errors and provide a fix plan.`;
 
     const userMessage = `Fix the test based on this analysis:\n\n${analysis}\n\nTest file: ${testFilename}\nCurrent content:\n${testContent}\n\nErrors:\n${testResult.errors.join("\n\n")}\n\nUse write_test_file to save the fixed test.`;
 
-    // Agentic tool-use loop
-    const messages: ChatMessage[] = [
-      { role: "user", content: userMessage },
-    ];
-    
-    const maxIterations = this.state.maxIterations ?? 50;
-    let iteration = 0;
-    
-    while (iteration < maxIterations) {
-      iteration++;
-      logger.debug(`[AgentTestsReviewer] Tool loop iteration ${iteration}`);
-      
-      const response = await provider.chat({
-        system: systemPrompt,
-        messages,
-        tools,
-        maxTokens: this.state.agentConfig[AGENT_NAMES.AGENT_TESTS_REVIEWER]?.maxTokens,
-        temperature: this.state.agentConfig[AGENT_NAMES.AGENT_TESTS_REVIEWER]?.temperature,
-      });
-
-      // Add assistant response to history
-      messages.push({ role: "assistant", content: response.content });
-
-      // Extract tool_use blocks
-      const toolBlocks = response.content.filter((b): b is { type: "tool_use"; id: string; name: string; input: Record<string, unknown> } => b.type === "tool_use");
-      
-      // If no tool calls, we're done
-      if (toolBlocks.length === 0 || response.stopReason !== "tool_use") {
-        logger.debug(`[AgentTestsReviewer] Tool loop completed after ${iteration} iterations`);
-        break;
-      }
-
-      // Execute tools and collect results
-      const toolResults: ContentBlock[] = [];
-      
-      for (const toolBlock of toolBlocks) {
-        logger.debug(`[AgentTestsReviewer] Executing tool: ${toolBlock.name}`);
-        const result = await this.executeTool(toolBlock.name, toolBlock.input);
-        toolResults.push({
-          type: "tool_result",
-          toolUseId: toolBlock.id,
-          content: result,
-        });
-      }
-
-      // Add tool results to messages
-      messages.push({ role: "user", content: toolResults });
-    }
-
-    if (iteration >= maxIterations) {
-      logger.warn(`[AgentTestsReviewer] Tool loop hit max iterations (${maxIterations})`);
-    }
+    await this.runToolLoop({
+      systemPrompt,
+      userMessage,
+      tools,
+      agentName: AGENT_NAMES.AGENT_TESTS_REVIEWER,
+    });
   }
 
   protected getAvailableTools(): ToolDefinition[] {
