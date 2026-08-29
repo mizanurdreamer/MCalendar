@@ -13,6 +13,7 @@ import { setDatabaseUrl } from "../utils/database_tools.js";
 import { createAgenticGraph } from "../core/graph.js";
 import { metrics } from "../core/metrics.js";
 import { createInitialAgentState } from "../core/state.js";
+import { registerAllTools } from "../core/register_tools.js";
 import { AgentCommitAnalyzer } from "../agents/agent_commit_analyzer.js";
 import { AgentTestsGenerator } from "../agents/agent_tests_generator.js";
 import { AgentTestsReviewer } from "../agents/agent_tests_reviewer.js";
@@ -56,6 +57,9 @@ export async function processCommit(
   const runner = new PlaywrightRunner(testProjectPath, config.playwrightWorkers ?? 6);
   const git = new GitBranch(codebasePath);
   const testOutputPath = path.join(testProjectPath, "tests");
+
+  // Initialize tool registry
+  registerAllTools(reader, runner, codebasePath, testProjectPath, testOutputPath);
   const metricsRunId = uuidv4();
 
   metrics.startPipeline(metricsRunId, "commit");

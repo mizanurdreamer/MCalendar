@@ -5,7 +5,7 @@ import { logger } from "../utils/logger.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
 import { getTaskProviderName, getTaskModel } from "../providers/registry.js";
 import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL, MESSAGE_TYPE, AGENT_EVENT, CORE_AGENT_NAMES } from "../utils/constants.js";
-import { createAgentTools, executeTool } from "../utils/tools.js";
+import { getToolRegistry } from "../core/tool_registry.js";
 import { exploreAppWithMcp } from "../mcp/explore.js";
 
 const SUBMIT_COMMIT_ANALYSIS_TOOL: ToolDefinition = {
@@ -99,11 +99,15 @@ When you have enough information, call submit_commit_analysis with your complete
   }
 
   protected getAvailableTools(): ToolDefinition[] {
-    return createAgentTools(this.taskContext.reader, this.taskContext.runner, this.taskContext.codebasePath);
+    return getToolRegistry().getByRole("commit_analyzer");
   }
 
   private async executeTool(name: string, input: Record<string, unknown>): Promise<string> {
-    return executeTool(name, input, this.taskContext.reader, this.taskContext.runner, this.taskContext.testOutputPath, this.taskContext.codebasePath);
+    return getToolRegistry().execute(name, input, {
+      codebasePath: this.taskContext.codebasePath,
+      testOutputPath: this.taskContext.testOutputPath,
+      testProjectPath: this.taskContext.testOutputPath,
+    });
   }
 
   private async exploreChangedFiles(files: { filename: string }[]): Promise<string> {
