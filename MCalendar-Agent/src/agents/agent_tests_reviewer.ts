@@ -134,7 +134,23 @@ Return the fixed test file content via write_test_file tool.`;
         logger.success(`[AgentTestsReviewer] Fix applied to ${testFilename}`);
       }
 
-      this.recordStep("review_fix", `Fixed ${testFilename} (attempt ${state.retries})`, "goto:run_tests");
+      // Re-run tests after fixing to validate the fix
+      logger.info(`[AgentTestsReviewer] Re-running tests after fix: ${testFilename}`);
+      const newTestResult = this.taskContext.runner.run(testFilename);
+      state.testResult = newTestResult;
+
+      if (newTestResult.success) {
+        logger.success(`[AgentTestsReviewer] Tests now passing: ${newTestResult.passed}/${newTestResult.total}`);
+      } else {
+        logger.warn(`[AgentTestsReviewer] Tests still failing after fix: ${newTestResult.passed} passed, ${newTestResult.failed} failed`);
+        if (newTestResult.errors.length > 0) {
+          for (let i = 0; i < newTestResult.errors.length; i++) {
+            logger.error(`  ${i + 1}. ${newTestResult.errors[i].slice(0, 300)}`);
+          }
+        }
+      }
+
+      this.recordStep("review_fix", `Fixed ${testFilename} (attempt ${state.retries}), re-run: ${newTestResult.success ? "passed" : "failed"}`, "next");
       this.updateStatus(AGENT_STATUS.COMPLETED);
     } catch (err) {
       logger.error(`[AgentTestsReviewer] Test review failed: ${err}`);

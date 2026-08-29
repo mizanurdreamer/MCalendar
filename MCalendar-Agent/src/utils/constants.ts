@@ -45,6 +45,7 @@ export const GRAPH_NODE = {
   SUPERVISOR: "supervisor",
   CRITIC: "critic",
   HUMAN_APPROVAL: "human_approval",
+  RUN_TESTS: "run_tests",
 } as const;
 
 // --- Run Mode ---

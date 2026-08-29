@@ -99,6 +99,7 @@ export class AgenticGraph {
     workflow.addNode(AGENT_NAMES.AGENT_ISSUE_ANALYZER, this.agentNode(AGENT_NAMES.AGENT_ISSUE_ANALYZER));
     workflow.addNode(AGENT_NAMES.AGENT_COMMIT_ANALYZER, this.agentNode(AGENT_NAMES.AGENT_COMMIT_ANALYZER));
     workflow.addNode(AGENT_NAMES.AGENT_TESTS_GENERATOR, this.agentNode(AGENT_NAMES.AGENT_TESTS_GENERATOR));
+    workflow.addNode(GRAPH_NODE.RUN_TESTS, this.runTestsNode.bind(this));
     workflow.addNode(AGENT_NAMES.AGENT_TESTS_REVIEWER, this.agentNode(AGENT_NAMES.AGENT_TESTS_REVIEWER));
     workflow.addNode(AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, this.agentNode(AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR));
     workflow.addNode(AGENT_NAMES.AGENT_SUMMARIZE, this.agentNode(AGENT_NAMES.AGENT_SUMMARIZE));
@@ -128,6 +129,7 @@ export class AgenticGraph {
       [AGENT_NAMES.AGENT_SUMMARIZE]: AGENT_NAMES.AGENT_SUMMARIZE,
       [GRAPH_NODE.CRITIC]: GRAPH_NODE.CRITIC,
       [GRAPH_NODE.HUMAN_APPROVAL]: GRAPH_NODE.HUMAN_APPROVAL,
+      [GRAPH_NODE.RUN_TESTS]: GRAPH_NODE.RUN_TESTS,
       [END]: END,
     } as any);
 
@@ -142,6 +144,9 @@ export class AgenticGraph {
     ] as AgentName[]) {
       workflow.addEdge(agentName as any, GRAPH_NODE.SUPERVISOR as any);
     }
+
+    // runTests returns to supervisor
+    workflow.addEdge(GRAPH_NODE.RUN_TESTS as any, GRAPH_NODE.SUPERVISOR as any);
 
     // Critic returns to supervisor
     workflow.addEdge(GRAPH_NODE.CRITIC as any, GRAPH_NODE.SUPERVISOR as any);
@@ -446,6 +451,47 @@ export class AgenticGraph {
     }
 
     return { status: PIPELINE_STATUS.FAILED, error: `Human rejected: ${pending.title}`, currentAgent: CORE_AGENT_NAMES.SUPERVISOR, humanApprovals: updatedApprovals };
+  }
+
+  private async runTestsNode(state: AgentState): Promise<Partial<AgentState>> {
+    const testFilename = state.testFilename;
+    if (!testFilename) {
+      logger.error(`[runTests] No test filename in state`);
+      return { status: PIPELINE_STATUS.FAILED, error: "No test filename", currentAgent: CORE_AGENT_NAMES.SUPERVISOR };
+    }
+
+    logger.info(`[runTests] Running tests: ${testFilename}`);
+
+    try {
+      const runner = state.runner;
+      if (!runner) {
+        logger.error(`[runTests] No test runner available`);
+        return { status: PIPELINE_STATUS.FAILED, error: "No test runner available", currentAgent: CORE_AGENT_NAMES.SUPERVISOR };
+      }
+
+      const testResult = runner.run(testFilename);
+      state.testResult = testResult;
+
+      if (testResult.success) {
+        logger.success(`[runTests] Tests passed: ${testResult.passed}/${testResult.total}`);
+      } else {
+        logger.warn(`[runTests] Tests failed: ${testResult.passed} passed, ${testResult.failed} failed`);
+        if (testResult.errors.length > 0) {
+          for (let i = 0; i < testResult.errors.length; i++) {
+            logger.error(`  ${i + 1}. ${testResult.errors[i].slice(0, 300)}`);
+          }
+        }
+      }
+
+      if (testResult.htmlReportPath) {
+        logger.info(`[runTests] HTML report: ${testResult.htmlReportPath}`);
+      }
+
+      return { testResult, currentAgent: CORE_AGENT_NAMES.SUPERVISOR };
+    } catch (err) {
+      logger.error(`[runTests] Test execution failed: ${err}`);
+      return { status: PIPELINE_STATUS.FAILED, error: `Test execution failed: ${err}`, currentAgent: CORE_AGENT_NAMES.SUPERVISOR };
+    }
   }
 
   private extractStateChanges(oldState: AgentState, newState: AgentState): Partial<AgentState> {

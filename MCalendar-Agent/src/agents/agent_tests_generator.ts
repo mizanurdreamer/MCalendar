@@ -129,7 +129,7 @@ You MUST use the write_test_file and append_test_file tools to save your test.`;
 
     state.testFilename = testFilename;
 
-    // RETRY CASE: If reviewer already fixed the test content, write it directly and run
+    // RETRY CASE: If reviewer already fixed the test content, write it directly
     if (state.retries > 0 && state.testContent) {
       logger.info(`[AgentTestsGenerator] Retry ${state.retries}: Using fixed test content from reviewer`);
       logger.info(`[AgentTestsGenerator] Previous test file: ${testFilename}`);
@@ -148,24 +148,7 @@ You MUST use the write_test_file and append_test_file tools to save your test.`;
       fs.writeFileSync(fullPath, state.testContent, "utf-8");
       logger.success(`[AgentTestsGenerator] Fixed test file written: tests/${testFilename}`);
       
-      // Run the fixed tests
-      logger.info(`[AgentTestsGenerator] Running fixed tests: ${testFilename}`);
-      const testResult = this.taskContext.runner.run(testFilename);
-      state.testResult = testResult;
-      
-      if (testResult.success) {
-        logger.success(`[AgentTestsGenerator] ✓ Fixed tests passed: ${testResult.passed}/${testResult.total}`);
-      } else {
-        logger.warn(`[AgentTestsGenerator] Fixed test results: ${testResult.passed} passed, ${testResult.failed} failed (${testResult.total} total)`);
-        if (testResult.errors.length > 0) {
-          logger.info(`[AgentTestsGenerator] Failed test details:`);
-          for (let i = 0; i < testResult.errors.length; i++) {
-            logger.error(`  ${i + 1}. ${testResult.errors[i].slice(0, 300)}`);
-          }
-        }
-      }
-      
-      this.recordStep("generate_tests", `Ran fixed tests: ${testFilename}`, "next");
+      this.recordStep("generate_tests", `Wrote fixed tests: ${testFilename}`, "next");
       this.updateStatus(AGENT_STATUS.COMPLETED);
       return state;
     }
@@ -250,31 +233,6 @@ Use the write_test_file tool to save the test as "${testFilename}".`;
             logger.info(`    ${i + 1}. ${testNames[i]}`);
           }
         }
-        
-        // Run the tests
-        logger.info(`[AgentTestsGenerator] Running tests: ${testFilename}`);
-        const testResult = this.taskContext.runner.run(testFilename);
-        state.testResult = testResult;
-        
-        // Log detailed test results
-        if (testResult.success) {
-          logger.success(`[AgentTestsGenerator] ✓ All tests passed: ${testResult.passed}/${testResult.total}`);
-        } else {
-          logger.warn(`[AgentTestsGenerator] Test results: ${testResult.passed} passed, ${testResult.failed} failed (${testResult.total} total)`);
-          
-          // Log failed test details
-          if (testResult.errors.length > 0) {
-            logger.info(`[AgentTestsGenerator] Failed test details:`);
-            for (let i = 0; i < testResult.errors.length; i++) {
-              logger.error(`  ${i + 1}. ${testResult.errors[i].slice(0, 300)}`);
-            }
-          }
-        }
-        
-        // Log HTML report path
-        if (testResult.htmlReportPath) {
-          logger.info(`[AgentTestsGenerator] HTML report: ${testResult.htmlReportPath}`);
-        }
       } else {
         logger.error(`[AgentTestsGenerator] Failed to create test file: tests/${testFilename}`);
       }
@@ -288,11 +246,8 @@ Use the write_test_file tool to save the test as "${testFilename}".`;
     }
 
     this.sendMessage(CORE_AGENT_NAMES.SUPERVISOR, MESSAGE_TYPE.NOTIFICATION, {
-      event: state.testResult?.success ? AGENT_EVENT.TESTS_GENERATED : AGENT_EVENT.TESTS_FAILED,
+      event: AGENT_EVENT.TESTS_GENERATED,
       filename: testFilename,
-      passed: state.testResult?.passed ?? 0,
-      failed: state.testResult?.failed ?? 0,
-      total: state.testResult?.total ?? 0,
     });
 
     return state;

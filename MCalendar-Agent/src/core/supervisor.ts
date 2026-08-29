@@ -2,7 +2,7 @@ import type { AgentState, AgentName, AgentMessage, AgentPlan, PlanStep, HumanApp
 import { BaseAgent } from "./base_agent.js";
 import { logger } from "../utils/logger.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
-import { CORE_AGENT_NAMES, ROUTING_ACTION, PIPELINE_STATUS, MODE, APPROVAL_RESOLUTION, APPROVED_BY } from "../utils/constants.js";
+import { CORE_AGENT_NAMES, GRAPH_NODE, ROUTING_ACTION, PIPELINE_STATUS, MODE, APPROVAL_RESOLUTION, APPROVED_BY } from "../utils/constants.js";
 
 export type RoutingDecision = 
   | { action: typeof ROUTING_ACTION.ROUTE; nextAgent: AgentName; reason: string; planStep?: PlanStep }
@@ -170,7 +170,10 @@ export class Supervisor {
         return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_GENERATOR, reason: "Generate tests from analysis" };
 
       case AGENT_NAMES.AGENT_TESTS_GENERATOR:
-        return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_REVIEWER, reason: "Review generated tests" };
+        return { action: ROUTING_ACTION.ROUTE, nextAgent: GRAPH_NODE.RUN_TESTS as AgentName, reason: "Run generated tests" };
+
+      case GRAPH_NODE.RUN_TESTS as AgentName:
+        return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_REVIEWER, reason: "Review test results" };
 
       case AGENT_NAMES.AGENT_TESTS_REVIEWER:
         if (testResult?.success) {
@@ -181,7 +184,7 @@ export class Supervisor {
           logger.info(`[Supervisor] Retry ${this.state.retries}/${maxRetries}: routing back to generator with fixes`);
           return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_GENERATOR, reason: `Tests failed, retry ${this.state.retries}/${maxRetries}` };
         }
-        return { action: ROUTING_ACTION.PARALLEL, agents: [AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, AGENT_NAMES.AGENT_SUMMARIZE], reason: "Max retries reached, generate report and summarize in parallel" };
+        return { action: ROUTING_ACTION.FAIL, reason: `Tests failed after ${maxRetries} retries` };
 
       case AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR:
         return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_SUMMARIZE, reason: "Report generated, summarize" };
@@ -213,7 +216,10 @@ export class Supervisor {
         return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_GENERATOR, reason: "Generate tests for commit changes" };
 
       case AGENT_NAMES.AGENT_TESTS_GENERATOR:
-        return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_REVIEWER, reason: "Review generated tests" };
+        return { action: ROUTING_ACTION.ROUTE, nextAgent: GRAPH_NODE.RUN_TESTS as AgentName, reason: "Run generated tests" };
+
+      case GRAPH_NODE.RUN_TESTS as AgentName:
+        return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_REVIEWER, reason: "Review test results" };
 
       case AGENT_NAMES.AGENT_TESTS_REVIEWER:
         if (testResult?.success) {
@@ -224,7 +230,7 @@ export class Supervisor {
           logger.info(`[Supervisor] Retry ${this.state.retries}/${maxRetries}: routing back to generator with fixes`);
           return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_GENERATOR, reason: `Tests failed, retry ${this.state.retries}/${maxRetries}` };
         }
-        return { action: ROUTING_ACTION.PARALLEL, agents: [AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, AGENT_NAMES.AGENT_SUMMARIZE], reason: "Max retries reached, generate report and summarize in parallel" };
+        return { action: ROUTING_ACTION.FAIL, reason: `Tests failed after ${maxRetries} retries` };
 
       case AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR:
         return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_SUMMARIZE, reason: "Report generated, summarize" };

@@ -38,151 +38,7 @@ export abstract class BaseAgent {
 
   abstract getGoal(): string;
   abstract getDefaultPlan(): AgentPlan;
-
-  async run(inputState?: AgentState): Promise<AgentState> {
-    // Use provided state or fall back to internal state (for backwards compatibility)
-    const state = inputState || this.state;
-    
-    this.updateStatus(AGENT_STATUS.PLANNING, state);
-    
-    const plan = await this.generatePlan(state);
-    state.plans[this.agentName] = plan;
-    
-    if (plan.riskLevel === RISK_LEVEL.HIGH || plan.riskLevel === RISK_LEVEL.MEDIUM) {
-      const approved = await this.requestHumanApproval(plan, state);
-      if (!approved) {
-        // Approval pending - return early with awaiting_human status
-        // The graph will interrupt and resume after approval
-        state.status = PIPELINE_STATUS.AWAITING_HUMAN;
-        this.updateStatus(AGENT_STATUS.AWAITING_APPROVAL, state);
-        return state;
-      }
-    }
-
-    this.updateStatus(AGENT_STATUS.EXECUTING, state);
-    const result = await this.executePlan(plan, state);
-    
-    this.updateStatus(AGENT_STATUS.REFLECTING, state);
-    const reflection = await this.reflect(result);
-    this.recordReflection(reflection, state);
-    
-    if (reflection.shouldRevise && reflection.revisedOutput) {
-      logger.info(`[${this.agentName}] Self-correction applied`);
-    }
-
-    this.updateStatus(AGENT_STATUS.COMPLETED, state);
-    return state;
-  }
-
-  protected async generatePlan(state: AgentState): Promise<AgentPlan> {
-    const defaultPlan = this.getDefaultPlan();
-    
-    const tools = await this.getAvailableTools();
-    
-    const planningPrompt = `You are a planner for the ${this.agentName} agent.
-Goal: ${this.getGoal()}
-
-Current context:
-- Mode: ${state.mode}
-- Project: ${state.projectName}
-- ${state.mode === MODE.ISSUE ? `Issue: #${state.issue?.number} - ${state.issue?.title}` : `Commit: ${state.commitDiff?.sha.slice(0,7)}`}
-- Retries so far: ${state.retries}/${state.maxRetries}
-
-Available tools: ${tools.map(t => t.name).join(", ")}
-
-Default plan:
-${JSON.stringify(defaultPlan, null, 2)}
-
-Generate an optimized plan as JSON with this exact shape:
-{
-  "agent": "${this.agentName}",
-  "goal": "specific goal for this run",
-  "steps": [
-    {"id": "step1", "tool": "tool_name", "args": {}, "expectedOutcome": "what we expect", "reasoning": "why this step"}
-  ],
-  "estimatedIterations": 3,
-  "riskLevel": "low|medium|high"
-}
-
-Return ONLY valid JSON.`;
-
-    try {
-      const provider = this.taskContext.provider;
-      const tools = await this.getAvailableTools();
-      
-      const response = await provider.chat({
-        system: "You are an expert planner. Output ONLY valid JSON.",
-        messages: [{ role: "user", content: planningPrompt }],
-        tools,
-        maxTokens: this.taskContext.maxTokens,
-        temperature: 0.2,
-      });
-
-      const textBlocks = response.content.filter((b): b is { type: "text"; text: string } => b.type === "text");
-      const raw = textBlocks.map((b) => b.text).join("\n");
-      const jsonMatch = raw.match(/\{[\s\S]*\}/);
-      
-      if (jsonMatch) {
-        const plan = JSON.parse(jsonMatch[0]) as AgentPlan;
-        plan.agent = this.agentName;
-        plan.createdAt = Date.now();
-        return plan;
-      }
-    } catch (err) {
-      logger.warn(`[${this.agentName}] Plan generation failed, using default: ${err}`);
-    }
-
-    return defaultPlan;
-  }
-
-  protected async executePlan(plan: AgentPlan, state: AgentState): Promise<string> {
-    const messages: ChatMessage[] = [{ role: "user", content: this.getGoal() }];
-    let lastOutput = "";
-
-    for (let i = 0; i < plan.steps.length; i++) {
-      const step = plan.steps[i];
-      
-      if (step.dependsOn) {
-        const depsMet = step.dependsOn.every(depId => 
-          plan.steps.some(s => s.id === depId && s.id !== step.id)
-        );
-        if (!depsMet) continue;
-      }
-
-      logger.info(`[${this.agentName}] Executing step ${step.id}: ${step.tool}`);
-      
-      messages.push({
-        role: "assistant",
-        content: [{ type: "tool_use", id: step.id, name: step.tool, input: step.args }]
-      });
-
-      try {
-        const result = await executeTool(
-          step.tool,
-          step.args,
-          this.taskContext.reader,
-          this.taskContext.runner,
-          this.taskContext.testOutputPath,
-          this.taskContext.codebasePath
-        );
-        
-        messages.push({
-          role: "user",
-          content: [{ type: "tool_result", toolUseId: step.id, content: result }]
-        });
-        
-        lastOutput = result;
-        this.recordStep(step.id, result, "next", state);
-        
-      } catch (err) {
-        logger.error(`[${this.agentName}] Step ${step.id} failed: ${err}`);
-        this.recordStep(step.id, String(err), "stop", state);
-        throw err;
-      }
-    }
-
-    return lastOutput;
-  }
+  abstract run(inputState?: AgentState): Promise<AgentState>;
 
   protected async reflect(output: string): Promise<ReflectionResult> {
     const criticPrompt = `You are a critic evaluating the output of the ${this.agentName} agent.
@@ -340,9 +196,6 @@ Return ONLY valid JSON:
     }
   }
 
-  /**
-   * Subscribe to messages from other agents via the message bus
-   */
   protected subscribeToMessages(handler: (message: AgentMessage) => void): (() => void) | null {
     if (!this.state.messageBus) return null;
     return this.state.messageBus.subscribe(this.agentName, handler);
@@ -365,34 +218,22 @@ Return ONLY valid JSON:
       },
     };
     
-    // Store in memory store if available (for persistence across runs)
     if (this.state.memoryStore) {
       this.state.memoryStore.store(memoryEntry).catch(err => 
         logger.warn(`[${this.agentName}] Failed to store memory: ${err}`)
       );
     }
     
-    // Also keep in local state for immediate access
     this.state.memory.push(memoryEntry);
   }
 
   protected recall(type: MemoryEntry["type"], tags: string[], limit = 5): MemoryEntry[] {
-    // Try to retrieve from memory store first (includes cross-run memories)
-    if (this.state.memoryStore) {
-      // Note: This is async, but we need sync for recall
-      // In practice, we'll use local state for immediate recall
-      // and the store will be used for cross-run retrieval in future runs
-    }
-    
     return this.state.memory
       .filter(m => m.type === type && tags.some(t => m.metadata.tags.includes(t)))
       .sort((a, b) => b.metadata.timestamp - a.metadata.timestamp)
       .slice(0, limit);
   }
 
-  /**
-   * Async version of recall that queries the memory store for cross-run memories
-   */
   protected async recallFromStore(type: MemoryEntry["type"], tags: string[], limit = 5): Promise<MemoryEntry[]> {
     if (!this.state.memoryStore) {
       return this.recall(type, tags, limit);
