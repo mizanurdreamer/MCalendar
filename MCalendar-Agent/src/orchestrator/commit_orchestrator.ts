@@ -36,6 +36,7 @@ export interface CommitOrchestratorConfig {
   targetBranch: string;
   projectName: string;
   databaseUrl?: string;
+  agentMemoryDatabaseUrl?: string;
   apiBaseUrl?: string;
   commitAutoApprove?: boolean;
   playwrightMcpEnabled?: boolean;
@@ -116,7 +117,7 @@ export async function processCommit(
 
   const graph = createAgenticGraph({
     memoryType: config.memoryType || "local",
-    databaseUrl: config.databaseUrl,
+    agentMemoryDatabaseUrl: config.agentMemoryDatabaseUrl,
     enableCritic: true,
     enableHumanGates: !config.commitAutoApprove,
     maxParallelAgents: 3,

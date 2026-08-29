@@ -20,7 +20,6 @@ CREATE TABLE IF NOT EXISTS agent_memories (
   source TEXT,
   access_count INTEGER NOT NULL DEFAULT 0,
   last_accessed_at BIGINT,
-  embedding VECTOR(1536),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -39,9 +38,9 @@ export class PostgresMemoryStore implements MemoryStore {
   private initialized = false;
 
   constructor(databaseUrl?: string) {
-    const url = databaseUrl || process.env.DATABASE_URL;
+    const url = databaseUrl || process.env.AGENT_MEMORY_DATABASE_URL || process.env.DATABASE_URL;
     if (!url) {
-      throw new Error("PostgresMemoryStore requires DATABASE_URL");
+      throw new Error("PostgresMemoryStore requires AGENT_MEMORY_DATABASE_URL or DATABASE_URL");
     }
     this.pool = new Pool({
       connectionString: url,

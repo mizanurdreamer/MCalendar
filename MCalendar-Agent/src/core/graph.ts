@@ -15,6 +15,7 @@ import { CORE_AGENT_NAMES, GRAPH_NODE, MODE, PIPELINE_STATUS, ROUTING_ACTION } f
 export interface AgenticGraphConfig {
   memoryType: "local" | "postgres";
   databaseUrl?: string;
+  agentMemoryDatabaseUrl?: string;
   enableCritic: boolean;
   enableHumanGates: boolean;
   maxParallelAgents: number;
@@ -88,7 +89,7 @@ export class AgenticGraph {
       ...config,
     };
     
-    this.memoryStore = createMemoryStore(this.config.memoryType, this.config.databaseUrl);
+    this.memoryStore = createMemoryStore(this.config.memoryType, this.config.agentMemoryDatabaseUrl || this.config.databaseUrl);
     this.messageBus = new MessageBus();
     this.graph = this.buildGraph();
   }

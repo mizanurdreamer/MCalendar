@@ -36,6 +36,7 @@ export interface OrchestratorConfig {
   projectName: string;
   baseBranch?: string;
   databaseUrl?: string;
+  agentMemoryDatabaseUrl?: string;
   apiBaseUrl?: string;
   commitAutoApprove?: boolean;
   playwrightMcpEnabled?: boolean;
@@ -120,7 +121,7 @@ export async function processIssue(
 
   const graph = createAgenticGraph({
     memoryType: config.memoryType || "local",
-    databaseUrl: config.databaseUrl,
+    agentMemoryDatabaseUrl: config.agentMemoryDatabaseUrl,
     enableCritic: true,
     enableHumanGates: !config.commitAutoApprove,
     maxParallelAgents: 3,

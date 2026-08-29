@@ -41,6 +41,7 @@ export interface AppConfig {
   commitAutoApprove: boolean;
   watchBranch?: string;
   databaseUrl?: string;
+  agentMemoryDatabaseUrl?: string;
   apiBaseUrl?: string;
   superAdminEmail?: string;
   superAdminPassword?: string;
@@ -133,6 +134,7 @@ export function loadConfig(): AppConfig {
     commitAutoApprove: (process.env.COMMIT_AUTO_APPROVE ?? "true").toLowerCase() === "true",
     watchBranch: process.env.WATCH_BRANCH,
     databaseUrl: process.env.DATABASE_URL,
+    agentMemoryDatabaseUrl: process.env.AGENT_MEMORY_DATABASE_URL,
     apiBaseUrl: process.env.API_BASE_URL,
     superAdminEmail: process.env.SUPER_ADMIN_EMAIL,
     superAdminPassword: process.env.SUPER_ADMIN_PASSWORD,

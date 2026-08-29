@@ -13,7 +13,9 @@
     "dev:server:debug": "tsx watch --inspect=3002 src/server/main.ts",
     "dev:ui": "vite --config ui/vite.config.ts",
     "ui:debug": "vite --config ui/vite.config.ts --debug",
-    "build:ui": "vite build --config ui/vite.config.ts"
+    "build:ui": "vite build --config ui/vite.config.ts",
+    "db:setup": "tsx scripts/db-setup.ts",
+    "db:reset": "tsx scripts/db-setup.ts --reset"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",

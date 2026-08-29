@@ -28,6 +28,7 @@ export interface WatcherConfig {
   watchBranch?: string;
   projectName: string;
   databaseUrl?: string;
+  agentMemoryDatabaseUrl?: string;
   apiBaseUrl?: string;
   commitAutoApprove?: boolean;
   playwrightMcpEnabled?: boolean;
@@ -63,6 +64,7 @@ export async function startWatcher(config: WatcherConfig): Promise<void> {
     projectName,
     baseBranch: watchBranch,
     databaseUrl: config.databaseUrl,
+    agentMemoryDatabaseUrl: config.agentMemoryDatabaseUrl,
     apiBaseUrl: config.apiBaseUrl,
     commitAutoApprove: config.commitAutoApprove,
     playwrightMcpEnabled: config.playwrightMcpEnabled,
