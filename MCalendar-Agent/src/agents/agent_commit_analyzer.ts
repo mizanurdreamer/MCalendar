@@ -164,6 +164,12 @@ When you have enough information, call submit_commit_analysis with your complete
       return state;
     }
 
+    // Recall past lessons to improve analysis
+    const lessons = await this.recallLessons();
+    if (lessons) {
+      logger.info(`[AgentCommitAnalyzer] Recalled ${lessons.split("\n").length} lines of past lessons`);
+    }
+
     const diff = state.commitDiff;
     const shortSha = diff.sha.slice(0, 7);
 
@@ -215,7 +221,7 @@ ${fileList}`;
     }
 
     try {
-      const analysis = await this.runAnalysis(userMessage, mcpExploration, fileExploration, projectExploration);
+      const analysis = await this.runAnalysis(userMessage, mcpExploration, fileExploration, projectExploration, lessons);
       state.commitAnalysis = analysis;
 
       if (!analysis.needsTests) {
@@ -253,7 +259,7 @@ ${fileList}`;
     return state;
   }
 
-  private async runAnalysis(userMessage: string, mcpExploration?: string, fileExploration?: string, projectExploration?: string): Promise<NonNullable<AgentState["commitAnalysis"]>> {
+  private async runAnalysis(userMessage: string, mcpExploration?: string, fileExploration?: string, projectExploration?: string, lessons?: string): Promise<NonNullable<AgentState["commitAnalysis"]>> {
     logger.task(AGENT_NAMES.AGENT_COMMIT_ANALYZER, `${getTaskProviderName(AGENT_NAMES.AGENT_COMMIT_ANALYZER, this.state.agentConfig)}/${getTaskModel(AGENT_NAMES.AGENT_COMMIT_ANALYZER, this.state.agentConfig)}`);
 
     const systemPrompt = AgentCommitAnalyzer.buildSystemPrompt();
@@ -268,6 +274,9 @@ ${fileList}`;
     }
     if (mcpExploration) {
       sections.push(`\nLive App Exploration:\n${mcpExploration}`);
+    }
+    if (lessons) {
+      sections.push(lessons);
     }
     sections.push(`\nYou have baseline context above. Use tools to investigate further if needed. Call submit_commit_analysis when ready.`);
     const fullMessage = sections.join("\n");

@@ -115,6 +115,13 @@ You MUST use the write_test_file and append_test_file tools to save your test.`;
   async run(inputState?: AgentState): Promise<AgentState> {
     const state = inputState || this.state;
 
+    // Recall past lessons and test patterns
+    const lessons = await this.recallLessons();
+    const testPatterns = await this.recallTestPatterns();
+    if (lessons || testPatterns) {
+      logger.info(`[AgentTestsGenerator] Recalled past lessons and test patterns`);
+    }
+
     let testFilename: string;
     if (state.mode === MODE.ISSUE && state.issue) {
       testFilename = `issue-${state.issue.number}-${GitBranch.slugify(state.issue.title)}.spec.ts`;
@@ -167,6 +174,8 @@ ${state.issue.body ?? ""}
 TEST SCENARIOS (write one test case per scenario):
 ${scenarios || "(no scenarios — generate based on the issue)"}
 
+${lessons ? `\n${lessons}\n` : ""}
+${testPatterns ? `\n${testPatterns}\n` : ""}
 Use read_file/list_directory to explore source files as needed.
 Use the write_test_file tool to save the test as "${testFilename}".`;
     } else if (state.mode === MODE.COMMIT && state.commitDiff) {
@@ -189,6 +198,8 @@ Scope: ${state.commitAnalysis?.scope ?? "General E2E testing"}
 Files changed:
 ${changedFiles}
 
+${lessons ? `\n${lessons}\n` : ""}
+${testPatterns ? `\n${testPatterns}\n` : ""}
 Use read_file/list_directory to explore source files as needed.
 Use the write_test_file tool to save the test as "${testFilename}".`;
     } else {

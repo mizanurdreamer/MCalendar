@@ -1,4 +1,4 @@
-import type { AgentState, AgentName, AgentPlan, PlanStep, ReflectionResult } from "./state.js";
+import type { AgentState, AgentName, AgentPlan, PlanStep, ReflectionResult, MemoryEntry } from "./state.js";
 import { logger } from "../utils/logger.js";
 import type { ProviderInterface } from "../providers/types.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
@@ -34,12 +34,54 @@ export class AdvancedPlanner {
     this.provider = provider;
   }
 
+  /**
+   * Recall past decisions from memory to inform planning
+   */
+  private async recallPastDecisions(): Promise<string> {
+    if (!this.state.memoryStore) return "";
+    
+    try {
+      const decisions = await this.state.memoryStore.retrieve("decision", ["planning", "strategy"], 3);
+      if (decisions.length === 0) return "";
+      
+      const formatted = decisions.map((d, i) => {
+        return `Decision ${i + 1}: ${d.content.slice(0, 300)}`;
+      }).join("\n\n");
+      
+      return `\nPAST PLANNING DECISIONS:\n${formatted}\n\nConsider these when creating your plan.`;
+    } catch (err) {
+      logger.warn(`[AdvancedPlanner] Failed to recall past decisions: ${err}`);
+      return "";
+    }
+  }
+
+  /**
+   * Recall project context that might be relevant
+   */
+  private async recallProjectContext(): Promise<string> {
+    if (!this.state.memoryStore) return "";
+    
+    try {
+      const contexts = await this.state.memoryStore.retrieve("project_context", ["framework", "test-runner"], 2);
+      if (contexts.length === 0) return "";
+      
+      const formatted = contexts.map((c, i) => {
+        return `Context ${i + 1}: ${c.content.slice(0, 300)}`;
+      }).join("\n\n");
+      
+      return `\nPROJECT CONTEXT:\n${formatted}`;
+    } catch (err) {
+      logger.warn(`[AdvancedPlanner] Failed to recall project context: ${err}`);
+      return "";
+    }
+  }
+
   async generateMasterPlan(goal: string, availableAgents: AgentName[]): Promise<AgentPlan> {
     if (!this.config.enabled) {
       return this.getDefaultPlan(goal);
     }
 
-    const prompt = this.buildPlanningPrompt(goal, availableAgents);
+    const prompt = await this.buildPlanningPrompt(goal, availableAgents);
     
     try {
       if (!this.provider) return this.getDefaultPlan(goal);
@@ -195,7 +237,7 @@ IMPORTANT: Address the critic feedback above. Focus on:
 - Reducing risk level where critic scored low`;
   }
 
-  private buildPlanningPrompt(goal: string, availableAgents: AgentName[]): string {
+  private async buildPlanningPrompt(goal: string, availableAgents: AgentName[]): Promise<string> {
     const agentDescriptions: Record<string, string> = {
       [AGENT_NAMES.AGENT_ISSUE_ANALYZER]: "Analyzes GitHub issues and determines test requirements",
       [AGENT_NAMES.AGENT_COMMIT_ANALYZER]: "Analyzes commits and determines if tests are needed",
@@ -206,6 +248,10 @@ IMPORTANT: Address the critic feedback above. Focus on:
       [CORE_AGENT_NAMES.CRITIC]: "Critiques agent outputs and suggests improvements",
     };
 
+    // Recall past decisions and project context
+    const pastDecisions = await this.recallPastDecisions();
+    const projectContext = await this.recallProjectContext();
+
     return `Create an execution plan for: ${goal}
 
 Available agents:
@@ -215,7 +261,8 @@ Current state:
 - Mode: ${this.state.mode}
 - ${this.state.mode === MODE.ISSUE ? `Issue: #${this.state.issue?.number} - ${this.state.issue?.title}` : `Commit: ${this.state.commitDiff?.sha.slice(0,7)}`}
 - Retries: ${this.state.retries}/${this.state.maxRetries}
-
+${pastDecisions}
+${projectContext}
 Create a plan as JSON with this exact structure:
 {
   "agent": "${CORE_AGENT_NAMES.PLANNER}",

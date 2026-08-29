@@ -91,6 +91,15 @@ export class Supervisor {
       }
     }
 
+    // Adaptive retry: if reflection scores are declining, reduce max retries
+    if (allReflections.length >= 2) {
+      const recentScores = allReflections.slice(-2).map(r => r.score);
+      if (recentScores[1] < recentScores[0] - 15) {
+        logger.warn(`[Supervisor] Reflection score declining (${recentScores[0]} → ${recentScores[1]}), suggesting replan`);
+        return { action: ROUTING_ACTION.REPLAN, reason: `Reflection score declining: ${recentScores[0]} → ${recentScores[1]}` };
+      }
+    }
+
     return null;
   }
 

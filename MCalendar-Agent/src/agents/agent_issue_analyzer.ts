@@ -153,6 +153,12 @@ When you have enough information, call submit_analysis with your complete analys
       return state;
     }
 
+    // Recall past lessons to improve analysis
+    const lessons = await this.recallLessons();
+    if (lessons) {
+      logger.info(`[AgentIssueAnalyzer] Recalled ${lessons.split("\n").length} lines of past lessons`);
+    }
+
     const issue = state.issue;
     const labels = issue.labels.map((l: { name: string }) => l.name).join(", ") || "none";
     const userMessage = `Issue #${issue.number}: ${issue.title}
@@ -182,7 +188,7 @@ When you have enough information, call submit_analysis with your complete analys
     }
 
     try {
-      const analysis = await this.runAnalysis(userMessage, mcpExploration, projectExploration);
+      const analysis = await this.runAnalysis(userMessage, mcpExploration, projectExploration, lessons);
       state.issueAnalysis = analysis;
 
       if (!analysis.needs_tests) {
@@ -257,7 +263,7 @@ When you have enough information, call submit_analysis with your complete analys
     return state;
   }
 
-  private async runAnalysis(userMessage: string, mcpExploration?: string, projectExploration?: string): Promise<NonNullable<AgentState["issueAnalysis"]>> {
+  private async runAnalysis(userMessage: string, mcpExploration?: string, projectExploration?: string, lessons?: string): Promise<NonNullable<AgentState["issueAnalysis"]>> {
     logger.task(AGENT_NAMES.AGENT_ISSUE_ANALYZER, `${getTaskProviderName(AGENT_NAMES.AGENT_ISSUE_ANALYZER, this.state.agentConfig)}/${getTaskModel(AGENT_NAMES.AGENT_ISSUE_ANALYZER, this.state.agentConfig)}`);
 
     const systemPrompt = AgentIssueAnalyzer.buildSystemPrompt();
@@ -269,6 +275,9 @@ When you have enough information, call submit_analysis with your complete analys
     }
     if (mcpExploration) {
       sections.push(`\nLive App Exploration:\n${mcpExploration}`);
+    }
+    if (lessons) {
+      sections.push(lessons);
     }
     sections.push(`\nYou have baseline context above. Use tools to investigate further if needed. Call submit_analysis when ready.`);
     const fullMessage = sections.join("\n");

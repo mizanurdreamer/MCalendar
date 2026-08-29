@@ -261,6 +261,50 @@ Return ONLY valid JSON:
   }
 
   /**
+   * Recall relevant lessons from past runs for this agent type.
+   * Returns a formatted string to inject into agent context.
+   */
+  protected async recallLessons(context?: string): Promise<string> {
+    const lessons = await this.recallFromStore("lesson_learned", [this.agentName], 5);
+    if (lessons.length === 0) return "";
+
+    const formatted = lessons.map((l, i) => {
+      const parsed = JSON.parse(l.content);
+      return `Lesson ${i + 1} (score: ${parsed.score}/100):\n- Strengths: ${parsed.strengths?.join(", ") || "none"}\n- Weaknesses: ${parsed.weaknesses?.join(", ") || "none"}\n- Suggestions: ${parsed.suggestions?.join(", ") || "none"}`;
+    }).join("\n\n");
+
+    return `\nPAST LESSONS FROM PREVIOUS RUNS:\n${formatted}\n\nApply these lessons to improve your current work.`;
+  }
+
+  /**
+   * Recall past error fixes relevant to current context.
+   */
+  protected async recallErrorFixes(errorPattern?: string): Promise<string> {
+    const fixes = await this.recallFromStore("error_fix", [this.agentName], 3);
+    if (fixes.length === 0) return "";
+
+    const formatted = fixes.map((f, i) => {
+      return `Fix ${i + 1}: ${f.content.slice(0, 300)}`;
+    }).join("\n\n");
+
+    return `\nPAST ERROR FIXES:\n${formatted}\n\nConsider these patterns when debugging.`;
+  }
+
+  /**
+   * Recall test patterns that have worked before.
+   */
+  protected async recallTestPatterns(): Promise<string> {
+    const patterns = await this.recallFromStore("test_pattern", ["playwright", "e2e"], 3);
+    if (patterns.length === 0) return "";
+
+    const formatted = patterns.map((p, i) => {
+      return `Pattern ${i + 1}: ${p.content.slice(0, 500)}`;
+    }).join("\n\n");
+
+    return `\nPAST SUCCESSFUL TEST PATTERNS:\n${formatted}\n\nFollow these patterns for consistency.`;
+  }
+
+  /**
    * Shared agentic tool-use loop. All agents follow the same pattern:
    * 1. Send messages to LLM with tools
    * 2. If LLM calls tools → execute them, append results, loop
@@ -286,10 +330,33 @@ Return ONLY valid JSON:
     ];
 
     let iteration = 0;
+    let consecutiveErrors = 0;
+    let lastToolName = "";
+    let sameToolCount = 0;
+
     while (iteration < maxIterations) {
       iteration++;
       metrics.recordIteration();
       logger.debug(`[${tag}] Tool loop iteration ${iteration}`);
+
+      // Proactive stuck detection
+      if (consecutiveErrors >= 3) {
+        logger.warn(`[${tag}] Agent stuck: ${consecutiveErrors} consecutive tool errors, injecting help guidance`);
+        messages.push({
+          role: "user",
+          content: `You have encountered ${consecutiveErrors} consecutive tool errors. Please analyze what's going wrong and try a different approach. Consider reading different files, using different tools, or explaining what you need in text.`,
+        });
+        consecutiveErrors = 0;
+      }
+
+      if (sameToolCount >= 3) {
+        logger.warn(`[${tag}] Agent stuck: same tool called ${sameToolCount} times, injecting guidance`);
+        messages.push({
+          role: "user",
+          content: `You have called the same tool (${lastToolName}) ${sameToolCount} times without progress. Please try a different approach or tool.`,
+        });
+        sameToolCount = 0;
+      }
 
       const provider = this.taskContext.provider;
       const response = await provider.chat({
@@ -329,6 +396,15 @@ Return ONLY valid JSON:
       const toolResults: ContentBlock[] = [];
       for (const toolBlock of toolBlocks) {
         metrics.recordToolCall();
+        
+        // Track same tool calls
+        if (toolBlock.name === lastToolName) {
+          sameToolCount++;
+        } else {
+          sameToolCount = 0;
+          lastToolName = toolBlock.name;
+        }
+
         logger.info(`[${tag}] Executing tool: ${toolBlock.name}`);
         const result = await executeTool(
           toolBlock.name,
@@ -338,6 +414,14 @@ Return ONLY valid JSON:
           this.taskContext.testOutputPath,
           this.taskContext.codebasePath,
         );
+        
+        // Track consecutive errors
+        if (result.startsWith("Error:") || result.includes("error")) {
+          consecutiveErrors++;
+        } else {
+          consecutiveErrors = 0;
+        }
+
         toolResults.push({
           type: "tool_result",
           toolUseId: toolBlock.id,

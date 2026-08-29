@@ -86,6 +86,13 @@ Return the fixed test file content via write_test_file tool.`;
       return state;
     }
 
+    // Recall past error fixes and lessons
+    const errorFixes = await this.recallErrorFixes(testResult.errors[0]);
+    const lessons = await this.recallLessons();
+    if (errorFixes || lessons) {
+      logger.info(`[AgentTestsReviewer] Recalled past error fixes and lessons`);
+    }
+
     const testContent = state.testContent || "";
     
     logger.info(`[AgentTestsReviewer] Starting review for ${testFilename} (attempt ${state.retries + 1})`);
@@ -98,7 +105,7 @@ Return the fixed test file content via write_test_file tool.`;
     }
 
     try {
-      const analysis = await this.runErrorAnalysis(testContent);
+      const analysis = await this.runErrorAnalysis(testContent, errorFixes, lessons);
 
       state.retryHistory.push({
         attempt: state.retries,
@@ -292,7 +299,7 @@ Return the fixed test file content via write_test_file tool.`;
     return sourceInfo.join("\n\n");
   }
 
-  private async runErrorAnalysis(testContent: string): Promise<string> {
+  private async runErrorAnalysis(testContent: string, errorFixes?: string, lessons?: string): Promise<string> {
     const testFilename = this.state.testFilename;
     const testResult = this.state.testResult;
     
@@ -342,6 +349,8 @@ ${this.state.retryHistory.map((r, i) => `Attempt ${i + 1}: ${r.errors.join("; ")
 
 ${mcpDebugInfo ? `Live App Debug Info:\n${mcpDebugInfo}\n` : ""}
 ${sourceFileInfo ? `Source Files Context:\n${sourceFileInfo}\n` : ""}
+${errorFixes ? `\n${errorFixes}\n` : ""}
+${lessons ? `\n${lessons}\n` : ""}
 Analyze the errors and provide a fix plan.`;
 
     const response = await provider.chat({

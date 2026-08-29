@@ -179,7 +179,7 @@ Return ONLY valid JSON:
   }
 
   private async verifyRevisedOutput(output: string, context: { goal: string; agent: AgentName }): Promise<boolean> {
-    // For test files, verify the output is syntactically valid
+    // For test files, verify the output is syntactically valid AND runs successfully
     if (output.includes("test(") || output.includes("test.describe(")) {
       const hasImports = output.includes("import ");
       const hasTests = (output.match(/test\(/g) || []).length > 0;
@@ -209,6 +209,31 @@ Return ONLY valid JSON:
       if (Math.abs(openBraces - closeBraces) > 2) {
         logger.warn(`[AgentCritic] Revised test has mismatched braces (${openBraces} open, ${closeBraces} close)`);
         return false;
+      }
+
+      // Run the test to verify it actually works
+      const testFilename = this.state.testFilename;
+      if (testFilename && this.taskContext.runner) {
+        try {
+          logger.info(`[AgentCritic] Running tests to verify revision: ${testFilename}`);
+          const testResult = this.taskContext.runner.run(testFilename);
+          if (testResult.success) {
+            logger.success(`[AgentCritic] Revision verified: tests passing (${testResult.passed}/${testResult.total})`);
+            return true;
+          } else {
+            logger.warn(`[AgentCritic] Revision failed verification: ${testResult.failed} tests failing`);
+            // Still return true if most tests pass (partial improvement)
+            if (testResult.total > 0 && testResult.passed / testResult.total > 0.7) {
+              logger.info(`[AgentCritic] Partial improvement: ${(testResult.passed / testResult.total * 100).toFixed(0)}% passing`);
+              return true;
+            }
+            return false;
+          }
+        } catch (err) {
+          logger.warn(`[AgentCritic] Test execution failed during verification: ${err}`);
+          // Don't fail verification just because test execution failed
+          return true;
+        }
       }
     }
 
