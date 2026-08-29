@@ -10,7 +10,11 @@ declare module '@modelcontextprotocol/sdk/client/index.js' {
     request(request: any): Promise<any>;
     notify(notification: any): Promise<void>;
     listTools(): Promise<any>;
-    callTool(name: string, args: any): Promise<any>;
+    callTool(
+      params: { name: string; arguments?: any },
+      resultSchema?: any,
+      options?: { timeout?: number }
+    ): Promise<any>;
   }
 }
 

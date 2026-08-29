@@ -1,10 +1,29 @@
-import { callMcpTool } from "./client.js";
+import { callMcpTool, isMcpAlive } from "./client.js";
 import { logger } from "../utils/logger.js";
 
 export interface ExploreOptions {
   baseUrl: string;
   paths?: string[];
   maxSnapshotChars?: number;
+}
+
+async function isUrlReachable(url: string, timeoutMs = 5000): Promise<boolean> {
+  try {
+    const http = await import("node:http");
+    return new Promise<boolean>((resolve) => {
+      const req = http.get(url, (res) => {
+        res.resume();
+        resolve(true);
+      });
+      req.on("error", () => resolve(false));
+      req.setTimeout(timeoutMs, () => {
+        req.destroy();
+        resolve(false);
+      });
+    });
+  } catch {
+    return false;
+  }
 }
 
 export async function exploreAppWithMcp(options: ExploreOptions): Promise<string> {
@@ -17,6 +36,18 @@ export async function exploreAppWithMcp(options: ExploreOptions): Promise<string
       : baseUrl;
 
     logger.info(`[MCP] Exploring live app at ${targetUrl}...`);
+
+    // Pre-check: verify app is reachable before calling MCP browser_navigate
+    if (!isMcpAlive()) {
+      logger.warn(`[MCP] MCP client not alive — skipping exploration`);
+      return "";
+    }
+
+    const reachable = await isUrlReachable(targetUrl, 5000);
+    if (!reachable) {
+      logger.warn(`[MCP] App not reachable at ${targetUrl} — skipping exploration`);
+      return "";
+    }
 
     const navResult = await callMcpTool("browser_navigate", { url: targetUrl });
     if (navResult.startsWith("Error:")) {

@@ -11,6 +11,8 @@ export class AppServerManager {
     this.projectPath = projectPath;
     this.port = port;
 
+    logger.info(`[AppServer] Initializing on port ${port}...`);
+
     // Check if port is already in use (app may already be running)
     if (await this.isPortInUse(port)) {
       logger.info(`[AppServer] Port ${port} already in use — assuming app is already running`);

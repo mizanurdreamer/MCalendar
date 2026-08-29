@@ -107,7 +107,7 @@ export async function callMcpTool(
   }
 
   try {
-    const result = await client.callTool(name, args, { timeout: mcpTimeoutMs });
+    const result = await client.callTool({ name, arguments: args }, undefined, { timeout: mcpTimeoutMs });
     const content = (result as { content?: Array<{ type: string; text?: string }> }).content ?? [];
     return content
       .filter((c) => c.type === "text")
@@ -124,7 +124,7 @@ export async function callMcpTool(
         return `Error: MCP server restart failed after timeout on "${name}"`;
       }
       try {
-        const retryResult = await client.callTool(name, args, { timeout: mcpTimeoutMs });
+        const retryResult = await client.callTool({ name, arguments: args }, undefined, { timeout: mcpTimeoutMs });
         const retryContent = (retryResult as { content?: Array<{ type: string; text?: string }> }).content ?? [];
         return retryContent
           .filter((c) => c.type === "text")
