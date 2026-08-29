@@ -5,7 +5,7 @@ import { logger } from "../utils/logger.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
 import { getTaskProviderName, getTaskModel } from "../providers/registry.js";
 import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL, MESSAGE_TYPE, AGENT_EVENT, CORE_AGENT_NAMES } from "../utils/constants.js";
-import { createAgentTools, executeTool } from "../utils/tools.js";
+import { getToolRegistry } from "../core/tool_registry.js";
 import { exploreAppWithMcp } from "../mcp/explore.js";
 
 const SUBMIT_ANALYSIS_TOOL: ToolDefinition = {
@@ -61,19 +61,20 @@ You will receive pre-explored project structure and live app exploration in your
 TOOLS AVAILABLE:
 - read_file: Read source files to understand implementation details
 - list_directory: List directory contents to explore project structure
-- browser_navigate: Navigate to a URL in the live app
-- browser_snapshot: Get the DOM structure of the current page
-- browser_screenshot: Take a screenshot of the current page
-- browser_click: Click an element on the page
-- browser_type: Type text into an input field
-- browser_console_messages: Get browser console output
+- browser_navigate: Navigate to a URL in the live app (optional — skip if app not running)
+- browser_snapshot: Get the DOM structure of the current page (optional)
+- browser_screenshot: Take a screenshot of the current page (optional)
+- browser_click: Click an element on the page (optional)
+- browser_type: Type text into an input field (optional)
+- browser_console_messages: Get browser console output (optional)
 
 WHEN TO USE TOOLS:
 If the baseline context is insufficient to understand the issue:
 - Read specific source files mentioned in the issue
-- Navigate to relevant pages to verify UI elements exist
+- Navigate to relevant pages to verify UI elements exist (only if app is running)
 - Check database schema if the issue involves data
 - Explore related code directories
+If browser tools fail or are unavailable, proceed with code-only analysis.
 
 When you have enough information, call submit_analysis with your complete analysis.`;
   }
@@ -110,11 +111,15 @@ When you have enough information, call submit_analysis with your complete analys
   }
 
   protected getAvailableTools(): ToolDefinition[] {
-    return createAgentTools(this.taskContext.reader, this.taskContext.runner, this.taskContext.codebasePath);
+    return getToolRegistry().getByRole("issue_analyzer");
   }
 
   private async executeTool(name: string, input: Record<string, unknown>): Promise<string> {
-    return executeTool(name, input, this.taskContext.reader, this.taskContext.runner, this.taskContext.testOutputPath, this.taskContext.codebasePath);
+    return getToolRegistry().execute(name, input, {
+      codebasePath: this.taskContext.codebasePath,
+      testOutputPath: this.taskContext.testOutputPath,
+      testProjectPath: this.taskContext.testOutputPath,
+    });
   }
 
   private async exploreProject(): Promise<string> {

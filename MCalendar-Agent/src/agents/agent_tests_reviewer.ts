@@ -4,7 +4,7 @@ import { logger } from "../utils/logger.js";
 import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers/registry.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
 import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL, MESSAGE_TYPE, AGENT_EVENT, CORE_AGENT_NAMES } from "../utils/constants.js";
-import { createAgentTools, executeTool } from "../utils/tools.js";
+import { getToolRegistry } from "../core/tool_registry.js";
 import { isMcpTool, callMcpTool, isMcpAlive } from "../mcp/client.js";
 import type { ToolDefinition } from "../providers/types.js";
 
@@ -388,10 +388,14 @@ Analyze the errors and provide a fix plan.`;
   }
 
   protected getAvailableTools(): ToolDefinition[] {
-    return createAgentTools(this.taskContext.reader, this.taskContext.runner, this.taskContext.codebasePath);
+    return getToolRegistry().getByRole("tests_reviewer");
   }
 
   private async executeTool(name: string, input: Record<string, unknown>): Promise<string> {
-    return executeTool(name, input, this.taskContext.reader, this.taskContext.runner, this.taskContext.testOutputPath, this.taskContext.codebasePath);
+    return getToolRegistry().execute(name, input, {
+      codebasePath: this.taskContext.codebasePath,
+      testOutputPath: this.taskContext.testOutputPath,
+      testProjectPath: this.taskContext.testOutputPath,
+    });
   }
 }

@@ -7,7 +7,7 @@ import * as fs from "node:fs";
 import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers/registry.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
 import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL, MESSAGE_TYPE, AGENT_EVENT, CORE_AGENT_NAMES } from "../utils/constants.js";
-import { createAgentTools, executeTool } from "../utils/tools.js";
+import { getToolRegistry } from "../core/tool_registry.js";
 import type { ToolDefinition } from "../providers/types.js";
 
 export class AgentTestsGenerator extends BaseAgent {
@@ -29,14 +29,14 @@ Your task:
 3. Write a complete Playwright test file covering ALL scenarios
 4. IMPORTANT: You MUST call the write_test_file tool to save the test file. Do NOT just return the content as text.
 
-CRITICAL: MCP APP EXPLORATION (MANDATORY)
-Before writing any test code, you MUST explore the live application:
+CRITICAL: MCP APP EXPLORATION (OPTIONAL — only if app is running)
+If browser tools are available and the app is reachable, explore the live application:
 1. Use browser_navigate to visit the pages you need to test
 2. Use browser_snapshot to understand the actual DOM structure (element IDs, classes, labels, data attributes)
 3. Use browser_click and browser_type to verify your selectors work
 4. Note the real form field names, button labels, and page layout
-Do NOT guess selectors from source code — the rendered DOM may differ from React components.
-If browser tools are not available, read the HTML source or component files carefully.
+If browser tools fail or are unavailable, skip exploration and proceed with code-only analysis by reading source files.
+Do NOT guess selectors from source code — use browser exploration when possible, otherwise read HTML/component files carefully.
 
 AUTH UTILITIES:
 The project has auth utilities you MUST use:
@@ -292,11 +292,15 @@ Use the write_test_file tool to save the test as "${testFilename}".`;
   }
 
   protected getAvailableTools(): ToolDefinition[] {
-    return createAgentTools(this.taskContext.reader, this.taskContext.runner, this.taskContext.codebasePath);
+    return getToolRegistry().getByRole("tests_generator");
   }
 
   private async executeTool(name: string, input: Record<string, unknown>): Promise<string> {
-    return executeTool(name, input, this.taskContext.reader, this.taskContext.runner, this.taskContext.testOutputPath, this.taskContext.codebasePath);
+    return getToolRegistry().execute(name, input, {
+      codebasePath: this.taskContext.codebasePath,
+      testOutputPath: this.taskContext.testOutputPath,
+      testProjectPath: this.taskContext.testOutputPath,
+    });
   }
 
   private async fallbackExtractAndWrite(testFilename: string): Promise<boolean> {

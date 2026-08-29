@@ -1,7 +1,7 @@
 import type { ProviderInterface, ChatMessage, ContentBlock, Tool, ToolDefinition } from "../providers/types.js";
 import type { CodebaseReader } from "../codebase/reader.js";
 import type { PlaywrightRunner } from "../test_runner/playwright.js";
-import { createAgentTools, executeTool } from "../utils/tools.js";
+import { getToolRegistry, type AgentRole, type ToolHandlerContext } from "./tool_registry.js";
 import { logger } from "../utils/logger.js";
 import { metrics } from "./metrics.js";
 import type { AgentState, AgentName, AgentPlan, PlanStep, AgentMessage, ReflectionResult, MemoryEntry, HumanApprovalRequest } from "./state.js";
@@ -175,7 +175,20 @@ Return ONLY valid JSON:
   }
 
   protected getAvailableTools(): ToolDefinition[] {
-    return createAgentTools(this.taskContext.reader, this.taskContext.runner, this.taskContext.codebasePath);
+    const role = this.agentNameToRole(this.agentName);
+    return getToolRegistry().getByRole(role);
+  }
+
+  private agentNameToRole(agentName: AgentName): AgentRole {
+    const mapping: Record<string, AgentRole> = {
+      [AGENT_NAMES.AGENT_ISSUE_ANALYZER]: "issue_analyzer",
+      [AGENT_NAMES.AGENT_COMMIT_ANALYZER]: "commit_analyzer",
+      [AGENT_NAMES.AGENT_TESTS_GENERATOR]: "tests_generator",
+      [AGENT_NAMES.AGENT_TESTS_REVIEWER]: "tests_reviewer",
+      [AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR]: "tests_report_generator",
+      [AGENT_NAMES.AGENT_SUMMARIZE]: "summarize",
+    };
+    return mapping[agentName] || "issue_analyzer";
   }
 
   protected updateStatus(status: AgentState["agentStatus"][AgentName], state?: AgentState): void {
@@ -331,8 +344,8 @@ Return ONLY valid JSON:
 
     let iteration = 0;
     let consecutiveErrors = 0;
-    let lastToolName = "";
-    let sameToolCount = 0;
+    let lastDominantTool = "";
+    let sameToolStreak = 0;
 
     while (iteration < maxIterations) {
       iteration++;
@@ -349,13 +362,14 @@ Return ONLY valid JSON:
         consecutiveErrors = 0;
       }
 
-      if (sameToolCount >= 3) {
-        logger.warn(`[${tag}] Agent stuck: same tool called ${sameToolCount} times, injecting guidance`);
+      if (sameToolStreak >= 2) {
+        logger.warn(`[${tag}] Agent stuck: dominant tool "${lastDominantTool}" used ${sameToolStreak} iterations in a row, injecting guidance`);
         messages.push({
           role: "user",
-          content: `You have called the same tool (${lastToolName}) ${sameToolCount} times without progress. Please try a different approach or tool.`,
+          content: `You have been repeatedly calling the same tool (${lastDominantTool}) for ${sameToolStreak} iterations without progress. Please stop calling ${lastDominantTool} and try a completely different approach. Use different tools, read different files, or describe what you need in text.`,
         });
-        sameToolCount = 0;
+        sameToolStreak = 0;
+        lastDominantTool = "";
       }
 
       const provider = this.taskContext.provider;
@@ -394,25 +408,22 @@ Return ONLY valid JSON:
 
       // Execute remaining tools
       const toolResults: ContentBlock[] = [];
+      const toolCounts = new Map<string, number>();
       for (const toolBlock of toolBlocks) {
         metrics.recordToolCall();
         
-        // Track same tool calls
-        if (toolBlock.name === lastToolName) {
-          sameToolCount++;
-        } else {
-          sameToolCount = 0;
-          lastToolName = toolBlock.name;
-        }
+        // Track tool usage counts per iteration
+        toolCounts.set(toolBlock.name, (toolCounts.get(toolBlock.name) || 0) + 1);
 
         logger.info(`[${tag}] Executing tool: ${toolBlock.name}`);
-        const result = await executeTool(
+        const result = await getToolRegistry().execute(
           toolBlock.name,
           toolBlock.input,
-          this.taskContext.reader,
-          this.taskContext.runner,
-          this.taskContext.testOutputPath,
-          this.taskContext.codebasePath,
+          {
+            codebasePath: this.taskContext.codebasePath,
+            testOutputPath: this.taskContext.testOutputPath,
+            testProjectPath: this.taskContext.testOutputPath,
+          }
         );
         
         // Track consecutive errors
@@ -427,6 +438,23 @@ Return ONLY valid JSON:
           toolUseId: toolBlock.id,
           content: result,
         });
+      }
+
+      // After all tools executed, check for dominant tool streak
+      if (toolCounts.size > 0) {
+        const sorted = [...toolCounts.entries()].sort((a, b) => b[1] - a[1]);
+        const dominantTool = sorted[0][0];
+        const dominantCount = sorted[0][1];
+        
+        if (dominantCount >= 3 && dominantTool === lastDominantTool) {
+          sameToolStreak++;
+        } else if (dominantCount >= 3) {
+          sameToolStreak = 1;
+          lastDominantTool = dominantTool;
+        } else {
+          sameToolStreak = 0;
+          lastDominantTool = "";
+        }
       }
 
       messages.push({ role: "user", content: toolResults });

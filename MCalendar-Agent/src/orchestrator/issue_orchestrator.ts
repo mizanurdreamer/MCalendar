@@ -13,6 +13,7 @@ import { setDatabaseUrl } from "../utils/database_tools.js";
 import { createAgenticGraph } from "../core/graph.js";
 import { metrics } from "../core/metrics.js";
 import { createInitialAgentState } from "../core/state.js";
+import { registerAllTools } from "../core/register_tools.js";
 import { AgentIssueAnalyzer } from "../agents/agent_issue_analyzer.js";
 import { AgentTestsGenerator } from "../agents/agent_tests_generator.js";
 import { AgentTestsReviewer } from "../agents/agent_tests_reviewer.js";
@@ -55,6 +56,9 @@ export async function processIssue(
   const testReader = new CodebaseReader(testProjectPath);
   const runner = new PlaywrightRunner(testProjectPath, config.playwrightWorkers ?? 6);
   const git = new GitBranch(codebasePath);
+
+  // Initialize tool registry
+  registerAllTools(reader, runner, codebasePath, testProjectPath, testProjectPath);
 
   const testOutputPath = path.join(testProjectPath, "tests");
   const metricsRunId = uuidv4();
