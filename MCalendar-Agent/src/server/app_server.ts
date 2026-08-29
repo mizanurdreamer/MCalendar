@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn, execSync, type ChildProcess } from "node:child_process";
 import { logger } from "../utils/logger.js";
 
 export class AppServerManager {
@@ -67,18 +67,15 @@ export class AppServerManager {
   }
 
   private async isPortInUse(port: number): Promise<boolean> {
-    return new Promise((resolve) => {
-      const { execSync } = require("node:child_process");
-      try {
-        const output = execSync(`netstat -ano | findstr :${port}`, {
-          encoding: "utf-8",
-          stdio: ["pipe", "pipe", "pipe"],
-        });
-        resolve(!!output);
-      } catch {
-        resolve(false);
-      }
-    });
+    try {
+      const output = execSync(`netstat -ano | findstr :${port}`, {
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+      return !!output;
+    } catch {
+      return false;
+    }
   }
 
   private async waitForReady(url: string, timeoutMs: number): Promise<boolean> {
