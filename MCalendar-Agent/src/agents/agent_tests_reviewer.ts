@@ -5,7 +5,7 @@ import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers
 import { AGENT_NAMES } from "../utils/agent_names.js";
 import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL, MESSAGE_TYPE, AGENT_EVENT, CORE_AGENT_NAMES } from "../utils/constants.js";
 import { createAgentTools, executeTool } from "../utils/tools.js";
-import { isMcpTool, callMcpTool } from "../mcp/client.js";
+import { isMcpTool, callMcpTool, isMcpAlive } from "../mcp/client.js";
 import type { ToolDefinition, ChatMessage, ContentBlock } from "../providers/types.js";
 
 export class AgentTestsReviewer extends BaseAgent {
@@ -155,6 +155,11 @@ Return the fixed test file content via write_test_file tool.`;
   private async debugAppWithMcp(testContent?: string): Promise<string> {
     const debugInfo: string[] = [];
     
+    if (!isMcpAlive()) {
+      logger.info(`[AgentTestsReviewer] MCP server not running — skipping live app debug`);
+      return "";
+    }
+    
     try {
       // Use API_BASE_URL from .env (via state) instead of hardcoding
       const baseUrl = this.state.apiBaseUrl || "http://localhost:3000";
@@ -177,6 +182,11 @@ Return the fixed test file content via write_test_file tool.`;
       // Navigate to the app
       logger.info(`[AgentTestsReviewer] Debugging app with Playwright MCP at ${targetUrl}...`);
       const navResult = await callMcpTool("browser_navigate", { url: targetUrl });
+      if (navResult.startsWith("Error:")) {
+        logger.warn(`[AgentTestsReviewer] MCP navigation failed — skipping remaining debug calls`);
+        debugInfo.push(`Navigation: ${navResult}`);
+        return debugInfo.join("\n\n");
+      }
       debugInfo.push(`Navigation: ${navResult.slice(0, 200)}`);
       
       // Take a screenshot
