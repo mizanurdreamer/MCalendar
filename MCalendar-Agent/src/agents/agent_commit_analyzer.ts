@@ -1,10 +1,12 @@
 import type { AgentState } from "../core/state.js";
-import type { ToolDefinition } from "../providers/types.js";
+import type { ToolDefinition, ChatMessage, ContentBlock } from "../providers/types.js";
 import { BaseAgent } from "../core/base_agent.js";
 import { logger } from "../utils/logger.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
 import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers/registry.js";
 import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL, MESSAGE_TYPE, AGENT_EVENT, CORE_AGENT_NAMES } from "../utils/constants.js";
+import { createAgentTools, executeTool } from "../utils/tools.js";
+import { exploreAppWithMcp } from "../mcp/explore.js";
 
 const SUBMIT_COMMIT_ANALYSIS_TOOL: ToolDefinition = {
   name: "submit_commit_analysis",
@@ -30,11 +32,32 @@ export class AgentCommitAnalyzer extends BaseAgent {
 
 Given a commit diff, you must:
 1. Understand what changed and why
-2. Assess risk level of changes
-3. Determine if tests are needed for the changes
-4. Define the scope of testing needed
+2. Explore the live app and codebase to verify the current state
+3. Read changed source files to understand the implementation
+4. Assess risk level of changes
+5. Determine if tests are needed for the changes
+6. Define the scope of testing needed
 
-Use the submit_commit_analysis tool to return your analysis with all required fields.`;
+BASELINE CONTEXT:
+You will receive pre-explored project structure, changed files, and live app exploration in your first message. This is your baseline understanding. Use it as a starting point.
+
+TOOLS AVAILABLE:
+- read_file: Read source files to understand implementation details
+- list_directory: List directory contents to explore project structure
+- browser_navigate: Navigate to a URL in the live app
+- browser_snapshot: Get the DOM structure of the current page
+- browser_screenshot: Take a screenshot of the current page
+- browser_click: Click an element on the page
+- browser_type: Type text into an input field
+- browser_console_messages: Get browser console output
+
+WHEN TO USE TOOLS:
+If the baseline context is insufficient to understand the commit:
+- Read specific changed files in full to understand the implementation
+- Navigate to relevant pages to verify the UI state
+- Check database schema if changes involve data models
+
+When you have enough information, call submit_commit_analysis with your complete analysis.`;
   }
 
   getGoal(): string {
@@ -48,17 +71,88 @@ Use the submit_commit_analysis tool to return your analysis with all required fi
       goal: this.getGoal(),
       steps: [
         {
+          id: "explore_app",
+          tool: "browser_navigate",
+          args: {},
+          expectedOutcome: "Explore live app to understand current UI state",
+          reasoning: "Browser exploration helps verify the commit's impact on the UI",
+        },
+        {
+          id: "read_changed_files",
+          tool: "read_file",
+          args: {},
+          expectedOutcome: "Understand the code changes in context",
+          reasoning: "Reading changed files helps assess risk and test scope",
+        },
+        {
           id: "analyze_commit",
-          tool: "analyze_commit",
+          tool: "submit_commit_analysis",
           args: {},
           expectedOutcome: "Complete commit analysis with test decision",
           reasoning: "Use LLM to analyze the commit diff and determine if tests are needed",
         },
       ],
-      estimatedIterations: 1,
+      estimatedIterations: 2,
       riskLevel: RISK_LEVEL.LOW,
       createdAt: Date.now(),
     };
+  }
+
+  protected getAvailableTools(): ToolDefinition[] {
+    return createAgentTools(this.taskContext.reader, this.taskContext.runner, this.taskContext.codebasePath);
+  }
+
+  private async executeTool(name: string, input: Record<string, unknown>): Promise<string> {
+    return executeTool(name, input, this.taskContext.reader, this.taskContext.runner, this.taskContext.testOutputPath, this.taskContext.codebasePath);
+  }
+
+  private async exploreChangedFiles(files: { filename: string }[]): Promise<string> {
+    const projectInfo: string[] = [];
+    const reader = this.taskContext.reader;
+
+    try {
+      const rootEntries = reader.listDirectory(".");
+      projectInfo.push(`Project root: ${rootEntries.join(", ")}`);
+
+      for (const file of files.slice(0, 5)) {
+        const content = reader.readFile(file.filename);
+        if (content && !content.startsWith("Error")) {
+          const preview = content.slice(0, 1500);
+          projectInfo.push(`--- ${file.filename} ---\n${preview}`);
+        }
+      }
+    } catch (err) {
+      logger.warn(`[AgentCommitAnalyzer] File exploration failed: ${err}`);
+    }
+
+    return projectInfo.join("\n\n");
+  }
+
+  private async exploreProject(): Promise<string> {
+    const projectInfo: string[] = [];
+    const reader = this.taskContext.reader;
+
+    try {
+      const rootEntries = reader.listDirectory(".");
+      projectInfo.push(`Project root: ${rootEntries.join(", ")}`);
+
+      const srcEntries = reader.listDirectory("src");
+      if (srcEntries) projectInfo.push(`src/: ${srcEntries.join(", ")}`);
+
+      const appEntries = reader.listDirectory("app");
+      if (appEntries) projectInfo.push(`app/: ${appEntries.join(", ")}`);
+
+      const pkgContent = reader.readFile("package.json");
+      if (pkgContent && !pkgContent.startsWith("Error")) {
+        const pkg = JSON.parse(pkgContent);
+        const deps = Object.keys(pkg.dependencies ?? {}).slice(0, 15);
+        projectInfo.push(`Dependencies: ${deps.join(", ")}`);
+      }
+    } catch (err) {
+      logger.warn(`[AgentCommitAnalyzer] Project exploration failed: ${err}`);
+    }
+
+    return projectInfo.join("\n\n");
   }
 
   async run(inputState?: AgentState): Promise<AgentState> {
@@ -94,8 +188,34 @@ ${fileList}`;
       logger.info(`    - ${f.filename} (${f.status}, +${f.additions}/-${f.deletions})`);
     }
 
+    // Explore live app with MCP
+    let mcpExploration = "";
     try {
-      const analysis = await this.runAnalysis(userMessage);
+      mcpExploration = await exploreAppWithMcp({
+        baseUrl: this.state.apiBaseUrl || "http://localhost:3000",
+      });
+    } catch (err) {
+      logger.warn(`[AgentCommitAnalyzer] MCP exploration skipped: ${err}`);
+    }
+
+    // Read changed files to understand context
+    let fileExploration = "";
+    try {
+      fileExploration = await this.exploreChangedFiles(diff.files);
+    } catch (err) {
+      logger.warn(`[AgentCommitAnalyzer] File exploration skipped: ${err}`);
+    }
+
+    // Explore project structure
+    let projectExploration = "";
+    try {
+      projectExploration = await this.exploreProject();
+    } catch (err) {
+      logger.warn(`[AgentCommitAnalyzer] Project exploration skipped: ${err}`);
+    }
+
+    try {
+      const analysis = await this.runAnalysis(userMessage, mcpExploration, fileExploration, projectExploration);
       state.commitAnalysis = analysis;
 
       if (!analysis.needsTests) {
@@ -125,34 +245,86 @@ ${fileList}`;
     return state;
   }
 
-  private async runAnalysis(userMessage: string): Promise<NonNullable<AgentState["commitAnalysis"]>> {
+  private async runAnalysis(userMessage: string, mcpExploration?: string, fileExploration?: string, projectExploration?: string): Promise<NonNullable<AgentState["commitAnalysis"]>> {
     const provider = getTaskProvider(AGENT_NAMES.AGENT_COMMIT_ANALYZER, this.state.agentConfig);
     logger.task(AGENT_NAMES.AGENT_COMMIT_ANALYZER, `${getTaskProviderName(AGENT_NAMES.AGENT_COMMIT_ANALYZER, this.state.agentConfig)}/${getTaskModel(AGENT_NAMES.AGENT_COMMIT_ANALYZER, this.state.agentConfig)}`);
 
     const systemPrompt = AgentCommitAnalyzer.buildSystemPrompt();
+    const tools = [...this.getAvailableTools(), SUBMIT_COMMIT_ANALYSIS_TOOL];
 
-    const response = await provider.chat({
-      system: systemPrompt,
-      messages: [{ role: "user", content: userMessage }],
-      tools: [SUBMIT_COMMIT_ANALYSIS_TOOL],
-      toolChoice: { type: "tool", name: "submit_commit_analysis" },
-      maxTokens: this.state.agentConfig[AGENT_NAMES.AGENT_COMMIT_ANALYZER]?.maxTokens,
-      temperature: this.state.agentConfig[AGENT_NAMES.AGENT_COMMIT_ANALYZER]?.temperature,
-    });
+    const sections: string[] = [userMessage];
+    if (projectExploration) {
+      sections.push(`\nProject Structure:\n${projectExploration}`);
+    }
+    if (fileExploration) {
+      sections.push(`\nChanged Files Context:\n${fileExploration}`);
+    }
+    if (mcpExploration) {
+      sections.push(`\nLive App Exploration:\n${mcpExploration}`);
+    }
+    sections.push(`\nYou have baseline context above. Use tools to investigate further if needed. Call submit_commit_analysis when ready.`);
+    const fullMessage = sections.join("\n");
 
-    // Extract from tool_use block (structured output)
-    const toolBlocks = response.content.filter((b): b is { type: "tool_use"; id: string; name: string; input: Record<string, unknown> } => b.type === "tool_use");
-    if (toolBlocks.length > 0 && toolBlocks[0].name === "submit_commit_analysis") {
-      const input = toolBlocks[0].input;
-      logger.debug(`[AgentCommitAnalyzer] Extracted analysis from tool_use block`);
-      return input as NonNullable<AgentState["commitAnalysis"]>;
+    const messages: ChatMessage[] = [{ role: "user", content: fullMessage }];
+    const maxIterations = this.state.maxIterations ?? 50;
+    let iteration = 0;
+
+    while (iteration < maxIterations) {
+      iteration++;
+      logger.debug(`[AgentCommitAnalyzer] Tool loop iteration ${iteration}`);
+
+      const response = await provider.chat({
+        system: systemPrompt,
+        messages,
+        tools,
+        maxTokens: this.state.agentConfig[AGENT_NAMES.AGENT_COMMIT_ANALYZER]?.maxTokens,
+        temperature: this.state.agentConfig[AGENT_NAMES.AGENT_COMMIT_ANALYZER]?.temperature,
+      });
+
+      messages.push({ role: "assistant", content: response.content });
+
+      const toolBlocks = response.content.filter((b): b is { type: "tool_use"; id: string; name: string; input: Record<string, unknown> } => b.type === "tool_use");
+
+      if (toolBlocks.length === 0 || response.stopReason !== "tool_use") {
+        logger.debug(`[AgentCommitAnalyzer] Tool loop completed after ${iteration} iterations`);
+        break;
+      }
+
+      // Check for submit_commit_analysis call
+      const submitBlock = toolBlocks.find(t => t.name === "submit_commit_analysis");
+      if (submitBlock) {
+        logger.debug(`[AgentCommitAnalyzer] Extracted analysis from tool_use block`);
+        return submitBlock.input as NonNullable<AgentState["commitAnalysis"]>;
+      }
+
+      // Execute other tools
+      const toolResults: ContentBlock[] = [];
+      for (const toolBlock of toolBlocks) {
+        logger.info(`[AgentCommitAnalyzer] Executing tool: ${toolBlock.name}`);
+        const result = await this.executeTool(toolBlock.name, toolBlock.input);
+        toolResults.push({
+          type: "tool_result",
+          toolUseId: toolBlock.id,
+          content: result,
+        });
+      }
+
+      messages.push({ role: "user", content: toolResults });
     }
 
-    // Fallback: try to parse text response (for providers that don't support tool use)
-    const textBlocks = response.content.filter((b): b is { type: "text"; text: string } => b.type === "text");
-    const text = textBlocks.map((b) => b.text).join("\n");
-    logger.debug(`[AgentCommitAnalyzer] No tool_use block found, falling back to text parsing`);
-    return this.parseTextFallback(text);
+    // Fallback: extract from last assistant text message
+    const lastAssistant = [...messages].reverse().find(m => m.role === "assistant");
+    if (lastAssistant) {
+      const textBlocks = (Array.isArray(lastAssistant.content) ? lastAssistant.content : [])
+        .filter((b): b is { type: "text"; text: string } => b.type === "text");
+      const text = textBlocks.map(b => b.text).join("\n");
+      if (text) {
+        logger.debug(`[AgentCommitAnalyzer] Falling back to text parsing`);
+        return this.parseTextFallback(text);
+      }
+    }
+
+    return this.parseTextFallback("");
   }
 
   private parseTextFallback(text: string): NonNullable<AgentState["commitAnalysis"]> {

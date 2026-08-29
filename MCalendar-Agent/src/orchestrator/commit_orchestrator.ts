@@ -22,6 +22,7 @@ import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers
 import { AGENT_NAMES } from "../utils/agent_names.js";
 import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL } from "../utils/constants.js";
 import { initMcpClient, shutdownMcpClient } from "../mcp/client.js";
+import { AppServerManager } from "../server/app_server.js";
 
 export interface CommitOrchestratorConfig {
   agentConfig: AgentConfig;
@@ -39,6 +40,7 @@ export interface CommitOrchestratorConfig {
   playwrightMcpEnabled?: boolean;
   playwrightMcpBrowser?: string;
   playwrightWorkers?: number;
+  pipelineTimeoutMs?: number;
 }
 
 export async function processCommit(
@@ -54,6 +56,14 @@ export async function processCommit(
 
   setDiagnosticConfig({ databaseUrl: config.databaseUrl, apiBaseUrl: config.apiBaseUrl });
   setDatabaseUrl(config.databaseUrl ?? "");
+
+  // Start app server if MCP is enabled (agents need live app for browser exploration)
+  let appServer: AppServerManager | null = null;
+  if (config.playwrightMcpEnabled) {
+    appServer = new AppServerManager();
+    const apiBaseUrl = config.apiBaseUrl || "http://localhost:3000";
+    await appServer.start(config.codebasePath, 3000, apiBaseUrl);
+  }
 
   // Initialize Playwright MCP if enabled
   if (config.playwrightMcpEnabled) {
@@ -129,7 +139,26 @@ export async function processCommit(
     logger.warn(`[Orchestrator] Branch creation failed, continuing on current branch: ${err}`);
   }
   
-  let result = await graph.invoke(initialState, { configurable: { thread_id: threadId } });
+  // Apply pipeline-level timeout
+  const pipelineTimeoutMs = config.pipelineTimeoutMs ?? 30 * 60 * 1000; // 30 min default
+  const pipelineTimer = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error(`Pipeline timed out after ${pipelineTimeoutMs}ms`)), pipelineTimeoutMs)
+  );
+
+  let result: Awaited<ReturnType<typeof graph.invoke>>;
+  try {
+    result = await Promise.race([
+      graph.invoke(initialState, { configurable: { thread_id: threadId } }),
+      pipelineTimer,
+    ]);
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("timed out")) {
+      logger.error(`[Orchestrator] Pipeline timed out after ${pipelineTimeoutMs}ms`);
+      result = { ...initialState, status: PIPELINE_STATUS.FAILED, error: err.message };
+    } else {
+      throw err;
+    }
+  }
 
   // Handle human approval interrupts
   while (result.status === PIPELINE_STATUS.AWAITING_HUMAN) {
@@ -190,6 +219,11 @@ export async function processCommit(
     } catch (err) {
       logger.warn(`[Orchestrator] Failed to shutdown Playwright MCP: ${err}`);
     }
+  }
+
+  // Stop app server if we started it
+  if (appServer) {
+    await appServer.stop();
   }
 
   return {

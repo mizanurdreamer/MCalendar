@@ -1,10 +1,12 @@
 import type { AgentState } from "../core/state.js";
-import type { ToolDefinition } from "../providers/types.js";
+import type { ToolDefinition, ChatMessage, ContentBlock } from "../providers/types.js";
 import { BaseAgent } from "../core/base_agent.js";
 import { logger } from "../utils/logger.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
 import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers/registry.js";
 import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL, MESSAGE_TYPE, AGENT_EVENT, CORE_AGENT_NAMES } from "../utils/constants.js";
+import { createAgentTools, executeTool } from "../utils/tools.js";
+import { exploreAppWithMcp } from "../mcp/explore.js";
 
 const SUBMIT_ANALYSIS_TOOL: ToolDefinition = {
   name: "submit_analysis",
@@ -48,11 +50,32 @@ export class AgentIssueAnalyzer extends BaseAgent {
 
 Given an issue, you must:
 1. Understand the functionality described
-2. Identify relevant files and code paths
-3. Define specific test scenarios with acceptance criteria
-4. Determine if tests are actually needed (some issues are docs, config, etc.)
+2. Explore the live app and codebase to understand the actual UI and code
+3. Identify relevant files and code paths
+4. Define specific test scenarios with acceptance criteria
+5. Determine if tests are actually needed (some issues are docs, config, etc.)
 
-Use the submit_analysis tool to return your analysis with all required fields.`;
+BASELINE CONTEXT:
+You will receive pre-explored project structure and live app exploration in your first message. This is your baseline understanding. Use it as a starting point.
+
+TOOLS AVAILABLE:
+- read_file: Read source files to understand implementation details
+- list_directory: List directory contents to explore project structure
+- browser_navigate: Navigate to a URL in the live app
+- browser_snapshot: Get the DOM structure of the current page
+- browser_screenshot: Take a screenshot of the current page
+- browser_click: Click an element on the page
+- browser_type: Type text into an input field
+- browser_console_messages: Get browser console output
+
+WHEN TO USE TOOLS:
+If the baseline context is insufficient to understand the issue:
+- Read specific source files mentioned in the issue
+- Navigate to relevant pages to verify UI elements exist
+- Check database schema if the issue involves data
+- Explore related code directories
+
+When you have enough information, call submit_analysis with your complete analysis.`;
   }
 
   getGoal(): string {
@@ -66,17 +89,59 @@ Use the submit_analysis tool to return your analysis with all required fields.`;
       goal: this.getGoal(),
       steps: [
         {
+          id: "explore_app",
+          tool: "browser_navigate",
+          args: {},
+          expectedOutcome: "Explore live app to understand current UI state",
+          reasoning: "Browser exploration helps ground test scenarios in the real app",
+        },
+        {
           id: "analyze_issue",
-          tool: "analyze_issue",
+          tool: "submit_analysis",
           args: {},
           expectedOutcome: "Complete issue analysis with test scenarios",
           reasoning: "Use LLM to analyze the issue and identify test requirements",
         },
       ],
-      estimatedIterations: 1,
+      estimatedIterations: 2,
       riskLevel: RISK_LEVEL.LOW,
       createdAt: Date.now(),
     };
+  }
+
+  protected getAvailableTools(): ToolDefinition[] {
+    return createAgentTools(this.taskContext.reader, this.taskContext.runner, this.taskContext.codebasePath);
+  }
+
+  private async executeTool(name: string, input: Record<string, unknown>): Promise<string> {
+    return executeTool(name, input, this.taskContext.reader, this.taskContext.runner, this.taskContext.testOutputPath, this.taskContext.codebasePath);
+  }
+
+  private async exploreProject(): Promise<string> {
+    const projectInfo: string[] = [];
+    const reader = this.taskContext.reader;
+
+    try {
+      const rootEntries = reader.listDirectory(".");
+      projectInfo.push(`Project root: ${rootEntries.join(", ")}`);
+
+      const srcEntries = reader.listDirectory("src");
+      if (srcEntries) projectInfo.push(`src/: ${srcEntries.join(", ")}`);
+
+      const appEntries = reader.listDirectory("app");
+      if (appEntries) projectInfo.push(`app/: ${appEntries.join(", ")}`);
+
+      const pkgContent = reader.readFile("package.json");
+      if (pkgContent && !pkgContent.startsWith("Error")) {
+        const pkg = JSON.parse(pkgContent);
+        const deps = Object.keys(pkg.dependencies ?? {}).slice(0, 15);
+        projectInfo.push(`Dependencies: ${deps.join(", ")}`);
+      }
+    } catch (err) {
+      logger.warn(`[AgentIssueAnalyzer] Project exploration failed: ${err}`);
+    }
+
+    return projectInfo.join("\n\n");
   }
 
   async run(inputState?: AgentState): Promise<AgentState> {
@@ -98,8 +163,26 @@ Use the submit_analysis tool to return your analysis with all required fields.`;
 
     logger.info(`[AgentIssueAnalyzer] Analyzing issue #${issue.number}`);
 
+    // Explore live app with MCP
+    let mcpExploration = "";
     try {
-      const analysis = await this.runAnalysis(userMessage);
+      mcpExploration = await exploreAppWithMcp({
+        baseUrl: this.state.apiBaseUrl || "http://localhost:3000",
+      });
+    } catch (err) {
+      logger.warn(`[AgentIssueAnalyzer] MCP exploration skipped: ${err}`);
+    }
+
+    // Explore project structure
+    let projectExploration = "";
+    try {
+      projectExploration = await this.exploreProject();
+    } catch (err) {
+      logger.warn(`[AgentIssueAnalyzer] Project exploration skipped: ${err}`);
+    }
+
+    try {
+      const analysis = await this.runAnalysis(userMessage, mcpExploration, projectExploration);
       state.issueAnalysis = analysis;
 
       if (!analysis.needs_tests) {
@@ -166,34 +249,83 @@ Use the submit_analysis tool to return your analysis with all required fields.`;
     return state;
   }
 
-  private async runAnalysis(userMessage: string): Promise<NonNullable<AgentState["issueAnalysis"]>> {
+  private async runAnalysis(userMessage: string, mcpExploration?: string, projectExploration?: string): Promise<NonNullable<AgentState["issueAnalysis"]>> {
     const provider = getTaskProvider(AGENT_NAMES.AGENT_ISSUE_ANALYZER, this.state.agentConfig);
     logger.task(AGENT_NAMES.AGENT_ISSUE_ANALYZER, `${getTaskProviderName(AGENT_NAMES.AGENT_ISSUE_ANALYZER, this.state.agentConfig)}/${getTaskModel(AGENT_NAMES.AGENT_ISSUE_ANALYZER, this.state.agentConfig)}`);
 
     const systemPrompt = AgentIssueAnalyzer.buildSystemPrompt();
+    const tools = [...this.getAvailableTools(), SUBMIT_ANALYSIS_TOOL];
 
-    const response = await provider.chat({
-      system: systemPrompt,
-      messages: [{ role: "user", content: userMessage }],
-      tools: [SUBMIT_ANALYSIS_TOOL],
-      toolChoice: { type: "tool", name: "submit_analysis" },
-      maxTokens: this.state.agentConfig[AGENT_NAMES.AGENT_ISSUE_ANALYZER]?.maxTokens,
-      temperature: this.state.agentConfig[AGENT_NAMES.AGENT_ISSUE_ANALYZER]?.temperature,
-    });
+    const sections: string[] = [userMessage];
+    if (projectExploration) {
+      sections.push(`\nProject Structure:\n${projectExploration}`);
+    }
+    if (mcpExploration) {
+      sections.push(`\nLive App Exploration:\n${mcpExploration}`);
+    }
+    sections.push(`\nYou have baseline context above. Use tools to investigate further if needed. Call submit_analysis when ready.`);
+    const fullMessage = sections.join("\n");
 
-    // Extract from tool_use block (structured output)
-    const toolBlocks = response.content.filter((b): b is { type: "tool_use"; id: string; name: string; input: Record<string, unknown> } => b.type === "tool_use");
-    if (toolBlocks.length > 0 && toolBlocks[0].name === "submit_analysis") {
-      const input = toolBlocks[0].input;
-      logger.debug(`[AgentIssueAnalyzer] Extracted analysis from tool_use block`);
-      return input as NonNullable<AgentState["issueAnalysis"]>;
+    const messages: ChatMessage[] = [{ role: "user", content: fullMessage }];
+    const maxIterations = this.state.maxIterations ?? 50;
+    let iteration = 0;
+
+    while (iteration < maxIterations) {
+      iteration++;
+      logger.debug(`[AgentIssueAnalyzer] Tool loop iteration ${iteration}`);
+
+      const response = await provider.chat({
+        system: systemPrompt,
+        messages,
+        tools,
+        maxTokens: this.state.agentConfig[AGENT_NAMES.AGENT_ISSUE_ANALYZER]?.maxTokens,
+        temperature: this.state.agentConfig[AGENT_NAMES.AGENT_ISSUE_ANALYZER]?.temperature,
+      });
+
+      messages.push({ role: "assistant", content: response.content });
+
+      const toolBlocks = response.content.filter((b): b is { type: "tool_use"; id: string; name: string; input: Record<string, unknown> } => b.type === "tool_use");
+
+      if (toolBlocks.length === 0 || response.stopReason !== "tool_use") {
+        logger.debug(`[AgentIssueAnalyzer] Tool loop completed after ${iteration} iterations`);
+        break;
+      }
+
+      // Check for submit_analysis call
+      const submitBlock = toolBlocks.find(t => t.name === "submit_analysis");
+      if (submitBlock) {
+        logger.debug(`[AgentIssueAnalyzer] Extracted analysis from tool_use block`);
+        return submitBlock.input as NonNullable<AgentState["issueAnalysis"]>;
+      }
+
+      // Execute other tools
+      const toolResults: ContentBlock[] = [];
+      for (const toolBlock of toolBlocks) {
+        logger.info(`[AgentIssueAnalyzer] Executing tool: ${toolBlock.name}`);
+        const result = await this.executeTool(toolBlock.name, toolBlock.input);
+        toolResults.push({
+          type: "tool_result",
+          toolUseId: toolBlock.id,
+          content: result,
+        });
+      }
+
+      messages.push({ role: "user", content: toolResults });
     }
 
-    // Fallback: try to parse text response (for providers that don't support tool use)
-    const textBlocks = response.content.filter((b): b is { type: "text"; text: string } => b.type === "text");
-    const text = textBlocks.map((b) => b.text).join("\n");
-    logger.debug(`[AgentIssueAnalyzer] No tool_use block found, falling back to text parsing`);
-    return this.parseTextFallback(text);
+    // Fallback: extract from last assistant text message
+    const lastAssistant = [...messages].reverse().find(m => m.role === "assistant");
+    if (lastAssistant) {
+      const textBlocks = (Array.isArray(lastAssistant.content) ? lastAssistant.content : [])
+        .filter((b): b is { type: "text"; text: string } => b.type === "text");
+      const text = textBlocks.map(b => b.text).join("\n");
+      if (text) {
+        logger.debug(`[AgentIssueAnalyzer] Falling back to text parsing`);
+        return this.parseTextFallback(text);
+      }
+    }
+
+    return this.parseTextFallback("");
   }
 
   private parseTextFallback(text: string): NonNullable<AgentState["issueAnalysis"]> {

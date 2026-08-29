@@ -204,6 +204,58 @@ Return the fixed test file content via write_test_file tool.`;
     return debugInfo.join("\n\n");
   }
 
+  private async exploreSourceFiles(testContent: string): Promise<string> {
+    const sourceInfo: string[] = [];
+    const reader = this.taskContext.reader;
+
+    try {
+      // Extract page.goto() URLs to find relevant source files
+      const gotoMatches = [...testContent.matchAll(/page\.goto\(['"](.*?)['"]\)/g)];
+      const urlToFilePath = (url: string): string | null => {
+        if (!url.startsWith("/")) return null;
+        const segments = url.split("/").filter(Boolean);
+        if (segments.length === 0) return null;
+        // Map URL path to Next.js app directory structure
+        return `app/${segments.join("/")}/page.tsx`;
+      };
+
+      const filePaths = new Set<string>();
+      for (const match of gotoMatches) {
+        const filePath = urlToFilePath(match[1]);
+        if (filePath) filePaths.add(filePath);
+      }
+
+      // Also extract describe block names that might hint at feature areas
+      const describeMatches = [...testContent.matchAll(/describe\(['"](.*?)['"]/g)];
+      for (const match of describeMatches) {
+        const name = match[1].toLowerCase().replace(/\s+/g, "-");
+        // Try common paths
+        const candidates = [
+          `app/${name}/page.tsx`,
+          `app/admin/${name}/page.tsx`,
+          `app/client/${name}/page.tsx`,
+          `src/services/${name}.ts`,
+        ];
+        for (const c of candidates) {
+          if (reader.readFile(c) && !reader.readFile(c).startsWith("Error")) {
+            filePaths.add(c);
+          }
+        }
+      }
+
+      for (const filePath of [...filePaths].slice(0, 3)) {
+        const content = reader.readFile(filePath);
+        if (content && !content.startsWith("Error")) {
+          sourceInfo.push(`--- ${filePath} ---\n${content.slice(0, 2000)}`);
+        }
+      }
+    } catch (err) {
+      logger.warn(`[AgentTestsReviewer] Source file exploration failed: ${err}`);
+    }
+
+    return sourceInfo.join("\n\n");
+  }
+
   private async runErrorAnalysis(testContent: string): Promise<string> {
     const testFilename = this.state.testFilename;
     const testResult = this.state.testResult;
@@ -218,6 +270,14 @@ Return the fixed test file content via write_test_file tool.`;
       mcpDebugInfo = await this.debugAppWithMcp(testContent);
     } catch (err) {
       logger.warn(`[AgentTestsReviewer] MCP debug skipped: ${err}`);
+    }
+
+    // Read source files referenced in the test
+    let sourceFileInfo = "";
+    try {
+      sourceFileInfo = await this.exploreSourceFiles(testContent);
+    } catch (err) {
+      logger.warn(`[AgentTestsReviewer] Source file exploration skipped: ${err}`);
     }
     
     const provider = getTaskProvider(AGENT_NAMES.AGENT_TESTS_REVIEWER, this.state.agentConfig);
@@ -245,6 +305,7 @@ Retry history:
 ${this.state.retryHistory.map((r, i) => `Attempt ${i + 1}: ${r.errors.join("; ")}`).join("\n")}
 
 ${mcpDebugInfo ? `Live App Debug Info:\n${mcpDebugInfo}\n` : ""}
+${sourceFileInfo ? `Source Files Context:\n${sourceFileInfo}\n` : ""}
 Analyze the errors and provide a fix plan.`;
 
     const response = await provider.chat({
