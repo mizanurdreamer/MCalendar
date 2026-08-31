@@ -73,7 +73,13 @@ export interface AppConfigResponse {
   memoryType: "local" | "postgres";
 }
 
-async function request<T>(url: string, init?: RequestInit): Promise<T> {
+export interface MemoryStatsResponse {
+  memoryType: "local" | "postgres";
+  totalEntries: number;
+  byType: Record<string, number>;
+}
+
+export async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     headers: { "Content-Type": "application/json" },
     ...init,
@@ -91,6 +97,7 @@ export const api = {
   getJobStatus: () => request<JobStatus>("/api/job"),
   getRetries: () => request<RetriesResponse>("/api/retries"),
   clearRetries: () => request<{ cleared: number }>("/api/retries/clear", { method: "POST" }),
+  getMemoryStats: () => request<MemoryStatsResponse>("/api/memory/stats"),
   startIssueJob: (number: number) =>
     request<JobInfo>("/api/jobs/issue", { method: "POST", body: JSON.stringify({ number }) }),
   sendChat: (message: string, history: { role: "user" | "assistant"; content: string }[]) =>

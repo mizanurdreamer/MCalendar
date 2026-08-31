@@ -15,6 +15,10 @@ export class AgentTestsGenerator extends BaseAgent {
     super(AGENT_NAMES.AGENT_TESTS_GENERATOR, state, AgentTestsGenerator.buildSystemPrompt(), taskContext);
   }
 
+  private static sanitizeFilename(filename: string): string {
+    return filename.replace(/^(tests[/\\])+/, "");
+  }
+
   static buildSystemPrompt(): string {
     return `You are the Test Generator agent. Your job is to write Playwright E2E test files based on analysis.
 
@@ -384,7 +388,7 @@ Use the write_test_file tool to save the test as "${testFilename}".`;
       if (toolBlocks.length > 0) {
         // Execute the tool call
         const toolBlock = toolBlocks[0];
-        const filename = (toolBlock.input.filename as string) || testFilename;
+        const filename = AgentTestsGenerator.sanitizeFilename((toolBlock.input.filename as string) || testFilename);
         const content = toolBlock.input.content as string;
         if (content) {
           const fullPath = path.join(this.state.testOutputPath, filename);

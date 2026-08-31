@@ -14,6 +14,10 @@ import { logger } from "../utils/logger.js";
 
 const ALL_ROLES = ["issue_analyzer", "commit_analyzer", "tests_generator", "tests_reviewer", "tests_report_generator", "summarize"] as const;
 
+function sanitizeTestFilename(filename: string): string {
+  return filename.replace(/^(tests[/\\])+/, "");
+}
+
 export function registerAllTools(
   reader: CodebaseReader,
   runner: PlaywrightRunner,
@@ -50,11 +54,11 @@ export function registerAllTools(
     },
     {
       name: "write_test_file",
-      description: "Write a generated Playwright test file to the test project's tests/. The filename should end with .spec.ts.",
+      description: "Write a generated Playwright test file to the test project's tests/. The filename should end with .spec.ts. Do NOT include a tests/ prefix in the filename.",
       inputSchema: {
         type: "object",
         properties: {
-          filename: { type: "string", description: "Test filename or path ending in .spec.ts" },
+          filename: { type: "string", description: "Test filename ending in .spec.ts (e.g., issue-6-xxx.spec.ts). Do NOT include tests/ prefix." },
           content: { type: "string", description: "The complete test file content" },
         },
         required: ["filename", "content"],
@@ -66,7 +70,7 @@ export function registerAllTools(
       inputSchema: {
         type: "object",
         properties: {
-          filename: { type: "string", description: "Test filename or path ending in .spec.ts" },
+          filename: { type: "string", description: "Test filename ending in .spec.ts (e.g., issue-6-xxx.spec.ts). Do NOT include tests/ prefix." },
           content: { type: "string", description: "Additional test code to append" },
         },
         required: ["filename", "content"],
@@ -101,7 +105,7 @@ export function registerAllTools(
         break;
       case "write_test_file":
         handler = async (input: Record<string, unknown>) => {
-          const filename = input.filename as string;
+          const filename = sanitizeTestFilename(input.filename as string);
           const content = input.content as string;
           const fullPath = path.join(context.testOutputPath, filename);
           const dir = path.dirname(fullPath);
@@ -112,7 +116,7 @@ export function registerAllTools(
         break;
       case "append_test_file":
         handler = async (input: Record<string, unknown>) => {
-          const filename = input.filename as string;
+          const filename = sanitizeTestFilename(input.filename as string);
           const content = input.content as string;
           const fullPath = path.join(context.testOutputPath, filename);
           if (!fs.existsSync(fullPath)) {

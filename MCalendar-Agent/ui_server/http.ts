@@ -15,6 +15,7 @@ import { runChatTurn } from "./chat_agent.js";
 import { attachWs, broadcast, connectedCount } from "./ws_hub.js";
 import { attachLogBroadcast } from "./log_transport.js";
 import { getPendingApprovals as getStoredApprovals, resolveApproval as resolveStoredApproval, createApprovalRequest as createStoredApproval } from "../src/core/approval_store.js";
+import { createMemoryStore } from "../src/core/memory.js";
 
 export interface ApprovalRequest {
   id: string;
@@ -147,6 +148,17 @@ export async function startWebServer(options: WebServerOptions = {}): Promise<vo
       new CommitStateManager("state").clearCommitRetries();
     broadcast({ type: "retries:update" });
     res.json({ cleared });
+  });
+
+  app.get("/api/memory/stats", async (_req: Request, res: Response) => {
+    try {
+      const memoryStore = createMemoryStore(config.memoryType, config.agentMemoryDatabaseUrl || config.databaseUrl);
+      await memoryStore.initialize();
+      const stats = await memoryStore.getStats();
+      res.json({ memoryType: config.memoryType, ...stats });
+    } catch (err) {
+      res.status(500).json({ error: `Memory store error: ${err instanceof Error ? err.message : String(err)}` });
+    }
   });
 
   app.get("/api/approvals", (_req: Request, res: Response) => {

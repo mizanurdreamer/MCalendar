@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
-import type { IssueSummary, JobStatus, RetriesResponse } from "../api";
+import type { IssueSummary, JobStatus, RetriesResponse, MemoryStatsResponse } from "../api";
 
 interface SidebarProps {
   appConfig: Awaited<ReturnType<typeof api.getConfig>> | null;
@@ -13,16 +13,19 @@ export function Sidebar({ appConfig, retriesVersion, connected, onCompose }: Sid
   const [issues, setIssues] = useState<IssueSummary[]>([]);
   const [retries, setRetries] = useState<RetriesResponse | null>(null);
   const [jobStatus, setJobStatus] = useState<JobStatus | null>(null);
+  const [memoryStats, setMemoryStats] = useState<MemoryStatsResponse | null>(null);
 
   const refresh = useCallback(async () => {
-    const [issuesRes, retriesRes, jobsRes] = await Promise.allSettled([
+    const [issuesRes, retriesRes, jobsRes, memoryRes] = await Promise.allSettled([
       api.getIssues(),
       api.getRetries(),
       api.getJobStatus(),
+      api.getMemoryStats(),
     ]);
     if (issuesRes.status === "fulfilled") setIssues(issuesRes.value);
     if (retriesRes.status === "fulfilled") setRetries(retriesRes.value);
     if (jobsRes.status === "fulfilled") setJobStatus(jobsRes.value);
+    if (memoryRes.status === "fulfilled") setMemoryStats(memoryRes.value);
   }, []);
 
   useEffect(() => {
@@ -59,6 +62,11 @@ export function Sidebar({ appConfig, retriesVersion, connected, onCompose }: Sid
           {appConfig && appConfig.memoryType === "local" && (
             <span className="badge badge-warn" title="Set MEMORY_TYPE=persistent in .env for cross-run memory">
               memory: local
+            </span>
+          )}
+          {memoryStats && memoryStats.memoryType === "postgres" && (
+            <span className="badge" title={`Memory entries: ${memoryStats.totalEntries}`}>
+              memory: {memoryStats.totalEntries} entries
             </span>
           )}
         </div>

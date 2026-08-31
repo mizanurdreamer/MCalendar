@@ -252,7 +252,7 @@ Return ONLY valid JSON:
     
     if (this.state.memoryStore) {
       this.state.memoryStore.store(memoryEntry).catch(err => 
-        logger.warn(`[${this.agentName}] Failed to store memory: ${err}`)
+        logger.error(`[${this.agentName}] Failed to store memory: ${err}`)
       );
     }
     

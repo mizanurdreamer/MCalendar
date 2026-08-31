@@ -592,7 +592,13 @@ export class AgenticGraph {
   }
 
   async initialize(): Promise<void> {
-    await this.memoryStore.initialize();
+    try {
+      await this.memoryStore.initialize();
+      logger.success(`[AgenticGraph] Memory store initialized (${this.config.memoryType})`);
+    } catch (err) {
+      logger.error(`[AgenticGraph] Memory store initialization failed: ${err}`);
+      logger.warn(`[AgenticGraph] Continuing without persistent memory — memories will not be stored`);
+    }
     logger.success("[AgenticGraph] Initialized with native LangGraph features");
   }
 

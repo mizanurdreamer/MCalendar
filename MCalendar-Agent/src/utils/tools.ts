@@ -9,6 +9,10 @@ import { getDevToolDefinitions, executeDevTool } from "./dev_tools.js";
 import { getMcpToolDefinitions } from "../mcp/tools.js";
 import { callMcpTool, isMcpTool } from "../mcp/client.js";
 
+function sanitizeTestFilename(filename: string): string {
+  return filename.replace(/^(tests[/\\])+/, "");
+}
+
 export function createAgentTools(
   reader: CodebaseReader,
   runner: PlaywrightRunner,
@@ -133,7 +137,7 @@ export async function executeTool(
       return JSON.stringify(entries, null, 2);
     }
     case "write_test_file": {
-      const filename = input.filename as string;
+      const filename = sanitizeTestFilename(input.filename as string);
       const content = input.content as string;
       const fullPath = path.join(testOutputPath, filename);
       const dir = path.dirname(fullPath);
@@ -142,7 +146,7 @@ export async function executeTool(
       return `Test file written to: tests/${filename}`;
     }
     case "append_test_file": {
-      const filename = input.filename as string;
+      const filename = sanitizeTestFilename(input.filename as string);
       const content = input.content as string;
       const fullPath = path.join(testOutputPath, filename);
       if (!fs.existsSync(fullPath)) {
