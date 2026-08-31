@@ -241,8 +241,12 @@ export async function executeDevTool(
 
     case "find_usage": {
       const name = input.name as string;
+      const isWin = process.platform === "win32";
       try {
-        const output = execSync(`grep -rn "${name}" --include="*.ts" --include="*.tsx" --include="*.js" .`, { cwd, encoding: "utf-8", timeout: 30_000 });
+        const cmd = isWin
+          ? `findstr /s /n /c:"${name}" *.ts *.tsx *.js`
+          : `grep -rn "${name}" --include="*.ts" --include="*.tsx" --include="*.js" .`;
+        const output = execSync(cmd, { cwd, encoding: "utf-8", timeout: 30_000 });
         return output || `(no usages of "${name}" found)`;
       } catch {
         return `(no usages of "${name}" found)`;
@@ -251,6 +255,7 @@ export async function executeDevTool(
 
     case "find_definition": {
       const name = input.name as string;
+      const isWin = process.platform === "win32";
       try {
         const patterns = [
           `function ${name}`,
@@ -262,8 +267,15 @@ export async function executeDevTool(
           `type ${name}`,
           `export.*${name}`,
         ];
-        const pattern = patterns.join("\\|");
-        const output = execSync(`grep -rn "${pattern}" --include="*.ts" --include="*.tsx" --include="*.js" .`, { cwd, encoding: "utf-8", timeout: 30_000 });
+        let cmd: string;
+        if (isWin) {
+          const findstrPatterns = patterns.map((p) => `/c:"${p}"`).join(" ");
+          cmd = `findstr /s /n /r ${findstrPatterns} *.ts *.tsx *.js`;
+        } else {
+          const pattern = patterns.join("\\|");
+          cmd = `grep -rn "${pattern}" --include="*.ts" --include="*.tsx" --include="*.js" .`;
+        }
+        const output = execSync(cmd, { cwd, encoding: "utf-8", timeout: 30_000 });
         return output || `(no definition of "${name}" found)`;
       } catch {
         return `(no definition of "${name}" found)`;

@@ -171,7 +171,7 @@ export function registerAllTools(
   for (const tool of getDevToolDefinitions()) {
     const metadata: ToolMetadata = {
       category: "dev",
-      roles: ["tests_generator", "tests_reviewer"],
+      roles: ["issue_analyzer", "commit_analyzer", "tests_generator", "tests_reviewer"],
     };
     registry.register(
       tool,

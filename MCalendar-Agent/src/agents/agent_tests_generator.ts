@@ -162,7 +162,7 @@ You MUST use the write_test_file and append_test_file tools to save your test.`;
 
     let userMessage: string;
     if (state.mode === MODE.ISSUE && state.issue && state.issueAnalysis) {
-      const scenarios = state.issueAnalysis.test_scenarios
+      const scenarios = (state.issueAnalysis.test_scenarios ?? [])
         .map((s, i) => `${i + 1}. ${s.name} (${s.type}): ${s.description}${s.acceptance_criterion ? ` [criteria: ${s.acceptance_criterion}]` : ""}`)
         .join("\n");
 
