@@ -200,6 +200,7 @@ Supervisor → agent_tests_generator (AgentTestsGenerator)
 
 - Node.js >= 20.0.0
 - npm
+- PostgreSQL (running locally)
 - GitHub Personal Access Token (with `repo` scope)
 - AI provider API key (Anthropic, OpenAI, Google, Ollama, or OpenRouter)
 
@@ -235,9 +236,70 @@ Supervisor → agent_tests_generator (AgentTestsGenerator)
    # Watch commits only on a branch
    npm start -- watch-branch main
 
-   # List open issues
-   npm start -- list
-   ```
+    # List open issues
+    npm start -- list
+    ```
+
+## Database Setup
+
+The agent uses PostgreSQL for two purposes:
+
+| Database | Purpose | Created by |
+|----------|---------|------------|
+| `bookingcalendar` | MCalendar app data (diagnostic tools) | Docker Compose |
+| `mcalendar_agent` | Agent persistent memory (lessons, patterns) | `npm run db:setup` |
+
+### Start PostgreSQL
+
+Ensure PostgreSQL is installed and running locally. Then create the required databases:
+
+```bash
+# Connect to PostgreSQL
+psql -U postgres
+
+# Create the MCalendar app database
+CREATE DATABASE bookingcalendar;
+
+# Create the agent memory database
+CREATE DATABASE mcalendar_agent;
+
+# Exit
+\q
+```
+
+Or run the agent's setup script to auto-create the `mcalendar_agent` database:
+
+```bash
+npm run db:setup
+```
+
+### Create Agent Memory Database
+
+From the **MCalendar-Agent** directory:
+
+```bash
+cd D:\Projects\MCalendar\MCalendar-Agent
+npm run db:setup
+```
+
+This creates the `mcalendar_agent` database and `agent_memories` table (idempotent — safe to run multiple times).
+
+To reset the memory database:
+
+```bash
+npm run db:reset
+```
+
+### Verify .env Configuration
+
+Ensure these are set in `MCalendar-Agent/.env`:
+
+```bash
+AGENT_MEMORY_DATABASE_URL=postgresql://user:pass@localhost:5432/mcalendar_agent
+MEMORY_TYPE=persistent
+```
+
+> **Note:** Update the port, user, and password to match your local PostgreSQL setup.
 
 ## Web UI
 
@@ -326,6 +388,9 @@ The API server binds to `127.0.0.1` on port `3002` by default — change via `WE
 | `PLAYWRIGHT_WORKERS` | No | Number of parallel workers for Playwright test runs (default: `6`) |
 | `WEB_PORT` | No | Web UI API server port (default: `3002`) |
 | `WEB_HOST` | No | Web UI bind address (default: `127.0.0.1`) |
+| `DATABASE_URL` | For diagnostic tools | PostgreSQL connection string for MCalendar app DB |
+| `AGENT_MEMORY_DATABASE_URL` | For persistent memory | PostgreSQL connection string for agent memory DB (falls back to `DATABASE_URL`) |
+| `MEMORY_TYPE` | No | Memory store: `local` (in-memory, default) or `postgres` (persistent) |
 
 ### Model Auto-Selection
 
@@ -595,6 +660,29 @@ Ensure the provider is uncommented in `src/providers/registry.ts` and the npm pa
 
 ### "MCP transport error"
 If using `PLAYWRIGHT_MCP_ENABLED=true`, ensure `npx` is available and the `@playwright/mcp` package can be downloaded. The first run may take longer as it downloads the MCP server.
+
+### "PostgreSQL not creating automatically"
+PostgreSQL is not bundled with the agent. You must start it separately:
+
+```bash
+# Connect to your local PostgreSQL
+psql -U postgres
+
+# Create the required databases
+CREATE DATABASE bookingcalendar;
+CREATE DATABASE mcalendar_agent;
+
+# Exit
+\q
+```
+
+Or run the agent's setup script to auto-create the `mcalendar_agent` database:
+
+```bash
+npm run db:setup
+```
+
+If you see connection errors, verify the port and credentials in your `.env` match your local PostgreSQL setup (default port: `5432`).
 
 ## GitHub API
 
