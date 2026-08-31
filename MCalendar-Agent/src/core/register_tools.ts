@@ -88,7 +88,7 @@ export function registerAllTools(
   for (const tool of coreTools) {
     const metadata: ToolMetadata = {
       category: "core",
-      roles: ["issue_analyzer", "commit_analyzer", "tests_generator", "tests_reviewer"],
+      roles: [...ALL_ROLES],
     };
 
     let handler: ((input: Record<string, unknown>, ctx: ToolHandlerContext) => Promise<string>) | undefined;
@@ -145,7 +145,7 @@ export function registerAllTools(
   for (const tool of getDiagnosticToolDefinitions()) {
     const metadata: ToolMetadata = {
       category: "diagnostic",
-      roles: ["commit_analyzer", "tests_reviewer", "issue_analyzer"],
+      roles: [...ALL_ROLES],
     };
     registry.register(
       tool,
@@ -158,7 +158,7 @@ export function registerAllTools(
   for (const tool of getDatabaseToolDefinitions()) {
     const metadata: ToolMetadata = {
       category: "database",
-      roles: ["issue_analyzer", "commit_analyzer", "tests_reviewer"],
+      roles: [...ALL_ROLES],
     };
     registry.register(
       tool,
@@ -171,7 +171,7 @@ export function registerAllTools(
   for (const tool of getDevToolDefinitions()) {
     const metadata: ToolMetadata = {
       category: "dev",
-      roles: ["issue_analyzer", "commit_analyzer", "tests_generator", "tests_reviewer"],
+      roles: [...ALL_ROLES],
     };
     registry.register(
       tool,
@@ -184,7 +184,7 @@ export function registerAllTools(
   for (const tool of getMcpToolDefinitions()) {
     const metadata: ToolMetadata = {
       category: "mcp",
-      roles: ["issue_analyzer", "tests_generator", "tests_reviewer"],
+      roles: [...ALL_ROLES],
     };
     registry.register(
       tool,

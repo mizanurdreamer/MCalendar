@@ -6,7 +6,6 @@ import { processCommit } from "./orchestrator/commit_orchestrator.js";
 import { startWatcher } from "./watcher/issue_orchestrator_watcher.js";
 import { StateManager } from "./watcher/issue_state_tracker.js";
 import { CommitStateManager } from "./watcher/commit_state_tracker.js";
-import { startWebServer } from "../ui_server/http.js";
 import { logger } from "./utils/logger.js";
 import { createAgenticGraph } from "./core/graph.js";
 import { createInitialAgentState } from "./core/state.js";
@@ -269,7 +268,10 @@ program
   .option("-p, --port <port>", "Server port (default: WEB_PORT env or 3002)")
   .action(async (opts: { port?: string }) => {
     try {
-      await startWebServer({ port: opts.port ? parseInt(opts.port, 10) : undefined });
+      // Dynamic import — path built at runtime to avoid TS rootDir resolution
+      const p = await import("node:path");
+      const mod = await import(p.join(process.cwd(), "ui_server", "http.js"));
+      await mod.startWebServer({ port: opts.port ? parseInt(opts.port, 10) : undefined });
     } catch (err) {
       logger.error(`Error: ${err}`);
       process.exit(1);

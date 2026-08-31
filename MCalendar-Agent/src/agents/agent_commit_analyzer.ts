@@ -41,20 +41,45 @@ Given a commit diff, you must:
 BASELINE CONTEXT:
 You will receive pre-explored project structure, changed files, and live app exploration in your first message. This is your baseline understanding. Use it as a starting point.
 
-TOOLS AVAILABLE:
-- read_file: Read source files to understand implementation details
-- list_directory: List directory contents to explore project structure
-- browser_navigate: Navigate to a URL in the live app
-- browser_snapshot: Get the DOM structure of the current page
-- browser_screenshot: Take a screenshot of the current page
-- browser_click: Click an element on the page
-- browser_type: Type text into an input field
-- browser_console_messages: Get browser console output
+ALL TOOLS AVAILABLE TO YOU:
+File & Code Exploration:
+- read_file: Read any source file
+- list_directory: List directory contents
+- find_usage: Find where a function/variable is used
+- find_definition: Find where a function/variable is defined
+
+Shell & Dev:
+- run_command: Execute any shell command
+- npm_command: Run npm scripts
+- git_log: View recent git commits
+- git_diff: View git diff for changes
+- lint_code: Run linter on code
+- check_types: Run TypeScript type checking
+
+Database:
+- database_schema: Query database schema
+- query_database: Run SQL queries
+
+Browser (if app running):
+- browser_navigate: Navigate to a URL
+- browser_snapshot: Get DOM structure
+- browser_screenshot: Take a screenshot
+- browser_click: Click an element
+- browser_type: Type text into input
+- browser_console_messages: Get console output
+
+Debugging:
+- check_process: Check running processes
+- check_port: Check what's on a port
+- env_check: Check environment variables
+- read_server_logs: Read application logs
 
 WHEN TO USE TOOLS:
-If the baseline context is insufficient to understand the commit:
-- Read specific changed files in full to understand the implementation
-- Navigate to relevant pages to verify the UI state
+Use tools to understand the commit and its impact:
+- Read changed files to understand the implementation
+- Use git_diff to see exactly what changed
+- Use find_usage to trace affected code paths
+- Navigate to relevant pages to verify the UI state (if app running)
 - Check database schema if changes involve data models
 
 When you have enough information, call submit_commit_analysis with your complete analysis.`;
