@@ -30,8 +30,18 @@ export function JobCard({ job }: { job: JobInfo }) {
               {!!job.result.testsFailed && <span className="stat stat-fail">✘ {job.result.testsFailed} failed</span>}
             </>
           )}
+          {job.result.testsPassed === 0 && job.result.testsFailed === 0 && job.result.filesWritten && job.result.filesWritten.length > 0 && (
+            <span className="stat stat-warn">⚠ 0 tests executed</span>
+          )}
           {job.result.filesWritten && job.result.filesWritten.length > 0 && (
-            <span className="stat">📝 {job.result.filesWritten.length} test file(s)</span>
+            <div className="job-files">
+              {job.result.filesWritten.map((f) => (
+                <span key={f} className="stat file-stat">📝 {f}</span>
+              ))}
+            </div>
+          )}
+          {job.result.reportPath && (
+            <span className="stat">📄 <a href={job.result.reportPath} target="_blank" rel="noopener noreferrer">View Report</a></span>
           )}
         </div>
       )}

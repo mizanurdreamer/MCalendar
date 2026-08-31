@@ -70,6 +70,7 @@ export interface AppConfigResponse {
   agentEnabled: boolean;
   codebasePath: string;
   testProjectPath: string;
+  memoryType: "local" | "postgres";
 }
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {

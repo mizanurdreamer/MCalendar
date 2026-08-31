@@ -59,7 +59,7 @@ export async function processCommit(
   const testOutputPath = path.join(testProjectPath, "tests");
 
   // Initialize tool registry
-  registerAllTools(reader, runner, codebasePath, testProjectPath, testOutputPath);
+  registerAllTools(reader, runner, codebasePath, testOutputPath, testProjectPath);
   const metricsRunId = uuidv4();
 
   metrics.startPipeline(metricsRunId, "commit");

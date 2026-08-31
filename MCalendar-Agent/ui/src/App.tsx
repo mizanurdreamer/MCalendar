@@ -12,7 +12,8 @@ import { CheckpointPanel } from "./components/CheckpointPanel";
 
 type UiMessage =
   | { kind: "text"; id: string; role: "user" | "assistant"; content: string }
-  | { kind: "job"; id: string; jobId: string };
+  | { kind: "job"; id: string; jobId: string }
+  | { kind: "summary"; id: string; jobId: string; title: string; markdown: string; logs: { level: string; message: string; timestamp: string }[] };
 
 const WELCOME = `Hi! I'm the **MCalendar Test Agent** console. I can:
 
@@ -59,7 +60,7 @@ export default function App() {
     if (additions.length > 0) setMessages((prev) => [...prev, ...additions]);
   }, [jobs]);
 
-  // Append chat-started job result summaries as assistant messages
+  // Append chat-started job result summaries as summary messages
   useEffect(() => {
     const newSummaries = chatSummaries.filter((s) => !shownSummariesRef.current.has(s.id));
     if (newSummaries.length === 0) return;
@@ -68,10 +69,12 @@ export default function App() {
       ...prev,
       ...newSummaries.map(
         (s): UiMessage => ({
-          kind: "text",
+          kind: "summary",
           id: `s${s.id}`,
-          role: "assistant",
-          content: s.markdown,
+          jobId: s.jobId,
+          title: s.title,
+          markdown: s.markdown,
+          logs: s.logs,
         })
       ),
     ]);
@@ -169,6 +172,25 @@ export default function App() {
               <div key={msg.id} className={`msg-row msg-${msg.role}`}>
                 <div className="msg-bubble">
                   {msg.role === "assistant" ? <Markdown text={msg.content} /> : msg.content}
+                </div>
+              </div>
+            ) : msg.kind === "summary" ? (
+              <div key={msg.id} className="msg-row msg-assistant">
+                <div className="msg-bubble">
+                  <Markdown text={msg.markdown} />
+                  {msg.logs.length > 0 && (
+                    <details className="job-logs-details">
+                      <summary>Agent Logs ({msg.logs.length} entries)</summary>
+                      <div className="job-logs-body">
+                        {msg.logs.map((log, i) => (
+                          <div key={i} className={`log-line log-${log.level}`}>
+                            <span className="log-ts">{log.timestamp.slice(11, 19)}</span>
+                            <span className="log-msg">{log.message}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
                 </div>
               </div>
             ) : (

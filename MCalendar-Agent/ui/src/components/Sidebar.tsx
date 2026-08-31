@@ -56,6 +56,11 @@ export function Sidebar({ appConfig, retriesVersion, connected, onCompose }: Sid
               agent disabled
             </span>
           )}
+          {appConfig && appConfig.memoryType === "local" && (
+            <span className="badge badge-warn" title="Set MEMORY_TYPE=persistent in .env for cross-run memory">
+              memory: local
+            </span>
+          )}
         </div>
       </div>
 

@@ -80,6 +80,7 @@ export async function startWebServer(options: WebServerOptions = {}): Promise<vo
       agentEnabled: config.agentEnabled,
       codebasePath: config.codebasePath,
       testProjectPath: config.testProjectPath,
+      memoryType: config.memoryType,
     });
   });
 

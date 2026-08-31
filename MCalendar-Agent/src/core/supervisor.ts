@@ -224,7 +224,7 @@ export class Supervisor {
 
       case AGENT_NAMES.AGENT_TESTS_REVIEWER:
         if (testResult?.success) {
-          return { action: ROUTING_ACTION.PARALLEL, agents: [AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, AGENT_NAMES.AGENT_SUMMARIZE], reason: "Tests passed, generate report and summarize in parallel" };
+          return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, reason: "Tests passed, generate report" };
         }
         if (retries < maxRetries) {
           this.state.retries = retries + 1;
@@ -271,7 +271,7 @@ export class Supervisor {
 
       case AGENT_NAMES.AGENT_TESTS_REVIEWER:
         if (testResult?.success) {
-          return { action: ROUTING_ACTION.PARALLEL, agents: [AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, AGENT_NAMES.AGENT_SUMMARIZE], reason: "Tests passed, generate report and summarize in parallel" };
+          return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, reason: "Tests passed, generate report" };
         }
         if (retries < maxRetries) {
           this.state.retries = retries + 1;

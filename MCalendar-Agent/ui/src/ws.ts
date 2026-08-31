@@ -7,7 +7,7 @@ export type WsEvent =
   | { type: "job:update"; job: JobInfo }
   | { type: "job:result"; job: JobInfo }
   | { type: "chat:activity"; phase: "start" | "end"; name: string }
-  | { type: "chat:summary"; jobId: string; title: string; markdown: string }
+  | { type: "chat:summary"; jobId: string; title: string; markdown: string; logs?: { level: string; message: string; timestamp: string }[] }
   | { type: "retries:update" }
   // Agentic events
   | { type: "agent:status"; agent: string; status: string; timestamp: string }
@@ -30,6 +30,7 @@ export interface ChatSummary {
   jobId: string;
   title: string;
   markdown: string;
+  logs: { level: string; message: string; timestamp: string }[];
 }
 
 export interface AgentStatus {
@@ -163,7 +164,7 @@ export function useAgentSocket() {
         case "chat:summary": {
           setChatSummaries((prev) => [
             ...prev,
-            { id: ++summaryIdRef.current, jobId: msg.jobId, title: msg.title, markdown: msg.markdown },
+            { id: ++summaryIdRef.current, jobId: msg.jobId, title: msg.title, markdown: msg.markdown, logs: msg.logs ?? [] },
           ]);
           break;
         }

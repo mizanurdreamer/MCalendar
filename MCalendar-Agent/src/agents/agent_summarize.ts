@@ -105,40 +105,41 @@ ${state.report ?? "(no report)"}`;
       return state;
     }
 
+    let output: string;
     try {
-      const output = await this.runSummarization(userMessage);
-
-      state.summary = output;
-      
-      // Log the generated summary
-      logger.info(`[AgentSummarize] Summary generated (${output.length} chars):`);
-      const summaryLines = output.split('\n').slice(0, 20);
-      for (const line of summaryLines) {
-        logger.info(`  ${line}`);
-      }
-
-      // Post GitHub comment (non-fatal — summary is still valid)
-      try {
-        if (state.githubClient && state.issue) {
-          await state.githubClient.addComment(state.issue.number, output);
-          logger.success(`[AgentSummarize] Posted comment to issue #${state.issue.number}`);
-        } else if (state.githubClient && state.mode === MODE.COMMIT && state.prUrl) {
-          await state.githubClient.addPRComment(state.prUrl, output);
-          logger.success(`[AgentSummarize] Posted comment to PR ${state.prUrl}`);
-        } else {
-          logger.warn(`[AgentSummarize] No GitHub client available, skipping comment`);
-        }
-      } catch (commentErr) {
-        logger.warn(`[AgentSummarize] Failed to post GitHub comment (non-fatal): ${commentErr}`);
-      }
-
-      this.recordStep("summarize", output, "done");
-      this.updateStatus(AGENT_STATUS.COMPLETED);
+      output = await this.runSummarization(userMessage);
     } catch (err) {
-      logger.error(`[AgentSummarize] Summarize failed: ${err}`);
-      state.error = `Summarize failed: ${err}`;
-      this.updateStatus(AGENT_STATUS.FAILED);
+      // Graceful degradation: generate a basic summary locally when LLM is unavailable
+      logger.warn(`[AgentSummarize] LLM summarization failed, generating fallback summary: ${err}`);
+      output = this.buildFallbackSummary(state);
     }
+
+    state.summary = output;
+    
+    // Log the generated summary
+    logger.info(`[AgentSummarize] Summary generated (${output.length} chars):`);
+    const summaryLines = output.split('\n').slice(0, 20);
+    for (const line of summaryLines) {
+      logger.info(`  ${line}`);
+    }
+
+    // Post GitHub comment (non-fatal — summary is still valid)
+    try {
+      if (state.githubClient && state.issue) {
+        await state.githubClient.addComment(state.issue.number, output);
+        logger.success(`[AgentSummarize] Posted comment to issue #${state.issue.number}`);
+      } else if (state.githubClient && state.mode === MODE.COMMIT && state.prUrl) {
+        await state.githubClient.addPRComment(state.prUrl, output);
+        logger.success(`[AgentSummarize] Posted comment to PR ${state.prUrl}`);
+      } else {
+        logger.warn(`[AgentSummarize] No GitHub client available, skipping comment`);
+      }
+    } catch (commentErr) {
+      logger.warn(`[AgentSummarize] Failed to post GitHub comment (non-fatal): ${commentErr}`);
+    }
+
+    this.recordStep("summarize", output, "done");
+    this.updateStatus(AGENT_STATUS.COMPLETED);
 
     this.sendMessage(CORE_AGENT_NAMES.SUPERVISOR, MESSAGE_TYPE.NOTIFICATION, {
       event: AGENT_EVENT.SUMMARY_CREATED,
@@ -165,5 +166,48 @@ ${state.report ?? "(no report)"}`;
 
     const textBlocks = response.content.filter((b): b is { type: "text"; text: string } => b.type === "text");
     return textBlocks.map((b) => b.text).join("\n");
+  }
+
+  private buildFallbackSummary(state: AgentState): string {
+    const lines: string[] = [];
+    
+    if (state.mode === MODE.ISSUE && state.issue) {
+      lines.push(`## Summary: Issue #${state.issue.number}`);
+      lines.push(`**${state.issue.title}**`);
+      lines.push("");
+      lines.push(`- **Branch:** \`${state.branchName}\``);
+      if (state.testFilename) {
+        lines.push(`- **Test file:** \`${state.testFilename}\``);
+      }
+      if (state.testResult) {
+        lines.push(`- **Tests:** ${state.testResult.passed} passed, ${state.testResult.failed} failed (${state.testResult.total} total)`);
+      }
+      if (state.prUrl) {
+        lines.push(`- **PR:** ${state.prUrl}`);
+      }
+    } else if (state.mode === MODE.COMMIT && state.commitDiff) {
+      const shortSha = state.commitDiff.sha.slice(0, 7);
+      lines.push(`## Summary: Commit ${shortSha}`);
+      lines.push(`**${state.commitDiff.message.split("\n")[0]}**`);
+      lines.push("");
+      lines.push(`- **Branch:** \`${state.branchName}\``);
+      if (state.testFilename) {
+        lines.push(`- **Test file:** \`${state.testFilename}\``);
+      }
+      if (state.testResult) {
+        lines.push(`- **Tests:** ${state.testResult.passed} passed, ${state.testResult.failed} failed (${state.testResult.total} total)`);
+      }
+      if (state.prUrl) {
+        lines.push(`- **PR:** ${state.prUrl}`);
+      }
+    }
+
+    if (state.report) {
+      lines.push("");
+      lines.push("### Report");
+      lines.push(state.report);
+    }
+
+    return lines.join("\n") || "Summary generation failed — LLM unavailable.";
   }
 }

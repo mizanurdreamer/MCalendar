@@ -10,6 +10,8 @@ import { CommitStateManager } from "../src/watcher/commit_state_tracker.js";
 import { logger } from "../src/utils/logger.js";
 import { broadcast } from "./ws_hub.js";
 import { PIPELINE_STATUS, MODE } from "../src/utils/constants.js";
+import { winstonInstance } from "../src/utils/logger.js";
+import Transport from "winston-transport";
 
 export interface JobInfo {
   id: string;
@@ -30,6 +32,47 @@ export interface JobStartOptions {
 }
 
 const HISTORY_LIMIT = 20;
+const MAX_CHAT_LOGS = 100;
+
+interface LogCapture {
+  level: string;
+  message: string;
+  timestamp: string;
+}
+
+class LogCollector extends Transport {
+  private logs: LogCapture[] = [];
+  private collecting = false;
+
+  start(): void {
+    this.logs = [];
+    this.collecting = true;
+    winstonInstance.add(this);
+  }
+
+  stop(): void {
+    this.collecting = false;
+    try { winstonInstance.remove(this); } catch { /* ignore */ }
+  }
+
+  getLogs(): LogCapture[] {
+    return this.logs.slice(-MAX_CHAT_LOGS);
+  }
+
+  log(info: { level?: string; message?: unknown }, callback: () => void): void {
+    setImmediate(() => {
+      if (this.collecting) {
+        const raw = typeof info.message === "string" ? info.message : String(info.message ?? "");
+        this.logs.push({
+          level: info.level ?? "info",
+          message: raw.length > 4000 ? `${raw.slice(0, 4000)}…` : raw,
+          timestamp: new Date().toISOString(),
+        });
+      }
+      callback();
+    });
+  }
+}
 
 export class RunManager {
   private config: AppConfig;
@@ -152,6 +195,9 @@ export class RunManager {
     this.broadcastJob(job);
     logger.info(`[job:${job.type}] Started — ${job.label}`);
 
+    const logCollector = new LogCollector();
+    logCollector.start();
+
     try {
       const result = await fn();
       job.result = result;
@@ -163,17 +209,20 @@ export class RunManager {
       job.error = String(err instanceof Error ? err.message : err);
       logger.error(`[job:${job.type}] Failed — ${job.label}: ${job.error}`);
     } finally {
+      logCollector.stop();
       job.finishedAt = Date.now();
       this.current = null;
       this.history.unshift(job);
       if (this.history.length > HISTORY_LIMIT) this.history.pop();
       this.broadcastJob(job);
       if (job.source === "chat") {
+        const jobLogs = logCollector.getLogs();
         broadcast({
           type: "chat:summary",
           jobId: job.id,
           title: job.label,
           markdown: formatJobResult(job),
+          logs: jobLogs,
         });
       }
     }

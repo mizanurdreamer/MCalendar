@@ -57,10 +57,11 @@ export async function processIssue(
   const runner = new PlaywrightRunner(testProjectPath, config.playwrightWorkers ?? 6);
   const git = new GitBranch(codebasePath);
 
-  // Initialize tool registry
-  registerAllTools(reader, runner, codebasePath, testProjectPath, testProjectPath);
-
   const testOutputPath = path.join(testProjectPath, "tests");
+
+  // Initialize tool registry
+  registerAllTools(reader, runner, codebasePath, testOutputPath, testProjectPath);
+
   const metricsRunId = uuidv4();
 
   metrics.startPipeline(metricsRunId, "issue");
