@@ -2,13 +2,37 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "▶ Debug Server (breakpoints)",
+      "type": "node",
+      "request": "launch",
+      "name": "Debug Server (launch)",
+      "runtimeExecutable": "${workspaceFolder}/../../node_modules/.bin/tsx",
+      "args": ["${workspaceFolder}/main.ts"],
+      "cwd": "${workspaceFolder}/../..",
+      "envFile": "${workspaceFolder}/../../.env",
+      "sourceMaps": true,
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
       "type": "node",
       "request": "attach",
+      "name": "Debug Server (attach)",
       "port": 3002,
       "restart": true,
-      "skipFiles": ["<node_internals>/**"],
-      "preLaunchTask": "server: dev debug"
+      "sourceMaps": true,
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug Server (with inspector)",
+      "runtimeExecutable": "${workspaceFolder}/../../node_modules/.bin/tsx",
+      "args": ["--inspect=3002", "${workspaceFolder}/main.ts"],
+      "cwd": "${workspaceFolder}/../..",
+      "envFile": "${workspaceFolder}/../../.env",
+      "sourceMaps": true,
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
     }
   ]
 }

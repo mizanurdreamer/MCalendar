@@ -20,7 +20,7 @@
         "background": {
           "activeOnStart": true,
           "beginsPattern": "^.",
-          "endsPattern": "Listening on|EADDRINUSE|Error"
+          "endsPattern": "Listening on|EADDRINUSE"
         }
       }
     }
