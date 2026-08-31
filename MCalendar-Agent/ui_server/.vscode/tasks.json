@@ -5,7 +5,7 @@
       "label": "server: dev debug",
       "type": "shell",
       "command": "npm run dev:server:debug",
-      "cwd": "${workspaceFolder}/../..",
+      "cwd": "${workspaceFolder}/..",
       "isBackground": true,
       "presentation": {
         "reveal": "always",

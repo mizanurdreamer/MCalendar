@@ -1,18 +1,18 @@
-import type { AppConfig } from "../config/config.js";
+import type { AppConfig } from "../src/config/config.js";
 import type {
   ChatMessage,
   ContentBlock,
   ToolDefinition,
   ProviderInterface,
-} from "../providers/types.js";
-import { createProvider } from "../providers/registry.js";
-import { GitHubClient } from "../github/client.js";
-import { CodebaseReader } from "../codebase/reader.js";
-import { StateManager } from "../watcher/issue_state_tracker.js";
-import { CommitStateManager } from "../watcher/commit_state_tracker.js";
+} from "../src/providers/types.js";
+import { createProvider } from "../src/providers/registry.js";
+import { GitHubClient } from "../src/github/client.js";
+import { CodebaseReader } from "../src/codebase/reader.js";
+import { StateManager } from "../src/watcher/issue_state_tracker.js";
+import { CommitStateManager } from "../src/watcher/commit_state_tracker.js";
 import { RunManager } from "./run_manager.js";
 import { broadcast } from "./ws_hub.js";
-import { logger } from "../utils/logger.js";
+import { logger } from "../src/utils/logger.js";
 
 const MAX_TOOL_ITERATIONS = 10;
 const MAX_TOOL_RESULT_LENGTH = 12_000;

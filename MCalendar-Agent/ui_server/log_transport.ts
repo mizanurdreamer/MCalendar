@@ -1,5 +1,5 @@
 import Transport from "winston-transport";
-import { winstonInstance } from "../utils/logger.js";
+import { winstonInstance } from "../src/utils/logger.js";
 import { broadcast } from "./ws_hub.js";
 
 const MAX_MESSAGE_LENGTH = 4000;

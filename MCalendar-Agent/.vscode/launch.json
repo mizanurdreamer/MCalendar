@@ -109,7 +109,7 @@
       "request": "launch",
       "name": "Debug Server",
       "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/tsx",
-      "args": ["src/server/main.ts"],
+      "args": ["ui_server/main.ts"],
       "cwd": "${workspaceFolder}",
       "envFile": "${workspaceFolder}/.env",
       "sourceMaps": true,

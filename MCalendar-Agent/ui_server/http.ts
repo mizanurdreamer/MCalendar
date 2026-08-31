@@ -4,17 +4,17 @@ import http from "node:http";
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import { z } from "zod";
-import { loadConfig } from "../config/config.js";
-import { GitHubClient } from "../github/client.js";
-import { StateManager } from "../watcher/issue_state_tracker.js";
-import { CommitStateManager } from "../watcher/commit_state_tracker.js";
-import { logger } from "../utils/logger.js";
+import { loadConfig } from "../src/config/config.js";
+import { GitHubClient } from "../src/github/client.js";
+import { StateManager } from "../src/watcher/issue_state_tracker.js";
+import { CommitStateManager } from "../src/watcher/commit_state_tracker.js";
+import { logger } from "../src/utils/logger.js";
 import { RunManager } from "./run_manager.js";
-import { APPROVAL_TYPE } from "../utils/constants.js";
+import { APPROVAL_TYPE } from "../src/utils/constants.js";
 import { runChatTurn } from "./chat_agent.js";
 import { attachWs, broadcast, connectedCount } from "./ws_hub.js";
 import { attachLogBroadcast } from "./log_transport.js";
-import { getPendingApprovals as getStoredApprovals, resolveApproval as resolveStoredApproval, createApprovalRequest as createStoredApproval } from "../core/approval_store.js";
+import { getPendingApprovals as getStoredApprovals, resolveApproval as resolveStoredApproval, createApprovalRequest as createStoredApproval } from "../src/core/approval_store.js";
 
 export interface ApprovalRequest {
   id: string;
