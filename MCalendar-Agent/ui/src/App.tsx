@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api";
 import { useAgentSocket } from "./ws";
 import { Sidebar } from "./components/Sidebar";
 import { JobCard, Markdown } from "./components/JobCard";
 import { LogDrawer } from "./components/LogDrawer";
+import { LiveLogStream } from "./components/LiveLogStream";
 import { HumanApprovalPanel } from "./components/HumanApprovalPanel";
 import { AgentStatusPanel } from "./components/AgentStatusPanel";
 import { AgentPlanPanel } from "./components/AgentPlanPanel";
@@ -42,6 +43,24 @@ export default function App() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const thinkingRef = useRef(false);
+  const jobStartRef = useRef<number | undefined>(undefined);
+
+  // Detect running job
+  const runningJob = useMemo(() => {
+    for (const [, job] of jobs) {
+      if (job.status === "running") return job;
+    }
+    return null;
+  }, [jobs]);
+
+  // Track when the current job started
+  useEffect(() => {
+    if (runningJob && !jobStartRef.current) {
+      jobStartRef.current = runningJob.startedAt;
+    } else if (!runningJob) {
+      jobStartRef.current = undefined;
+    }
+  }, [runningJob]);
 
   // Load app config
   useEffect(() => {
@@ -84,7 +103,7 @@ export default function App() {
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, thinking, activity]);
+  }, [messages, thinking, activity, logs]);
 
   thinkingRef.current = thinking;
 
@@ -222,6 +241,12 @@ export default function App() {
               </div>
             </div>
           )}
+
+          <LiveLogStream
+            logs={logs}
+            running={!!runningJob}
+            startedAt={jobStartRef.current}
+          />
         </div>
 
         {errorBanner && <div className="error-banner">{errorBanner}</div>}
