@@ -21,11 +21,41 @@ Process:
 2. Fix the test code to resolve issues
 3. Re-run tests to verify fixes
 
-You have access to:
-- The failing test file content
-- Test execution errors and output
-- Ability to read source files for context
-- write_test_file tool to save fixes
+ALL TOOLS AVAILABLE TO YOU:
+File & Code:
+- read_file: Read any source file
+- list_directory: List directory contents
+- find_usage: Find where a function/variable is used
+- find_definition: Find where a function/variable is defined
+- write_test_file: Write a Playwright test file
+- append_test_file: Append test cases to existing file
+
+Shell & Dev:
+- run_command: Execute any shell command
+- npm_command: Run npm scripts
+- git_log: View recent git commits
+- git_diff: View git diff
+- lint_code: Run linter
+- check_types: Run TypeScript type checking
+- run_playwright_test: Execute Playwright tests
+
+Database:
+- database_schema: Query database schema
+- query_database: Run SQL queries
+
+Browser:
+- browser_navigate: Navigate to a URL
+- browser_snapshot: Get DOM structure
+- browser_screenshot: Take a screenshot
+- browser_click: Click an element
+- browser_type: Type text into input
+- browser_console_messages: Get console output
+
+Debugging:
+- check_process: Check running processes
+- check_port: Check what's on a port
+- env_check: Check environment variables
+- read_server_logs: Read application logs
 
 Focus on:
 - Selector issues (wrong locators, timing)
@@ -34,7 +64,7 @@ Focus on:
 - Data dependencies
 - Async/await problems
 
-Return the fixed test file content via write_test_file tool.`;
+Use all available tools to debug and fix tests. Return the fixed test file content via write_test_file tool.`;
   }
 
   getGoal(): string {
@@ -322,13 +352,18 @@ Return the fixed test file content via write_test_file tool.`;
     } catch (err) {
       logger.warn(`[AgentTestsReviewer] Source file exploration skipped: ${err}`);
     }
-    
-    const provider = getTaskProvider(AGENT_NAMES.AGENT_TESTS_REVIEWER, this.state.agentConfig);
-    logger.task(AGENT_NAMES.AGENT_TESTS_REVIEWER, `${getTaskProviderName(AGENT_NAMES.AGENT_TESTS_REVIEWER, this.state.agentConfig)}/${getTaskModel(AGENT_NAMES.AGENT_TESTS_REVIEWER, this.state.agentConfig)}`);
 
-    const systemPrompt = `You are a test error analyzer. Given a failing test file, its error output, and optionally live app debug info, analyze the root cause and provide a detailed fix plan.
+    const systemPrompt = `You are a test error analyzer. Given a failing test file, its error output, and optionally live app debug info, analyze the root cause.
 
-Output a JSON with this structure:
+You have access to all tools to investigate:
+- Read source files with read_file to understand the code
+- Run commands with run_command to check the environment
+- Use browser tools to verify the app state
+- Query database with database_schema if needed
+
+When you have finished investigating, call the submit_analysis tool with your findings.
+
+Output structure:
 {
   "root_cause": "description of the root cause",
   "fixes_needed": [
@@ -349,19 +384,70 @@ ${this.state.retryHistory.map((r, i) => `Attempt ${i + 1}: ${r.errors.join("; ")
 
 ${mcpDebugInfo ? `Live App Debug Info:\n${mcpDebugInfo}\n` : ""}
 ${sourceFileInfo ? `Source Files Context:\n${sourceFileInfo}\n` : ""}
-${errorFixes ? `\n${errorFixes}\n` : ""}
-${lessons ? `\n${lessons}\n` : ""}
-Analyze the errors and provide a fix plan.`;
+${errorFixes ? `\nPrevious fix attempts:\n${errorFixes}\n` : ""}
+${lessons ? `\nPast lessons:\n${lessons}\n` : ""}
+Use tools to investigate the root cause, then call submit_analysis with your fix plan.`;
 
-    const response = await provider.chat({
-      system: systemPrompt,
-      messages: [{ role: "user", content: userMessage }],
-      maxTokens: this.state.agentConfig[AGENT_NAMES.AGENT_TESTS_REVIEWER]?.maxTokens,
-      temperature: this.state.agentConfig[AGENT_NAMES.AGENT_TESTS_REVIEWER]?.temperature,
+    const submitAnalysisTool: ToolDefinition = {
+      name: "submit_analysis",
+      description: "Submit the error analysis with fix plan",
+      inputSchema: {
+        type: "object",
+        properties: {
+          root_cause: { type: "string", description: "Description of the root cause" },
+          fixes_needed: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                file: { type: "string" },
+                issue: { type: "string" },
+                fix: { type: "string" },
+              },
+              required: ["file", "issue", "fix"],
+            },
+            description: "List of fixes needed",
+          },
+          priority: { type: "string", enum: ["high", "medium", "low"] },
+        },
+        required: ["root_cause", "fixes_needed", "priority"],
+      },
+    };
+
+    const { messages } = await this.runToolLoop({
+      systemPrompt,
+      userMessage,
+      tools: [...this.getAvailableTools(), submitAnalysisTool],
+      onToolCall: (toolBlocks) => {
+        const submitBlock = toolBlocks.find(t => t.name === "submit_analysis");
+        if (submitBlock) {
+          return { intercept: true, result: submitBlock.input };
+        }
+        return { intercept: false };
+      },
     });
 
-    const textBlocks = response.content.filter((b): b is { type: "text"; text: string } => b.type === "text");
-    return textBlocks.map((b) => b.text).join("\n");
+    // Extract the submit_analysis result from messages
+    for (const msg of messages) {
+      if (msg.role === "assistant") {
+        const toolBlocks = (Array.isArray(msg.content) ? msg.content : [])
+          .filter((b) => b.type === "tool_use" && b.name === "submit_analysis") as { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }[];
+        const submitBlock = toolBlocks.find(t => t.name === "submit_analysis");
+        if (submitBlock) {
+          return JSON.stringify(submitBlock.input);
+        }
+      }
+    }
+
+    // Fallback: return last assistant text
+    const lastAssistant = [...messages].reverse().find(m => m.role === "assistant");
+    if (lastAssistant) {
+      const textBlocks = (Array.isArray(lastAssistant.content) ? lastAssistant.content : [])
+        .filter((b): b is { type: "text"; text: string } => b.type === "text");
+      return textBlocks.map((b) => b.text).join("\n");
+    }
+
+    return "No analysis produced";
   }
 
   private async runFix(testContent: string, analysis: string): Promise<void> {

@@ -44,6 +44,42 @@ The project has auth utilities you MUST use:
 - auth.setup.ts: stored authentication states (admin.json, client.json, attendant.json)
 Use JWT cookie injection for authentication instead of UI login flows. It is faster and more reliable.
 
+ALL TOOLS AVAILABLE TO YOU:
+File & Code:
+- read_file: Read any source file (e.g., 'src/app/page.tsx')
+- list_directory: List directory contents
+- find_usage: Find where a function/variable is used
+- find_definition: Find where a function/variable is defined
+- write_test_file: Write a Playwright test file
+- append_test_file: Append test cases to existing file
+
+Shell & Dev:
+- run_command: Execute any shell command
+- npm_command: Run npm scripts (e.g., 'npm test')
+- git_log: View recent git commits
+- git_diff: View git diff
+- lint_code: Run linter
+- check_types: Run TypeScript type checking
+- run_playwright_test: Execute Playwright tests
+
+Database:
+- database_schema: Query database schema
+- query_database: Run SQL queries
+
+Browser:
+- browser_navigate: Navigate to a URL
+- browser_snapshot: Get DOM structure
+- browser_screenshot: Take a screenshot
+- browser_click: Click an element
+- browser_type: Type text into input
+- browser_console_messages: Get console output
+
+Debugging:
+- check_process: Check running processes
+- check_port: Check what's on a port
+- env_check: Check environment variables
+- read_server_logs: Read application logs
+
 CRITICAL RULES:
 - You MUST write a test case for EVERY SINGLE scenario provided. Do NOT skip any scenario.
 - Do NOT summarize, abbreviate, or group scenarios together. Each scenario gets its own test() block.
@@ -305,15 +341,63 @@ Use the write_test_file tool to save the test as "${testFilename}".`;
 
   private async fallbackExtractAndWrite(testFilename: string): Promise<boolean> {
     try {
+      // Build context for the fallback LLM call
+      const state = this.state;
+      let context = "Write a complete Playwright E2E test file.\n\n";
+
+      if (state.mode === MODE.ISSUE && state.issue && state.issueAnalysis) {
+        const scenarios = (state.issueAnalysis.test_scenarios ?? [])
+          .map((s, i) => `${i + 1}. ${s.name} (${s.type}): ${s.description}${s.acceptance_criterion ? ` [criteria: ${s.acceptance_criterion}]` : ""}`)
+          .join("\n");
+
+        context += `Issue #${state.issue.number}: ${state.issue.title}\n${state.issue.body ?? ""}\n\n`;
+        context += `TEST SCENARIOS:\n${scenarios || "(generate based on the issue)"}\n\n`;
+        context += `EDGE CASES:\n${(state.issueAnalysis.edge_cases ?? []).join("\n") || "None specified"}\n\n`;
+        context += `ROLE CHECKS:\n${(state.issueAnalysis.role_checks ?? []).join("\n") || "None specified"}\n\n`;
+      } else if (state.mode === MODE.COMMIT && state.commitDiff) {
+        const diff = state.commitDiff;
+        const shortSha = diff.sha.slice(0, 7);
+        const changedFiles = diff.files.map((f) => `  ${f.filename} (${f.status})`).join("\n");
+
+        context += `Commit ${shortSha}: ${diff.message}\n`;
+        context += `Scope: ${state.commitAnalysis?.scope ?? "General E2E testing"}\n\n`;
+        context += `Files changed:\n${changedFiles}\n\n`;
+      }
+
+      context += `Save the test as "${testFilename}" using the write_test_file tool.`;
+
       // Make one more LLM call asking specifically for the test content
       const provider = getTaskProvider(AGENT_NAMES.AGENT_TESTS_GENERATOR, this.state.agentConfig);
       const response = await provider.chat({
-        system: "You must return ONLY the Playwright test file content. No explanations, no markdown fences, just the raw TypeScript test code.",
-        messages: [{ role: "user", content: "Write the complete Playwright test file content now. Return ONLY the code." }],
+        system: "You are a Playwright E2E test generator. Write a complete, working test file. Use write_test_file tool to save the test. Return ONLY the test code in the tool call.",
+        messages: [{ role: "user", content: context }],
+        tools: this.getAvailableTools(),
         maxTokens: this.state.agentConfig[AGENT_NAMES.AGENT_TESTS_GENERATOR]?.maxTokens,
         temperature: this.state.agentConfig[AGENT_NAMES.AGENT_TESTS_GENERATOR]?.temperature,
       });
 
+      // Check if write_test_file was called in the response
+      const toolBlocks = response.content.filter(
+        (b) => b.type === "tool_use" && b.name === "write_test_file"
+      ) as { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }[];
+
+      if (toolBlocks.length > 0) {
+        // Execute the tool call
+        const toolBlock = toolBlocks[0];
+        const filename = (toolBlock.input.filename as string) || testFilename;
+        const content = toolBlock.input.content as string;
+        if (content) {
+          const fullPath = path.join(this.state.testOutputPath, filename);
+          const dir = path.dirname(fullPath);
+          if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+          fs.writeFileSync(fullPath, content, "utf-8");
+          this.state.testContent = content;
+          logger.success(`[AgentTestsGenerator] Fallback: Test file written via tool call: tests/${filename}`);
+          return true;
+        }
+      }
+
+      // Fallback: try to extract from text response
       const textBlocks = response.content.filter((b): b is { type: "text"; text: string } => b.type === "text");
       const text = textBlocks.map(b => b.text).join('\n');
       
@@ -335,7 +419,7 @@ Use the write_test_file tool to save the test as "${testFilename}".`;
         return true;
       }
       
-      logger.warn(`[AgentTestsGenerator] Fallback: Extracted text doesn't look like a test file`);
+      logger.warn(`[AgentTestsGenerator] Fallback: Could not extract test file`);
       return false;
     } catch (err) {
       logger.error(`[AgentTestsGenerator] Fallback extraction failed: ${err}`);

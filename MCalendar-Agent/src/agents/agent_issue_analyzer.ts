@@ -55,26 +55,60 @@ Given an issue, you must:
 4. Define specific test scenarios with acceptance criteria
 5. Determine if tests are actually needed (some issues are docs, config, etc.)
 
+CRITICAL: When to set needs_tests = true:
+- ANY issue that involves CRUD operations (Create, Read, Update, Delete) → needs_tests = true
+- ANY issue that involves UI functionality, forms, pages, or user interactions → needs_tests = true
+- ANY issue that involves API endpoints or data operations → needs_tests = true
+- ANY issue that mentions "test", "verify", "check", "validate", "ensure" → needs_tests = true
+- ANY issue that describes functionality to implement → needs_tests = true
+- ONLY set needs_tests = false for pure documentation, README, comment-only, or config changes with no functional impact
+
+When in doubt, set needs_tests = true and provide test scenarios. It is ALWAYS better to generate tests than to skip them.
+
 BASELINE CONTEXT:
 You will receive pre-explored project structure and live app exploration in your first message. This is your baseline understanding. Use it as a starting point.
 
-TOOLS AVAILABLE:
-- read_file: Read source files to understand implementation details
-- list_directory: List directory contents to explore project structure
-- browser_navigate: Navigate to a URL in the live app (optional — skip if app not running)
-- browser_snapshot: Get the DOM structure of the current page (optional)
-- browser_screenshot: Take a screenshot of the current page (optional)
-- browser_click: Click an element on the page (optional)
-- browser_type: Type text into an input field (optional)
-- browser_console_messages: Get browser console output (optional)
+ALL TOOLS AVAILABLE TO YOU:
+File & Code Exploration:
+- read_file: Read any source file (e.g., 'src/app/page.tsx')
+- list_directory: List directory contents
+- find_usage: Find where a function/variable is used
+- find_definition: Find where a function/variable is defined
+
+Shell & Dev:
+- run_command: Execute any shell command (e.g., 'ls', 'cat', 'find')
+- npm_command: Run npm scripts (e.g., 'npm run dev', 'npm test')
+- git_log: View recent git commits
+- git_diff: View git diff for changes
+- lint_code: Run linter on code
+- check_types: Run TypeScript type checking
+
+Database:
+- database_schema: Query database schema
+- query_database: Run SQL queries
+
+Browser (if app running):
+- browser_navigate: Navigate to a URL
+- browser_snapshot: Get DOM structure
+- browser_screenshot: Take a screenshot
+- browser_click: Click an element
+- browser_type: Type text into input
+- browser_console_messages: Get console output
+
+Debugging:
+- check_process: Check running processes
+- check_port: Check what's on a port
+- env_check: Check environment variables
+- read_server_logs: Read application logs
 
 WHEN TO USE TOOLS:
-If the baseline context is insufficient to understand the issue:
-- Read specific source files mentioned in the issue
-- Navigate to relevant pages to verify UI elements exist (only if app is running)
-- Check database schema if the issue involves data
-- Explore related code directories
-If browser tools fail or are unavailable, proceed with code-only analysis.
+Use tools to explore the codebase and understand the issue thoroughly:
+- Read source files to understand implementation details
+- Use find_usage/find_definition to trace code paths
+- Run git_log/git_diff to see recent changes
+- Use database_schema to understand data models
+- Navigate to relevant pages to verify UI elements (if app running)
+- Run commands to check project structure and dependencies
 
 When you have enough information, call submit_analysis with your complete analysis.`;
   }
@@ -195,6 +229,28 @@ When you have enough information, call submit_analysis with your complete analys
     try {
       const analysis = await this.runAnalysis(userMessage, mcpExploration, projectExploration, lessons);
       state.issueAnalysis = analysis;
+
+      if (!analysis.needs_tests) {
+        // Safety check: if summary mentions testing-related keywords, override needs_tests
+        const summaryLower = (analysis.summary ?? "").toLowerCase();
+        const needsTestsKeywords = ["test", "crud", "create", "update", "delete", "validation", "form", "page", "api", "endpoint", "functionality", "feature"];
+        const hasTestKeywords = needsTestsKeywords.some((kw) => summaryLower.includes(kw));
+        if (hasTestKeywords && (!analysis.test_scenarios || analysis.test_scenarios.length === 0)) {
+          logger.warn(`[AgentIssueAnalyzer] Override: summary mentions test-related keywords but needs_tests=false, forcing needs_tests=true`);
+          analysis.needs_tests = true;
+          // Generate placeholder test scenarios if none provided
+          if (!analysis.test_scenarios || analysis.test_scenarios.length === 0) {
+            analysis.test_scenarios = [
+              {
+                name: "Basic functionality test",
+                type: "positive" as const,
+                description: `Test the core functionality described in the issue: ${analysis.summary?.slice(0, 200)}`,
+                acceptance_criterion: "Feature works as described in the issue",
+              },
+            ];
+          }
+        }
+      }
 
       if (!analysis.needs_tests) {
         logger.info(`[AgentIssueAnalyzer] Issue #${issue.number}: No tests needed - ${analysis.summary}`);
