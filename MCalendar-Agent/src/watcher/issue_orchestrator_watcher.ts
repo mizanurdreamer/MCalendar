@@ -205,7 +205,8 @@ export async function startWatcher(config: WatcherConfig): Promise<void> {
       await runRetrySweep();
 
       const lastNumber = stateManager.getLastProcessedNumber();
-      const newIssues = await githubClient.getNewIssues(lastNumber);
+      const readyIssues = await githubClient.listIssuesByProjectStatus("Ready");
+      const newIssues = readyIssues.filter((i) => i.number > lastNumber);
 
       for (const issue of newIssues) {
         logger.success(`✨ New issue detected: #${issue.number} "${issue.title}"`);

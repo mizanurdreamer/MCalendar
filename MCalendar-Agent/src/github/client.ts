@@ -95,6 +95,85 @@ export class GitHubClient {
     return issues.filter((i) => i.number > lastProcessedNumber);
   }
 
+  async listIssuesByProjectStatus(status: string): Promise<GitHubIssue[]> {
+    const projectNumber = parseInt(process.env.GITHUB_PROJECT_NUMBER ?? "0", 10);
+    if (!projectNumber) {
+      logger.warn(`[GitHub] GITHUB_PROJECT_NUMBER not set, falling back to listOpenIssues()`);
+      return this.listOpenIssues();
+    }
+
+    try {
+      const data = await this.octokit.graphql<{
+        user: {
+          projectV2: {
+            items: {
+              nodes: Array<{
+                id: string;
+                content: { number: number; title: string } | null;
+                fieldValues: {
+                  nodes: Array<{
+                    name: string;
+                    field: { name: string };
+                  }>;
+                };
+              }>;
+            };
+          };
+        };
+      }>(
+        `query($login: String!, $number: Int!) {
+          user(login: $login) {
+            projectV2(number: $number) {
+              items(first: 100) {
+                nodes {
+                  id
+                  content {
+                    ... on Issue {
+                      number
+                      title
+                    }
+                  }
+                  fieldValues(first: 10) {
+                    nodes {
+                      ... on ProjectV2ItemFieldSingleSelectValue {
+                        name
+                        field { name }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }`,
+        { login: this.owner, number: projectNumber }
+      );
+
+      const items = data.user.projectV2.items.nodes;
+      const issueNumbers: number[] = [];
+
+      for (const item of items) {
+        if (!item.content?.number) continue;
+
+        const statusValue = item.fieldValues.nodes.find(
+          (fv) => fv.field.name === "Status"
+        );
+
+        if (statusValue?.name === status) {
+          issueNumbers.push(item.content.number);
+        }
+      }
+
+      if (issueNumbers.length === 0) return [];
+
+      const issues = await this.listOpenIssues();
+      return issues.filter((i) => issueNumbers.includes(i.number));
+    } catch (err) {
+      logger.warn(`[GitHub] Failed to list issues by project status: ${err}`);
+      return this.listOpenIssues();
+    }
+  }
+
   async addComment(issueNumber: number, body: string): Promise<void> {
     try {
       return await this.withRetry(`addComment(#${issueNumber})`, async () => {
