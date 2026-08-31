@@ -1,15 +1,15 @@
 import { randomUUID } from "node:crypto";
-import type { AppConfig } from "../config/config.js";
-import type { TaskResult } from "../utils/types.js";
-import type { GitHubIssue } from "../github/types.js";
-import { GitHubClient } from "../github/client.js";
-import { processIssue } from "../orchestrator/issue_orchestrator.js";
-import { processCommit } from "../orchestrator/commit_orchestrator.js";
-import { StateManager } from "../watcher/issue_state_tracker.js";
-import { CommitStateManager } from "../watcher/commit_state_tracker.js";
-import { logger } from "../utils/logger.js";
+import type { AppConfig } from "../src/config/config.js";
+import type { TaskResult } from "../src/utils/types.js";
+import type { GitHubIssue } from "../src/github/types.js";
+import { GitHubClient } from "../src/github/client.js";
+import { processIssue } from "../src/orchestrator/issue_orchestrator.js";
+import { processCommit } from "../src/orchestrator/commit_orchestrator.js";
+import { StateManager } from "../src/watcher/issue_state_tracker.js";
+import { CommitStateManager } from "../src/watcher/commit_state_tracker.js";
+import { logger } from "../src/utils/logger.js";
 import { broadcast } from "./ws_hub.js";
-import { PIPELINE_STATUS, MODE } from "../utils/constants.js";
+import { PIPELINE_STATUS, MODE } from "../src/utils/constants.js";
 
 export interface JobInfo {
   id: string;

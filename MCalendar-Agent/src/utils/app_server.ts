@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { logger } from "../utils/logger.js";
+import { logger } from "./logger.js";
 
 export class AppServerManager {
   private process: ChildProcess | null = null;

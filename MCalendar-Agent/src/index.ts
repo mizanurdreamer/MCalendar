@@ -6,7 +6,7 @@ import { processCommit } from "./orchestrator/commit_orchestrator.js";
 import { startWatcher } from "./watcher/issue_orchestrator_watcher.js";
 import { StateManager } from "./watcher/issue_state_tracker.js";
 import { CommitStateManager } from "./watcher/commit_state_tracker.js";
-import { startWebServer } from "./server/http.js";
+import { startWebServer } from "../ui_server/http.js";
 import { logger } from "./utils/logger.js";
 import { createAgenticGraph } from "./core/graph.js";
 import { createInitialAgentState } from "./core/state.js";

@@ -24,7 +24,7 @@ import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers
 import { AGENT_NAMES } from "../utils/agent_names.js";
 import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL } from "../utils/constants.js";
 import { initMcpClient, shutdownMcpClient } from "../mcp/client.js";
-import { AppServerManager } from "../server/app_server.js";
+import { AppServerManager } from "../utils/app_server.js";
 
 export interface CommitOrchestratorConfig {
   agentConfig: AgentConfig;

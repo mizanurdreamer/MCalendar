@@ -68,7 +68,7 @@ src/
 │   ├── dev_tools.ts                # Developer tool definitions
 │   ├── database_tools.ts           # Database tool definitions
 │   └── errors.ts                   # Global error handlers
-├── server/                         # Web UI backend
+├── ui_server/                     # Web UI backend
 │   ├── http.ts                     # Express app (REST API + static UI serving)
 │   ├── main.ts                     # Standalone server entry point
 │   ├── ws_hub.ts                   # WebSocket hub (log/job/chat event broadcast)

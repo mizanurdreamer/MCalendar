@@ -2,12 +2,51 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "▶ Debug UI (attach to open browser)",
+      "name": "Debug UI (attach to browser)",
       "type": "chrome",
       "request": "attach",
       "port": 3001,
       "webRoot": "${workspaceFolder}",
       "preLaunchTask": "ui: vite dev"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug UI (Vite only)",
+      "runtimeExecutable": "${workspaceFolder}/../node_modules/.bin/vite",
+      "args": ["--config", "vite.config.ts"],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/../.env",
+      "sourceMaps": true,
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug UI + Server",
+      "runtimeExecutable": "${workspaceFolder}/../node_modules/.bin/tsx",
+      "args": ["${workspaceFolder}/../ui_server/main.ts"],
+      "cwd": "${workspaceFolder}/..",
+      "envFile": "${workspaceFolder}/../.env",
+      "sourceMaps": true,
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "type": "node",
+      "request": "attach",
+      "name": "Debug Server (attach)",
+      "port": 3002,
+      "restart": true,
+      "sourceMaps": true,
+      "skipFiles": ["<node_internals>/**"]
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Debug All (Server + Vite)",
+      "configurations": ["Debug UI + Server", "Debug UI (Vite only)"]
     }
   ]
 }

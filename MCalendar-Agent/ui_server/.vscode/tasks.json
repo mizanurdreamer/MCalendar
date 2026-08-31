@@ -5,7 +5,7 @@
       "label": "server: dev debug",
       "type": "shell",
       "command": "npm run dev:server:debug",
-      "cwd": "${workspaceFolder}/../..",
+      "cwd": "${workspaceFolder}/..",
       "isBackground": true,
       "presentation": {
         "reveal": "always",
@@ -20,7 +20,7 @@
         "background": {
           "activeOnStart": true,
           "beginsPattern": "^.",
-          "endsPattern": "Listening on|EADDRINUSE|Error"
+          "endsPattern": "Listening on|EADDRINUSE"
         }
       }
     }

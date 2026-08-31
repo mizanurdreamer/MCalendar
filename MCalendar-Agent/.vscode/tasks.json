@@ -20,7 +20,7 @@
         "background": {
           "activeOnStart": true,
           "beginsPattern": "^.",
-          "endsPattern": "Listening on|EADDRINUSE|Error"
+          "endsPattern": "Listening on|EADDRINUSE"
         }
       }
     },
@@ -43,7 +43,7 @@
         "background": {
           "activeOnStart": true,
           "beginsPattern": "^.",
-          "endsPattern": "ready in|Local:|EADDRINUSE|error"
+          "endsPattern": "ready in|Local:|EADDRINUSE"
         }
       }
     }
