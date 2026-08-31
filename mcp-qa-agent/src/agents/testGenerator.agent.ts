@@ -27,6 +27,15 @@ ${generatedMarkdown}
 ### Commit Diff:
 ${commitDiffText.substring(0, 4000)}
 
+### STRICT CONSTRAINTS (Prevent Bloat):
+1. **MAXIMUM 3 to 5 TESTS TOTAL**: Do not generate comprehensive edge cases. Focus ONLY on critical functionality.
+2. **Prioritize Key Scenarios**:
+   - 1x Primary Happy Path (End-to-end success flow)
+   - 1x Critical Authorization/Security check (Unauthenticated or 401/403)
+   - 1x Major Negative / Validation failure
+3. **Combine Related Assertions**: Group multiple simple assertions into a single test block instead of splitting them across multiple tests.
+4. **No Low-Value UI Checks**: Skip layout, styling, simple label presence, or trivial UI element visibility tests unless explicitly requested.
+
 Output ONLY raw executable TypeScript code. No markdown code blocks.
         `,
       },

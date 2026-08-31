@@ -41,24 +41,25 @@ async function processGitHubIssue(owner: string, repo: string, issueNumber: numb
   const { tools } = await ghClient.listTools();
   const formattedTools = formatMCPToolsForClaude(tools);
 
-  // Step 1: Analyze Issue Requirements
-  const issueData = await runIssueAnalyzer(owner, repo, issueNumber, formattedTools, ghClient);
-  console.log(`📌 Feature Identified: ${issueData.targetFeature}`);
+  // // Step 1: Analyze Issue Requirements
+   const issueData = await runIssueAnalyzer(owner, repo, issueNumber, formattedTools, ghClient);
+   console.log(`📌 Feature Identified: ${issueData.targetFeature}`);
 
-  // Step 2: Fetch Related Code from Repo
-  const featureCode = await runFeatureAnalyzer(owner, repo, issueData.targetFeature, formattedTools, ghClient);
+  // // Step 2: Fetch Related Code from Repo
+   const featureCode = await runFeatureAnalyzer(owner, repo, issueData.targetFeature, formattedTools, ghClient);
 
-  // Step 3: Generate Acceptance Criteria combining Issue Criteria + Source Code
-  const mergedContext = `Issue Criteria:\n${issueData.acceptanceCriteria.join('\n')}\n\nCodebase Context:\n${featureCode}`;
-  const criteriaMarkdown = await runCriteriaGenerator(mergedContext);
+  // // Step 3: Generate Acceptance Criteria combining Issue Criteria + Source Code
+   const mergedContext = `Issue Criteria:\n${issueData.acceptanceCriteria.join('\n')}\n\nCodebase Context:\n${featureCode}`;
+   const criteriaMarkdown = await runCriteriaGenerator(mergedContext);
 
-  // Step 4: Generate and Run Tests
-  const fileSlug = `issue-${issueNumber}-${issueData.targetFeature.toLowerCase().replace(/\s+/g, '-')}`;
-  const testPath = await runTestGenerator(criteriaMarkdown, featureCode, fileSlug,repo);
+  // // Step 4: Generate and Run Tests
+   const fileSlug = `issue-${issueNumber}-${issueData.targetFeature.toLowerCase().replace(/\s+/g, '-')}`;
+   const testPath = await runTestGenerator(criteriaMarkdown, featureCode, fileSlug,repo);
+ 
   const execResult = await runTestExecutor(testPath,repo);
 
   // Step 5: Post Execution Summary Report back to GitHub Issue
-  await runReporter(owner, repo, issueNumber, fileSlug, criteriaMarkdown, testPath, execResult, ghClient);
+  await runReporter(owner, repo, issueNumber, fileSlug, `Retry Triggered for Fix Verification\n` + issueData.acceptanceCriteria.join('\n'), testPath, execResult, ghClient);
 
   await ghClient.close();
 }
