@@ -5,6 +5,10 @@ import { logger } from "../utils/logger.js";
 const RETRYABLE_CODES = ["ECONNRESET", "ETIMEDOUT", "ENOTFOUND", "EAI_AGAIN"];
 const RETRYABLE_STATUS_CODES = [502, 503, 504, 429];
 
+type OctokitWithGraphql = Octokit & {
+  graphql<T = any>(query: string, variables?: Record<string, any>): Promise<T>;
+};
+
 const PERMISSION_HINT =
   "Your GitHub token lacks permission for this action. " +
   "Fine-grained token: GitHub Settings → Developer settings → Personal access tokens → " +
@@ -33,13 +37,13 @@ function withPermissionHint(err: unknown, action: string): never {
 // REST API (ACTIVE — default)
 // ═══════════════════════════════════════════════════════════
 export class GitHubClient {
-  private octokit: Octokit;
+  private octokit: OctokitWithGraphql;
   private owner: string;
   private repo: string;
   private maxRetries: number;
 
   constructor(token: string, owner: string, repo: string, maxRetries = 3) {
-    this.octokit = new Octokit({ auth: token });
+    this.octokit = new Octokit({ auth: token }) as OctokitWithGraphql;
     this.owner = owner;
     this.repo = repo;
     this.maxRetries = maxRetries;
@@ -103,6 +107,96 @@ export class GitHubClient {
       });
     } catch (err) {
       withPermissionHint(err, `Commenting on issue #${issueNumber}`);
+    }
+  }
+
+  async getIssueNodeId(issueNumber: number): Promise<string | null> {
+    try {
+      const data = await this.octokit.graphql<{ repository: { issue: { id: string } } }>(
+        `query($owner: String!, $repo: String!, $number: Int!) {
+          repository(owner: $owner, name: $repo) {
+            issue(number: $number) { id }
+          }
+        }`,
+        { owner: this.owner, repo: this.repo, number: issueNumber }
+      );
+      return data.repository.issue.id;
+    } catch (err) {
+      logger.warn(`[GitHub] Failed to get issue node ID for #${issueNumber}: ${err}`);
+      return null;
+    }
+  }
+
+  async updateProjectStatus(issueNodeId: string, status: string): Promise<void> {
+    const projectNumber = parseInt(process.env.GITHUB_PROJECT_NUMBER ?? "0", 10);
+    if (!projectNumber) {
+      logger.warn(`[GitHub] GITHUB_PROJECT_NUMBER not set, skipping project status update`);
+      return;
+    }
+
+    try {
+      // 1. Get project ID
+      const projectData = await this.octokit.graphql<{
+        user: { projectV2: { id: string } };
+      }>(
+        `query($login: String!, $number: Int!) {
+          user(login: $login) {
+            projectV2(number: $number) { id }
+          }
+        }`,
+        { login: this.owner, number: projectNumber }
+      );
+      const projectId = projectData.user.projectV2.id;
+
+      // 2. Get Status field ID and option IDs
+      const fieldData = await this.octokit.graphql<{
+        user: { projectV2: { field: { id: string; options: Array<{ id: string; name: string }> } } };
+      }>(
+        `query($login: String!, $number: Int!) {
+          user(login: $login) {
+            projectV2(number: $number) {
+              field(name: "Status") {
+                ... on ProjectV2SingleSelectField {
+                  id
+                  options { id name }
+                }
+              }
+            }
+          }
+        }`,
+        { login: this.owner, number: projectNumber }
+      );
+
+      const field = projectData && fieldData.user.projectV2.field as { id: string; options: Array<{ id: string; name: string }> };
+      if (!field?.id) {
+        logger.warn(`[GitHub] Status field not found in project #${projectNumber}`);
+        return;
+      }
+
+      const option = field.options.find((o: { id: string; name: string }) => o.name === status);
+      if (!option) {
+        logger.warn(`[GitHub] Status option "${status}" not found in project. Available: ${field.options.map((o: { id: string; name: string }) => o.name).join(", ")}`);
+        return;
+      }
+
+      // 3. Update the status
+      await this.octokit.graphql(
+        `mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: ID!) {
+          updateProjectV2ItemFieldValue(input: {
+            projectId: $projectId
+            itemId: $itemId
+            fieldId: $fieldId
+            value: { singleSelectOptionId: $optionId }
+          }) {
+            projectV2Item { id }
+          }
+        }`,
+        { projectId, itemId: issueNodeId, fieldId: field.id, optionId: option.id }
+      );
+
+      logger.success(`[GitHub] Issue status updated to "${status}" in project #${projectNumber}`);
+    } catch (err) {
+      logger.warn(`[GitHub] Failed to update project status: ${err}`);
     }
   }
 

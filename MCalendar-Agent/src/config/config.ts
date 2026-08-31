@@ -39,6 +39,7 @@ export interface AppConfig {
   agentConfig: AgentConfig;
   agentEnabled: boolean;
   commitAutoApprove: boolean;
+  githubProjectNumber: number;
   watchBranch?: string;
   databaseUrl?: string;
   agentMemoryDatabaseUrl?: string;
@@ -132,6 +133,7 @@ export function loadConfig(): AppConfig {
     agentConfig,
     agentEnabled: (process.env.AGENT_ENABLED ?? "true").toLowerCase() === "true",
     commitAutoApprove: (process.env.COMMIT_AUTO_APPROVE ?? "true").toLowerCase() === "true",
+    githubProjectNumber: parseInt(process.env.GITHUB_PROJECT_NUMBER ?? "0", 10),
     watchBranch: process.env.WATCH_BRANCH,
     databaseUrl: process.env.DATABASE_URL,
     agentMemoryDatabaseUrl: process.env.AGENT_MEMORY_DATABASE_URL,

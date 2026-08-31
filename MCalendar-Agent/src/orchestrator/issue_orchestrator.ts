@@ -209,6 +209,17 @@ export async function processIssue(
       });
       result.prUrl = pr.html_url;
       logger.success(`[Orchestrator] PR created: ${pr.html_url}`);
+
+      // Update project status to "In review" after successful PR creation
+      try {
+        const issueNodeId = await githubClient.getIssueNodeId(issue.number);
+        if (issueNodeId) {
+          await githubClient.updateProjectStatus(issueNodeId, "In review");
+          logger.success(`[Orchestrator] Issue #${issue.number} status updated to "In review"`);
+        }
+      } catch (statusErr) {
+        logger.warn(`[Orchestrator] Failed to update issue status: ${statusErr}`);
+      }
     } catch (err) {
       logger.error(`[Orchestrator] Failed to commit/push/create PR: ${err}`);
     }
@@ -228,14 +239,29 @@ export async function processIssue(
     await appServer.stop();
   }
 
+  // Update project status to "In progress" when no tests were needed
+  if (result.status === PIPELINE_STATUS.COMPLETED && !result.testFilename) {
+    try {
+      const issueNodeId = await githubClient.getIssueNodeId(issue.number);
+      if (issueNodeId) {
+        await githubClient.updateProjectStatus(issueNodeId, "In progress");
+        logger.success(`[Orchestrator] Issue #${issue.number} status updated to "In progress"`);
+      }
+    } catch (statusErr) {
+      logger.warn(`[Orchestrator] Failed to update issue status: ${statusErr}`);
+    }
+  }
+
   metrics.endPipeline(
     result.status === PIPELINE_STATUS.COMPLETED && (result.testResult?.success ?? false) ? "completed" : "failed",
     result.error
   );
 
   return {
-    success: result.status === PIPELINE_STATUS.COMPLETED && (result.testResult?.success ?? false),
-    output: `Pushed to ${result.branchName} with ${result.testResult?.passed ?? 0} tests passed`,
+    success: result.status === PIPELINE_STATUS.COMPLETED && (result.testResult ? result.testResult.success : true),
+    output: result.testFilename
+      ? `Pushed to ${result.branchName} with ${result.testResult?.passed ?? 0} tests passed`
+      : `Completed — no tests needed for issue #${issue.number}`,
     filesWritten: result.testFilename ? [result.testFilename] : [],
     testsPassed: result.testResult?.passed ?? 0,
     testsFailed: result.testResult?.failed ?? 0,

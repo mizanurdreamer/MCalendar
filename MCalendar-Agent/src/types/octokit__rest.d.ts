@@ -6,6 +6,7 @@ declare module '@octokit/rest' {
         get(params: { owner: string; repo: string; issue_number: number }): Promise<{ data: any }>;
         listForRepo(params: { owner: string; repo: string; state?: string; per_page?: number }): Promise<{ data: any[] }>;
         createComment(params: { owner: string; repo: string; issue_number: number; body: string }): Promise<any>;
+        update(params: { owner: string; repo: string; issue_number: number; state: string }): Promise<any>;
       };
       repos: {
         get(params: { owner: string; repo: string }): Promise<{ data: { default_branch: string } }>;
