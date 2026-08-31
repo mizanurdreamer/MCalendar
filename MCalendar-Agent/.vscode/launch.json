@@ -4,73 +4,118 @@
     {
       "type": "node",
       "request": "launch",
-      "name": "Debug: issue",
-      "runtimeExecutable": "node",
-      "runtimeArgs": [
-        "--import",
-        "tsx/esm",
+      "name": "Debug Issue",
+      "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/tsx",
+      "args": [
         "src/index.ts",
         "issue",
         "${input:issueNumber}"
       ],
-      "skipFiles": ["<node_internals>/**"],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "sourceMaps": true,
       "console": "integratedTerminal",
-      "sourceMaps": true
+      "skipFiles": ["<node_internals>/**"]
     },
     {
       "type": "node",
       "request": "launch",
-      "name": "Debug: watch",
-      "runtimeExecutable": "node",
-      "runtimeArgs": [
-        "--import",
-        "tsx/esm",
+      "name": "Debug Commit",
+      "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/tsx",
+      "args": [
+        "src/index.ts",
+        "commit",
+        "${input:commitSha}",
+        "--branch",
+        "${input:targetBranch}"
+      ],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "sourceMaps": true,
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug Watch (Issues Only)",
+      "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/tsx",
+      "args": [
         "src/index.ts",
         "watch"
       ],
-      "skipFiles": ["<node_internals>/**"],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "sourceMaps": true,
       "console": "integratedTerminal",
-      "sourceMaps": true
+      "skipFiles": ["<node_internals>/**"]
     },
     {
       "type": "node",
       "request": "launch",
-      "name": "Debug: list",
-      "runtimeExecutable": "node",
-      "runtimeArgs": [
-        "--import",
-        "tsx/esm",
+      "name": "Debug Watch (Issues + Commits)",
+      "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/tsx",
+      "args": [
         "src/index.ts",
-        "list"
+        "watch",
+        "--branch",
+        "${input:watchBranch}"
       ],
-      "skipFiles": ["<node_internals>/**"],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "sourceMaps": true,
       "console": "integratedTerminal",
-      "sourceMaps": true
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug Watch-Branch (Commits Only)",
+      "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/tsx",
+      "args": [
+        "src/index.ts",
+        "watch-branch",
+        "${input:watchBranch}"
+      ],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "sourceMaps": true,
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
     },
     {
       "type": "node",
       "request": "attach",
-      "name": "Debug: server (:3002 breakpoints)",
-      "port": 9229,
+      "name": "Attach to Server",
+      "port": 3002,
       "restart": true,
-      "skipFiles": ["<node_internals>/**"],
-      "preLaunchTask": "agent: server debug (:3002)"
-    },
-    {
-      "type": "chrome",
-      "request": "attach",
-      "name": "Debug: UI (:3001 attach open browser)",
-      "port": 9222,
-      "webRoot": "${workspaceFolder}/ui",
-      "preLaunchTask": "agent: vite dev (:3001)"
+      "sourceMaps": true,
+      "skipFiles": ["<node_internals>/**"]
     }
   ],
   "inputs": [
     {
       "id": "issueNumber",
-      "description": "GitHub issue number to process",
       "type": "promptString",
-      "default": "1"
+      "description": "Issue number to process"
+    },
+    {
+      "id": "commitSha",
+      "type": "promptString",
+      "description": "Commit SHA to process",
+      "default": "HEAD"
+    },
+    {
+      "id": "targetBranch",
+      "type": "promptString",
+      "description": "Target branch to merge into",
+      "default": "main"
+    },
+    {
+      "id": "watchBranch",
+      "type": "promptString",
+      "description": "Branch to watch for commits",
+      "default": "main"
     }
   ]
 }
