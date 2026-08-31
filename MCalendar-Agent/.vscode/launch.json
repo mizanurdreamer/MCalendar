@@ -91,6 +91,50 @@
       "restart": true,
       "sourceMaps": true,
       "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug UI (Vite)",
+      "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/vite",
+      "args": ["--config", "ui/vite.config.ts"],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "sourceMaps": true,
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug Server",
+      "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/tsx",
+      "args": ["src/server/main.ts"],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "sourceMaps": true,
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "Debug UI + Server",
+      "configurations": ["Debug Server", "Debug UI (Vite)"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug Agent",
+      "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/tsx",
+      "args": ["src/index.ts", "watch-branch", "${input:watchBranch}"],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "sourceMaps": true,
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "Debug All (Agent + Server + UI)",
+      "configurations": ["Debug Agent", "Debug Server", "Debug UI (Vite)"]
     }
   ],
   "inputs": [
