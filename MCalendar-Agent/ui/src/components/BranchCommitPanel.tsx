@@ -47,7 +47,7 @@ export function BranchCommitPanel({ onJobStarted }: BranchCommitPanelProps) {
         <input
           type="text"
           className="branch-input"
-          placeholder="Branch name (e.g., main)"
+          placeholder="Enter branch name (e.g., main)"
           value={branch}
           onChange={(e) => setBranch(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleScan()}
@@ -89,7 +89,7 @@ export function BranchCommitPanel({ onJobStarted }: BranchCommitPanelProps) {
       )}
 
       {!scanning && commits.length === 0 && !error && (
-        <div className="muted">Enter a branch name and click Scan</div>
+        <div className="muted">Enter your working branch name to scan recent commits</div>
       )}
     </div>
   );

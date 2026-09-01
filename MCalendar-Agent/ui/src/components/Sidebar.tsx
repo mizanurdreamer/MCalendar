@@ -110,7 +110,7 @@ export function Sidebar({ appConfig, retriesVersion, connected, onCompose }: Sid
         </ul>
       </Section>
 
-      <Section title="Branch Commits" onRefresh={refresh}>
+      <Section title="Process Branch Commits" onRefresh={refresh}>
         <BranchCommitPanel onJobStarted={(job: JobInfo) => {
           // Refresh job status when a new job starts
           void refresh();
