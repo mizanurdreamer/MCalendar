@@ -12,8 +12,13 @@ type OctokitWithGraphql = Octokit & {
 const PERMISSION_HINT =
   "Your GitHub token lacks permission for this action. " +
   "Fine-grained token: GitHub Settings → Developer settings → Personal access tokens → " +
-  "grant 'Pull requests: Read and write' and 'Issues: Read and write' for this repo. " +
+  "grant 'Pull requests: Read and write', 'Issues: Read and write', and 'Projects: Read and write' for this repo. " +
   "Classic token: regenerate with the full 'repo' scope. " +
+  "Then update GITHUB_TOKEN in .env and restart.";
+
+const PROJECT_PERMISSION_HINT =
+  "If you're using a fine-grained token, ensure 'Projects: Read and write' permission is granted. " +
+  "GitHub Settings → Developer settings → Personal access tokens → Edit your token → Repository permissions → Projects → Read and write. " +
   "Then update GITHUB_TOKEN in .env and restart.";
 
 function isRetryable(err: unknown): boolean {
@@ -95,51 +100,86 @@ export class GitHubClient {
     return issues.filter((i) => i.number > lastProcessedNumber);
   }
 
-  async listIssuesByProjectStatus(status: string): Promise<GitHubIssue[]> {
-    const projectNumber = parseInt(process.env.GITHUB_PROJECT_NUMBER ?? "0", 10);
-    if (!projectNumber) {
-      logger.warn(`[GitHub] GITHUB_PROJECT_NUMBER not set, cannot filter by status "${status}". Falling back to all open issues.`);
-      return this.listOpenIssues();
-    }
+async listIssuesByProjectStatus(status: string): Promise<GitHubIssue[]> {
+  const projectNumber = parseInt(
+    process.env.GITHUB_PROJECT_NUMBER ?? "0",
+    10
+  );
 
-    logger.info(`[GitHub] Fetching issues with project status "${status}" from project #${projectNumber}`);
+  if (!projectNumber) {
+    logger.warn(
+      `[GitHub] GITHUB_PROJECT_NUMBER not set, cannot filter by status "${status}". ` +
+      `Falling back to all open issues.`
+    );
+    return this.listOpenIssues();
+  }
 
-    try {
-      const data = await this.octokit.graphql<{
-        user: {
-          projectV2: {
-            items: {
-              nodes: Array<{
-                id: string;
-                content: { number: number; title: string } | null;
-                fieldValues: {
-                  nodes: Array<{
-                    name: string;
-                    field: { name: string };
-                  }>;
-                };
-              }>;
-            };
-          };
+  logger.info(
+    `[GitHub] Fetching issues with project status "${status}" ` +
+    `from project #${projectNumber}`
+  );
+
+  type ProjectItem = {
+    id: string;
+    content: {
+      number: number;
+      title: string;
+    } | null;
+    fieldValues: {
+      nodes: Array<{
+        name: string | null;
+        field: {
+          name: string;
         };
-      }>(
-        `query($login: String!, $number: Int!) {
+      }>;
+    };
+  };
+
+  type ProjectItemsResult = {
+    user: {
+      projectV2: {
+        items: {
+          nodes: ProjectItem[];
+        };
+      } | null;
+    } | null;
+  };
+
+  try {
+    const data = await this.octokit.graphql<ProjectItemsResult>(
+      `
+        query($login: String!, $number: Int!) {
           user(login: $login) {
             projectV2(number: $number) {
               items(first: 100) {
                 nodes {
                   id
+
                   content {
                     ... on Issue {
                       number
                       title
                     }
                   }
-                  fieldValues(first: 10) {
+
+                  fieldValues(first: 20) {
                     nodes {
                       ... on ProjectV2ItemFieldSingleSelectValue {
                         name
-                        field { name }
+                        field {
+                          ... on ProjectV2SingleSelectField {
+                            name
+                          }
+                          ... on ProjectV2Field {
+                            name
+                          }
+                          ... on ProjectV2IterationField {
+                            name
+                          }
+                          ... on ProjectV2MultiSelectField {
+                            name
+                          }
+                        }
                       }
                     }
                   }
@@ -147,48 +187,83 @@ export class GitHubClient {
               }
             }
           }
-        }`,
-        { login: this.owner, number: projectNumber }
+        }
+      `,
+      {
+        login: this.owner,
+        number: projectNumber,
+      }
+    );
+
+    const project = data.user?.projectV2;
+
+    if (!project) {
+      logger.warn(
+        `[GitHub] Project #${projectNumber} not found or not accessible ` +
+        `for user "${this.owner}".`
       );
-
-      const items = data.user.projectV2.items.nodes;
-      const issueNumbers: number[] = [];
-      const statusLower = status.toLowerCase();
-
-      // Log all available fields for debugging
-      if (items.length > 0) {
-        const firstItem = items[0];
-        if (firstItem?.content?.number) {
-          const fields = firstItem.fieldValues.nodes.map(fv => `${fv.field.name}="${fv.name}"`).join(", ");
-          logger.info(`[GitHub] Project fields for issue #${firstItem.content.number}: ${fields}`);
-        }
-      }
-
-      for (const item of items) {
-        if (!item.content?.number) continue;
-
-        const statusValue = item.fieldValues.nodes.find(
-          (fv) => fv.field.name.toLowerCase() === "status"
-        );
-
-        // Case-insensitive comparison
-        if (statusValue?.name.toLowerCase() === statusLower) {
-          issueNumbers.push(item.content.number);
-        }
-      }
-
-      logger.info(`[GitHub] Found ${issueNumbers.length} issues with status "${status}": #${issueNumbers.join(", ") || "none"}`);
-
-      if (issueNumbers.length === 0) return [];
-
-      const issues = await this.listOpenIssues();
-      return issues.filter((i) => issueNumbers.includes(i.number));
-    } catch (err) {
-      logger.error(`[GitHub] Failed to list issues by project status "${status}": ${err}`);
-      logger.warn(`[GitHub] Falling back to all open issues`);
+      logger.warn(`[GitHub] ${PROJECT_PERMISSION_HINT}`);
       return this.listOpenIssues();
     }
+
+    const items = project.items.nodes;
+    const statusLower = status.trim().toLowerCase();
+
+    // Log available fields for debugging
+    if (items.length > 0) {
+      const firstIssue = items.find((item) => item.content?.number);
+
+      if (firstIssue?.content?.number) {
+        const fields = firstIssue.fieldValues.nodes
+          .map((fv) => `${fv.field.name}="${fv.name}"`)
+          .join(", ");
+
+        logger.info(
+          `[GitHub] Project fields for issue #${firstIssue.content.number}: ${fields}`
+        );
+      }
+    }
+
+    const issueNumbers: number[] = [];
+
+    for (const item of items) {
+      if (!item.content?.number) continue;
+
+      const statusValue = item.fieldValues.nodes.find(
+        (fv) =>
+          fv.field.name?.toLowerCase() === "status"
+      );
+
+      if (
+        statusValue?.name?.trim().toLowerCase() === statusLower
+      ) {
+        issueNumbers.push(item.content.number);
+      }
+    }
+
+    logger.info(
+      `[GitHub] Found ${issueNumbers.length} issues with status "${status}": ` +
+      `#${issueNumbers.join(", ") || "none"}`
+    );
+
+    if (issueNumbers.length === 0) {
+      return [];
+    }
+
+    const issues = await this.listOpenIssues();
+
+    return issues.filter((issue) =>
+      issueNumbers.includes(issue.number)
+    );
+  } catch (err) {
+    logger.error(
+      `[GitHub] Failed to list issues by project status "${status}": ${err}`
+    );
+    logger.warn(`[GitHub] Falling back to all open issues`);
+
+    return this.listOpenIssues();
   }
+}
 
   async addComment(issueNumber: number, body: string): Promise<void> {
     try {
@@ -419,6 +494,50 @@ export class GitHubClient {
       });
     } catch (err) {
       withPermissionHint(err, `Merging PR #${params.pull_number}`);
+    }
+  }
+
+  async listCommitsOnBranch(branch: string, limit = 10): Promise<Array<{
+    sha: string;
+    shortSha: string;
+    message: string;
+    author: string;
+    date: string;
+  }>> {
+    try {
+      return await this.withRetry(`listCommitsOnBranch(${branch})`, async () => {
+        const { data } = await this.octokit.rest.repos.listCommits({
+          owner: this.owner,
+          repo: this.repo,
+          sha: branch,
+          per_page: limit,
+        });
+        
+        return data.map((commit: any) => ({
+          sha: commit.sha,
+          shortSha: commit.sha.slice(0, 7),
+          message: commit.commit.message.split("\n")[0],
+          author: commit.commit.author?.name || commit.author?.login || "unknown",
+          date: commit.commit.author?.date || "",
+        }));
+      });
+    } catch (err) {
+      withPermissionHint(err, `Listing commits on branch ${branch}`);
+    }
+  }
+
+  async getLatestCommitSha(branch: string): Promise<string> {
+    try {
+      return await this.withRetry(`getLatestCommitSha(${branch})`, async () => {
+        const { data } = await this.octokit.rest.repos.getCommit({
+          owner: this.owner,
+          repo: this.repo,
+          ref: branch,
+        });
+        return data.sha;
+      });
+    } catch (err) {
+      withPermissionHint(err, `Getting latest commit on branch ${branch}`);
     }
   }
 }
