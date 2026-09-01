@@ -16,6 +16,7 @@ export interface TaskContext {
   codebasePath: string;
   maxTokens?: number;
   temperature?: number;
+  promptCaching?: boolean;
   maxRetries?: number;
 }
 
@@ -63,12 +64,16 @@ Return ONLY valid JSON:
   "revisedOutput": "improved version if shouldRevise else null"
 }`;
 
+    const promptCaching = this.state.agentConfig[this.agentName]?.promptCaching ?? true;
+    logger.debug(`[${this.agentName}] Reflect - prompt caching: ${promptCaching ? "enabled" : "disabled"}`);
+    
     try {
       const response = await this.taskContext.provider.chat({
         system: "You are a harsh but fair critic. Output ONLY valid JSON.",
         messages: [{ role: "user", content: criticPrompt }],
         maxTokens: 2048,
         temperature: 0.1,
+        promptCaching,
       });
 
       const textBlocks = response.content.filter((b): b is { type: "text"; text: string } => b.type === "text");
@@ -361,12 +366,20 @@ Return ONLY valid JSON:
       }
 
       const provider = this.taskContext.provider;
+      const promptCaching = this.state.agentConfig[tag]?.promptCaching;
+      
+      // Log prompt caching status on first iteration
+      if (iteration === 1) {
+        logger.info(`[${tag}] Prompt caching: ${promptCaching ? "enabled" : "disabled"}`);
+      }
+      
       const response = await provider.chat({
         system: systemPrompt,
         messages,
         tools,
         maxTokens: this.state.agentConfig[tag]?.maxTokens,
         temperature: this.state.agentConfig[tag]?.temperature,
+        promptCaching,
       });
 
       // Record token usage

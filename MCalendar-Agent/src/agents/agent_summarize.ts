@@ -162,6 +162,7 @@ ${state.report ?? "(no report)"}`;
       messages: [{ role: "user", content: userMessage }],
       maxTokens: this.state.agentConfig[AGENT_NAMES.AGENT_SUMMARIZE]?.maxTokens,
       temperature: this.state.agentConfig[AGENT_NAMES.AGENT_SUMMARIZE]?.temperature,
+      promptCaching: this.state.agentConfig[AGENT_NAMES.AGENT_SUMMARIZE]?.promptCaching,
     });
 
     const textBlocks = response.content.filter((b): b is { type: "text"; text: string } => b.type === "text");

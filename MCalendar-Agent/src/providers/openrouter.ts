@@ -60,7 +60,13 @@ export class OpenRouterProvider implements ProviderInterface {
     tools,
     maxTokens = 4096,
     temperature = 0.3,
+    promptCaching = false,
   }: ChatParams): Promise<ChatResponse> {
+    // Prompt caching depends on the underlying provider via OpenRouter
+    if (promptCaching) {
+      logger.debug("[openrouter] Prompt caching depends on the underlying provider");
+    }
+
     const effectiveModel =
       this.defaultModel === "auto"
         ? await this.resolveAutoModel()

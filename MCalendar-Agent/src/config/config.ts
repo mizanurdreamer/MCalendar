@@ -39,6 +39,7 @@ export interface AppConfig {
   agentConfig: AgentConfig;
   agentEnabled: boolean;
   commitAutoApprove: boolean;
+  promptCachingEnabled: boolean;
   githubProjectNumber: number;
   watchBranch?: string;
   databaseUrl?: string;
@@ -73,9 +74,11 @@ export function loadConfig(): AppConfig {
   if (!fs.existsSync(configPath)) {
     throw new Error("agent.config.json not found. Run from the MCalendar-Agent directory.");
   }
-  const fileConfig: Record<string, { maxTokens?: number; temperature?: number }> = JSON.parse(
+  const fileConfig: Record<string, { maxTokens?: number; temperature?: number; promptCaching?: boolean }> = JSON.parse(
     fs.readFileSync(configPath, "utf-8")
   );
+
+  const promptCachingEnabled = (process.env.PROMPT_CACHING_ENABLED ?? "true").toLowerCase() === "true";
 
   const agentConfig: AgentConfig = {};
   for (const [taskName, settings] of Object.entries(fileConfig)) {
@@ -84,6 +87,7 @@ export function loadConfig(): AppConfig {
       model: resolvedModel,
       maxTokens: settings.maxTokens,
       temperature: settings.temperature,
+      promptCaching: settings.promptCaching ?? promptCachingEnabled,
     };
   }
 
@@ -133,6 +137,7 @@ export function loadConfig(): AppConfig {
     agentConfig,
     agentEnabled: (process.env.AGENT_ENABLED ?? "true").toLowerCase() === "true",
     commitAutoApprove: (process.env.COMMIT_AUTO_APPROVE ?? "true").toLowerCase() === "true",
+    promptCachingEnabled,
     githubProjectNumber: parseInt(process.env.GITHUB_PROJECT_NUMBER ?? "0", 10),
     watchBranch: process.env.WATCH_BRANCH,
     databaseUrl: process.env.DATABASE_URL,

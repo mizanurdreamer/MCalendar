@@ -129,6 +129,7 @@ Generate a comprehensive markdown report with:
       messages: [{ role: "user", content: userMessage }],
       maxTokens: this.state.agentConfig[AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR]?.maxTokens,
       temperature: this.state.agentConfig[AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR]?.temperature,
+      promptCaching: this.state.agentConfig[AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR]?.promptCaching,
     });
 
     const textBlocks = response.content.filter((b): b is { type: "text"; text: string } => b.type === "text");

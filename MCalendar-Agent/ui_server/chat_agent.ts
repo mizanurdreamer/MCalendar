@@ -278,6 +278,7 @@ export async function runChatTurn(
       tools,
       maxTokens: 4096,
       temperature: 0.3,
+      promptCaching: deps.config.promptCachingEnabled,
     });
 
     messages.push({ role: "assistant", content: response.content });

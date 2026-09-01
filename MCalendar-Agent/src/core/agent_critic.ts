@@ -103,6 +103,7 @@ Return ONLY valid JSON:
         messages: [{ role: "user", content: prompt }],
         maxTokens: 4096,
         temperature: 0.1,
+        promptCaching: this.state.agentConfig[CORE_AGENT_NAMES.CRITIC]?.promptCaching ?? true,
       });
 
       const textBlocks = response.content.filter((b): b is { type: "text"; text: string } => b.type === "text");

@@ -46,6 +46,7 @@ export class AnthropicProvider implements ProviderInterface {
     toolChoice,
     maxTokens = 4096,
     temperature = 0.3,
+    promptCaching = false,
   }: ChatParams): Promise<ChatResponse> {
     const effectiveModel =
       this.defaultModel === "auto"
@@ -97,7 +98,18 @@ export class AnthropicProvider implements ProviderInterface {
       tool_choice: anthropicToolChoice,
       temperature,
       messages: apiMessages,
+      // Prompt caching: add cache_control at top level for automatic caching
+      ...(promptCaching && { cache_control: { type: "ephemeral" } }),
     });
+
+    // Log cache usage if available
+    if (promptCaching) {
+      const cacheCreation = response.usage.cache_creation_input_tokens ?? 0;
+      const cacheRead = response.usage.cache_read_input_tokens ?? 0;
+      if (cacheCreation > 0 || cacheRead > 0) {
+        logger.debug(`[anthropic] Prompt cache: write=${cacheCreation} read=${cacheRead}`);
+      }
+    }
 
     const contentBlocks: ContentBlock[] = response.content.map((block) => {
       if (block.type === "text") return { type: "text", text: block.text };
@@ -117,6 +129,8 @@ export class AnthropicProvider implements ProviderInterface {
       usage: {
         inputTokens: response.usage.input_tokens,
         outputTokens: response.usage.output_tokens,
+        cacheCreationTokens: response.usage.cache_creation_input_tokens ?? 0,
+        cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
       },
     };
   }

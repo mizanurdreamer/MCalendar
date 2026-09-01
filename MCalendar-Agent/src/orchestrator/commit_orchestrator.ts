@@ -264,6 +264,7 @@ function createTaskContext(state: any, agentName: string) {
     codebasePath: state.codebasePath,
     maxTokens: state.agentConfig[agentName]?.maxTokens,
     temperature: state.agentConfig[agentName]?.temperature,
+    promptCaching: state.agentConfig[agentName]?.promptCaching,
     maxRetries: state.maxRetries,
   };
 }

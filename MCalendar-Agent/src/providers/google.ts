@@ -47,12 +47,19 @@ export class GoogleProvider implements ProviderInterface {
     tools,
     maxTokens = 4096,
     temperature = 0.3,
+    promptCaching = false,
   }: ChatParams): Promise<ChatResponse> {
     const effectiveModel =
       this.defaultModel === "auto"
         ? await this.resolveAutoModel()
         : this.defaultModel;
     const functionDeclarations = tools?.map(this.convertTool);
+
+    // Google Context Caching requires explicit cache creation API (not automatic)
+    // See: https://ai.google.dev/gemini-api/docs/context-caching
+    if (promptCaching) {
+      logger.debug("[google] Context caching requires explicit cache creation - not automatically enabled");
+    }
 
     const contents = messages.map((m) => ({
       role: m.role === "assistant" ? "model" : "user",

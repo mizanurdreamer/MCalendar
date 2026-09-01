@@ -50,7 +50,13 @@ export class OllamaProvider implements ProviderInterface {
     tools,
     maxTokens = 4096,
     temperature = 0.3,
+    promptCaching = false,
   }: ChatParams): Promise<ChatResponse> {
+    // Ollama local models do not support prompt caching
+    if (promptCaching) {
+      logger.debug("[ollama] Prompt caching not supported for local models");
+    }
+
     const effectiveModel =
       this.defaultModel === "auto"
         ? await this.resolveAutoModel()

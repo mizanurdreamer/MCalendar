@@ -10,6 +10,7 @@ export interface ChatParams {
   toolChoice?: { type: "auto" } | { type: "tool"; name: string } | { type: "any" };
   maxTokens?: number;
   temperature?: number;
+  promptCaching?: boolean;
 }
 
 export interface ChatMessage {
@@ -33,7 +34,12 @@ export type Tool = ToolDefinition;
 export interface ChatResponse {
   content: ContentBlock[];
   stopReason: "end_turn" | "tool_use";
-  usage: { inputTokens: number; outputTokens: number };
+  usage: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheCreationTokens?: number;
+    cacheReadTokens?: number;
+  };
 }
 
 export interface ProviderConfig {
@@ -47,6 +53,7 @@ export interface TaskConfig {
   model: string;
   maxTokens?: number;
   temperature?: number;
+  promptCaching?: boolean;
 }
 
 export interface AgentConfig {

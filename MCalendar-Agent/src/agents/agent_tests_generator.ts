@@ -378,6 +378,7 @@ Use the write_test_file tool to save the test as "${testFilename}".`;
         tools: this.getAvailableTools(),
         maxTokens: this.state.agentConfig[AGENT_NAMES.AGENT_TESTS_GENERATOR]?.maxTokens,
         temperature: this.state.agentConfig[AGENT_NAMES.AGENT_TESTS_GENERATOR]?.temperature,
+        promptCaching: this.state.agentConfig[AGENT_NAMES.AGENT_TESTS_GENERATOR]?.promptCaching,
       });
 
       // Check if write_test_file was called in the response

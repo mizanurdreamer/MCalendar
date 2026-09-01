@@ -46,12 +46,18 @@ export class OpenAIProvider implements ProviderInterface {
     toolChoice,
     maxTokens = 4096,
     temperature = 0.3,
+    promptCaching = false,
   }: ChatParams): Promise<ChatResponse> {
     const effectiveModel =
       this.defaultModel === "auto"
         ? await this.resolveAutoModel()
         : this.defaultModel;
     const openaiTools = tools?.map(this.convertTool);
+
+    // OpenAI automatically caches repeated prompt prefixes (no API change needed)
+    if (promptCaching) {
+      logger.debug("[openai] Prompt caching is automatic for repeated prefixes");
+    }
 
     // Convert toolChoice to OpenAI format
     let openaiToolChoice: OpenAI.ChatCompletionToolChoiceOption | undefined;
