@@ -200,11 +200,17 @@ When you have enough information, call submit_analysis with your complete analys
 
     const issue = state.issue;
     const labels = issue.labels.map((l: { name: string }) => l.name).join(", ") || "none";
+    
+    // Build plan context if available
+    const planContext = this.taskContext.currentPlanStep 
+      ? `\n\nPlan Context:\n- Step: ${this.taskContext.currentPlanStep.reasoning}\n- Expected Outcome: ${this.taskContext.currentPlanStep.expectedOutcome}`
+      : '';
+    
     const userMessage = `Issue #${issue.number}: ${issue.title}
     Labels: ${labels}
     Created: ${issue.created_at}
 
-    ${issue.body ?? "(no description)"}`;
+    ${issue.body ?? "(no description)"}${planContext}`;
 
     logger.info(`[AgentIssueAnalyzer] Analyzing issue #${issue.number}`);
 
@@ -312,6 +318,17 @@ When you have enough information, call submit_analysis with your complete analys
       logger.error(`[AgentIssueAnalyzer] Issue analysis failed: ${err}`);
       state.error = `Issue analysis failed: ${err}`;
       this.updateStatus(AGENT_STATUS.FAILED);
+    }
+
+    // Send analysis results to TestsGenerator
+    if (state.issueAnalysis) {
+      this.sendMessage(AGENT_NAMES.AGENT_TESTS_GENERATOR, MESSAGE_TYPE.FEEDBACK, {
+        event: "issue_analyzed",
+        issueNumber: state.issue?.number,
+        needsTests: state.issueAnalysis.needs_tests,
+        scenarios: state.issueAnalysis.test_scenarios,
+        summary: state.issueAnalysis.summary,
+      });
     }
 
     this.sendMessage(CORE_AGENT_NAMES.SUPERVISOR, MESSAGE_TYPE.NOTIFICATION, {

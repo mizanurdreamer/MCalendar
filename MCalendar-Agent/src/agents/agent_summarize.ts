@@ -55,6 +55,11 @@ Keep it concise and actionable for developers.`;
   async run(inputState?: AgentState): Promise<AgentState> {
     const state = inputState || this.state;
     let userMessage: string;
+    
+    // Build plan context if available
+    const planContext = this.taskContext.currentPlanStep 
+      ? `\n\nPlan Context:\n- Step: ${this.taskContext.currentPlanStep.reasoning}\n- Expected Outcome: ${this.taskContext.currentPlanStep.expectedOutcome}`
+      : '';
 
     if (state.mode === MODE.ISSUE && state.issue) {
       logger.info(`[AgentSummarize] Summarizing issue #${state.issue.number} pipeline results`);
@@ -76,7 +81,7 @@ Test Results:
 ${state.testResult ? formatTestReport(state.testResult) : "(no results)"}
 
 Report:
-${state.report ?? "(no report)"}`;
+${state.report ?? "(no report)"}${planContext}`;
     } else if (state.mode === MODE.COMMIT && state.commitDiff) {
       const shortSha = state.commitDiff.sha.slice(0, 7);
       logger.info(`[AgentSummarize] Summarizing commit ${shortSha} pipeline results`);
@@ -98,7 +103,7 @@ Test Results:
 ${state.testResult ? formatTestReport(state.testResult) : "(no results)"}
 
 Report:
-${state.report ?? "(no report)"}`;
+${state.report ?? "(no report)"}${planContext}`;
     } else {
       logger.warn(`[AgentSummarize] No mode/issue/commit to summarize, skipping`);
       this.updateStatus(AGENT_STATUS.COMPLETED);

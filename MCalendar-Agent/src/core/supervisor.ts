@@ -351,6 +351,14 @@ export class Supervisor {
     this.state.currentAgent = agentName;
     logger.info(`[Supervisor] Executing agent: ${agentName}`);
 
+    // Pass plan context to agent
+    const masterPlan = this.state.plans?.planner;
+    const currentStep = masterPlan?.steps[this.currentPlanStepIndex];
+    agent.updateTaskContext({
+      currentPlanStep: currentStep,
+      overallPlan: masterPlan,
+    });
+
     try {
       return await agent.run();
     } catch (err) {
@@ -364,12 +372,22 @@ export class Supervisor {
   private async executeParallel(agents: AgentName[]): Promise<AgentState> {
     logger.info(`[Supervisor] Executing parallel: ${agents.join(", ")}`);
     
+    // Pass plan context to all parallel agents
+    const masterPlan = this.state.plans?.planner;
+    const currentStep = masterPlan?.steps[this.currentPlanStepIndex];
+    
     // Create state copies for each agent to prevent race conditions
     const stateCopies = agents.map(() => ({ ...this.state }));
     
     const promises = agents.map(async (name, index) => {
       const agent = this.agents.get(name);
       if (!agent) throw new Error(`Agent not registered: ${name}`);
+      
+      // Pass plan context to agent
+      agent.updateTaskContext({
+        currentPlanStep: currentStep,
+        overallPlan: masterPlan,
+      });
       
       // Run agent with its own state copy
       const agentState = await agent.run(stateCopies[index]);

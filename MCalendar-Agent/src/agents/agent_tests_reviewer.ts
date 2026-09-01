@@ -185,6 +185,14 @@ Use all available tools to debug and fix tests. Return the fixed test file conte
             logger.error(`  ${i + 1}. ${newTestResult.errors[i].slice(0, 300)}`);
           }
         }
+        
+        // Send feedback to TestsGenerator for next retry
+        this.sendMessage(AGENT_NAMES.AGENT_TESTS_GENERATOR, MESSAGE_TYPE.FEEDBACK, {
+          event: "tests_still_failing",
+          errors: newTestResult.errors,
+          analysis: analysis,
+          attempt: state.retries,
+        });
       }
 
       this.recordStep("review_fix", `Fixed ${testFilename} (attempt ${state.retries}), re-run: ${newTestResult.success ? "passed" : "failed"}`, "next");
@@ -386,6 +394,7 @@ ${mcpDebugInfo ? `Live App Debug Info:\n${mcpDebugInfo}\n` : ""}
 ${sourceFileInfo ? `Source Files Context:\n${sourceFileInfo}\n` : ""}
 ${errorFixes ? `\nPrevious fix attempts:\n${errorFixes}\n` : ""}
 ${lessons ? `\nPast lessons:\n${lessons}\n` : ""}
+${this.taskContext.currentPlanStep ? `\nPlan Context:\n- Step: ${this.taskContext.currentPlanStep.reasoning}\n- Expected Outcome: ${this.taskContext.currentPlanStep.expectedOutcome}\n` : ""}
 Use tools to investigate the root cause, then call submit_analysis with your fix plan.`;
 
     const submitAnalysisTool: ToolDefinition = {

@@ -154,12 +154,21 @@ You MUST use the write_test_file and append_test_file tools to save your test.`;
 
   async run(inputState?: AgentState): Promise<AgentState> {
     const state = inputState || this.state;
+    
+    // Initialize communication with other agents
+    this.initCommunication([AGENT_NAMES.AGENT_ISSUE_ANALYZER, AGENT_NAMES.AGENT_TESTS_REVIEWER]);
 
     // Recall past lessons and test patterns
     const lessons = await this.recallLessons();
     const testPatterns = await this.recallTestPatterns();
     if (lessons || testPatterns) {
       logger.info(`[AgentTestsGenerator] Recalled past lessons and test patterns`);
+    }
+    
+    // Check for feedback from reviewer (on retry)
+    const reviewerFeedback = this.getLatestMessage(AGENT_NAMES.AGENT_TESTS_REVIEWER, MESSAGE_TYPE.FEEDBACK);
+    if (reviewerFeedback) {
+      logger.info(`[AgentTestsGenerator] Received feedback from reviewer`);
     }
 
     let testFilename: string;
@@ -201,6 +210,12 @@ You MUST use the write_test_file and append_test_file tools to save your test.`;
     }
 
     let userMessage: string;
+    
+    // Build plan context if available
+    const planContext = this.taskContext.currentPlanStep 
+      ? `\n\nPlan Context:\n- Step: ${this.taskContext.currentPlanStep.reasoning}\n- Expected Outcome: ${this.taskContext.currentPlanStep.expectedOutcome}`
+      : '';
+    
     if (state.mode === MODE.ISSUE && state.issue && state.issueAnalysis) {
       const scenarios = (state.issueAnalysis.test_scenarios ?? [])
         .map((s, i) => `${i + 1}. ${s.name} (${s.type}): ${s.description}${s.acceptance_criterion ? ` [criteria: ${s.acceptance_criterion}]` : ""}`)
@@ -217,7 +232,7 @@ ${scenarios || "(no scenarios — generate based on the issue)"}
 ${lessons ? `\n${lessons}\n` : ""}
 ${testPatterns ? `\n${testPatterns}\n` : ""}
 Use read_file/list_directory to explore source files as needed.
-Use the write_test_file tool to save the test as "${testFilename}".`;
+Use the write_test_file tool to save the test as "${testFilename}".${planContext}`;
     } else if (state.mode === MODE.COMMIT && state.commitDiff) {
       const diff = state.commitDiff;
       const shortSha = diff.sha.slice(0, 7);
@@ -241,7 +256,7 @@ ${changedFiles}
 ${lessons ? `\n${lessons}\n` : ""}
 ${testPatterns ? `\n${testPatterns}\n` : ""}
 Use read_file/list_directory to explore source files as needed.
-Use the write_test_file tool to save the test as "${testFilename}".`;
+Use the write_test_file tool to save the test as "${testFilename}".${planContext}`;
     } else {
       logger.error(`[AgentTestsGenerator] No analysis data available (mode: ${state.mode})`);
       state.error = "No analysis data available for test generation";

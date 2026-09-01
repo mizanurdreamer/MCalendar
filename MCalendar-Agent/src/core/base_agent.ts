@@ -18,6 +18,8 @@ export interface TaskContext {
   temperature?: number;
   promptCaching?: boolean;
   maxRetries?: number;
+  currentPlanStep?: PlanStep;
+  overallPlan?: AgentPlan;
 }
 
 export abstract class BaseAgent {
@@ -126,7 +128,11 @@ Return ONLY valid JSON:
 
   protected async requestHumanApproval(plan: AgentPlan, state?: AgentState): Promise<boolean> {
     const s = state || this.state;
-    if (s.commitAutoApprove) {
+    
+    // Check risk level - only require approval for high-risk actions
+    const requireApproval = s.enableHumanGates && plan.riskLevel === RISK_LEVEL.HIGH;
+    
+    if (s.commitAutoApprove && !requireApproval) {
       plan.approved = true;
       plan.approvedBy = APPROVED_BY.SUPERVISOR;
       return true;
@@ -144,13 +150,12 @@ Return ONLY valid JSON:
         plan.approvedBy = existingApproval.resolution === APPROVAL_RESOLUTION.APPROVE ? APPROVED_BY.HUMAN : APPROVED_BY.SUPERVISOR;
         return plan.approved;
       }
-      // If pending but not resolved, signal to graph to wait
-      s.status = PIPELINE_STATUS.AWAITING_HUMAN;
-      this.updateStatus(AGENT_STATUS.AWAITING_APPROVAL, s);
-      return false;
+      // If pending but not resolved, wait for resolution
+      logger.warn(`[${this.agentName}] Waiting for human approval (${existingApproval.id})`);
+      return this.waitForApprovalResolution(existingApproval.id, s);
     }
 
-    // Create new approval request for LangGraph interrupt
+    // Create new approval request
     const request: HumanApprovalRequest = {
       id: `approval-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       agent: this.agentName,
@@ -174,9 +179,22 @@ Return ONLY valid JSON:
     
     logger.warn(`[${this.agentName}] Awaiting human approval for plan (${request.id})`);
     
-    // Return false to signal that execution should pause for approval
-    // The graph's humanApprovalNode will interrupt and wait for resolution
-    return false;
+    // Wait for human resolution
+    return this.waitForApprovalResolution(request.id, s);
+  }
+  
+  private async waitForApprovalResolution(approvalId: string, state: AgentState): Promise<boolean> {
+    return new Promise((resolve) => {
+      const checkInterval = setInterval(() => {
+        const approval = state.humanApprovals.find(a => a.id === approvalId);
+        if (approval?.resolved) {
+          clearInterval(checkInterval);
+          const approved = approval.resolution === APPROVAL_RESOLUTION.APPROVE;
+          logger.info(`[${this.agentName}] Approval ${approved ? "granted" : "rejected"} (${approvalId})`);
+          resolve(approved);
+        }
+      }, 1000);
+    });
   }
 
   protected getAvailableTools(): ToolDefinition[] {
@@ -200,6 +218,10 @@ Return ONLY valid JSON:
     const s = state || this.state;
     s.agentStatus[this.agentName] = status;
     s.currentAgent = this.agentName;
+  }
+
+  public updateTaskContext(updates: Partial<TaskContext>): void {
+    this.taskContext = { ...this.taskContext, ...updates };
   }
 
   protected recordStep(name: string, output: string, decision: string, state?: AgentState): void {
@@ -238,11 +260,25 @@ Return ONLY valid JSON:
     return this.state.messageBus.subscribe(this.agentName, handler);
   }
 
-  protected getMessages(from?: AgentName): AgentMessage[] {
+  protected initCommunication(subscriptions: AgentName[]): void {
+    subscriptions.forEach(agentName => {
+      this.subscribeToMessages((message) => {
+        logger.debug(`[${this.agentName}] Received message from ${message.from}: ${message.type}`);
+      });
+    });
+  }
+
+  protected getMessages(from?: AgentName, type?: AgentMessage["type"]): AgentMessage[] {
     return this.state.messages.filter(m => 
       (m.to === this.agentName || m.to === "broadcast") && 
-      (!from || m.from === from)
+      (!from || m.from === from) &&
+      (!type || m.type === type)
     );
+  }
+
+  protected getLatestMessage(from?: AgentName, type?: AgentMessage["type"]): AgentMessage | null {
+    const messages = this.getMessages(from, type);
+    return messages.length > 0 ? messages[messages.length - 1] : null;
   }
 
   protected remember(entry: Omit<MemoryEntry, "id" | "metadata"> & { metadata: Omit<MemoryEntry["metadata"], "timestamp"> }): void {

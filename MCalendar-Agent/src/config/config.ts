@@ -39,6 +39,7 @@ export interface AppConfig {
   agentConfig: AgentConfig;
   agentEnabled: boolean;
   commitAutoApprove: boolean;
+  enableHumanGates: boolean;
   promptCachingEnabled: boolean;
   githubProjectNumber: number;
   watchBranch?: string;
@@ -137,6 +138,7 @@ export function loadConfig(): AppConfig {
     agentConfig,
     agentEnabled: (process.env.AGENT_ENABLED ?? "true").toLowerCase() === "true",
     commitAutoApprove: (process.env.COMMIT_AUTO_APPROVE ?? "true").toLowerCase() === "true",
+    enableHumanGates: (process.env.ENABLE_HUMAN_GATES ?? "false").toLowerCase() === "true",
     promptCachingEnabled,
     githubProjectNumber: parseInt(process.env.GITHUB_PROJECT_NUMBER ?? "0", 10),
     watchBranch: process.env.WATCH_BRANCH,

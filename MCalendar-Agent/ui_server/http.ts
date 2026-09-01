@@ -182,6 +182,8 @@ export async function startWebServer(options: WebServerOptions = {}): Promise<vo
       res.status(404).json({ error: "Approval not found" });
       return;
     }
+    // Broadcast approval state change
+    broadcast({ type: "approval:resolved", approval });
     res.json({ ok: true });
   });
 

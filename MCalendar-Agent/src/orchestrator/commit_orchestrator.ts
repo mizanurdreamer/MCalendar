@@ -40,6 +40,7 @@ export interface CommitOrchestratorConfig {
   agentMemoryDatabaseUrl?: string;
   apiBaseUrl?: string;
   commitAutoApprove?: boolean;
+  enableHumanGates?: boolean;
   playwrightMcpEnabled?: boolean;
   playwrightMcpBrowser?: string;
   playwrightWorkers?: number;
@@ -114,6 +115,7 @@ export async function processCommit(
     maxIterations,
     maxPipelineSteps,
     commitAutoApprove: config.commitAutoApprove ?? true,
+    enableHumanGates: config.enableHumanGates ?? false,
     baseBranch: targetBranch,
     branchName,
     apiBaseUrl: config.apiBaseUrl,

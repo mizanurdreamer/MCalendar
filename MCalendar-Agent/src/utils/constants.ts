@@ -83,6 +83,7 @@ export const MESSAGE_TYPE = {
   RESPONSE: "response",
   NOTIFICATION: "notification",
   DELEGATION: "delegation",
+  FEEDBACK: "feedback",
 } as const;
 
 // --- Agent Events (for MessageBus communication) ---

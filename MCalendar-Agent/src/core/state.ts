@@ -59,7 +59,7 @@ export interface AgentMessage {
   id: string;
   from: AgentName;
   to: AgentName | typeof MESSAGE_TYPE.BROADCAST;
-  type: typeof MESSAGE_TYPE.REQUEST | typeof MESSAGE_TYPE.RESPONSE | typeof MESSAGE_TYPE.NOTIFICATION | typeof MESSAGE_TYPE.DELEGATION;
+  type: typeof MESSAGE_TYPE.REQUEST | typeof MESSAGE_TYPE.RESPONSE | typeof MESSAGE_TYPE.NOTIFICATION | typeof MESSAGE_TYPE.DELEGATION | typeof MESSAGE_TYPE.FEEDBACK;
   payload: unknown;
   timestamp: number;
   correlationId?: string;
@@ -133,6 +133,7 @@ export interface AgentState {
   maxIterations: number;
   maxPipelineSteps: number;
   commitAutoApprove: boolean;
+  enableHumanGates: boolean;
   retries: number;
   playwrightWorkers: number;
   
@@ -232,6 +233,7 @@ export function createInitialAgentState(input: {
   maxIterations: number;
   maxPipelineSteps: number;
   commitAutoApprove?: boolean;
+  enableHumanGates?: boolean;
   baseBranch: string;
   branchName: string;
   playwrightWorkers?: number;
@@ -269,6 +271,7 @@ export function createInitialAgentState(input: {
     maxIterations: input.maxIterations,
     maxPipelineSteps: input.maxPipelineSteps,
     commitAutoApprove: input.commitAutoApprove ?? true,
+    enableHumanGates: input.enableHumanGates ?? false,
     retries: 0,
     playwrightWorkers: input.playwrightWorkers ?? 6,
     planStepIndex: 0,

@@ -102,6 +102,10 @@ Output a well-structured markdown report.`;
     const systemPrompt = AgentTestsReportGenerator.buildSystemPrompt();
 
     const testResult = this.state.testResult!;
+    const planContext = this.taskContext.currentPlanStep 
+      ? `\n\nPlan Context:\n- Step: ${this.taskContext.currentPlanStep.reasoning}\n- Expected Outcome: ${this.taskContext.currentPlanStep.expectedOutcome}`
+      : '';
+    
     const userMessage = `Generate a comprehensive test report for: ${this.state.testFilename}
 
 Test Results:
@@ -122,7 +126,7 @@ Generate a comprehensive markdown report with:
 1. Executive Summary
 2. Test Results Breakdown
 3. Failure Analysis with Root Causes
-4. Recommendations`;
+4. Recommendations${planContext}`;
 
     const response = await provider.chat({
       system: systemPrompt,
