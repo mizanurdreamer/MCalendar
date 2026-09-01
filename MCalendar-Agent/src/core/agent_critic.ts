@@ -120,10 +120,10 @@ Return ONLY valid JSON:
     }
 
     return {
-      score: 75,
-      strengths: ["Evaluation unavailable"],
-      weaknesses: ["Could not run critic"],
-      suggestions: ["Enable critic for quality assurance"],
+      score: 0,
+      strengths: [],
+      weaknesses: ["Critic unavailable - output quality unverified"],
+      suggestions: ["Investigate critic failure", "Check provider configuration"],
       shouldRevise: false,
     };
   }

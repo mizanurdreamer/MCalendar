@@ -178,6 +178,29 @@ Use all available tools to debug and fix tests. Return the fixed test file conte
 
       if (newTestResult.success) {
         logger.success(`[AgentTestsReviewer] Tests now passing: ${newTestResult.passed}/${newTestResult.total}`);
+        
+        // Store successful fix pattern to memory for future recall
+        try {
+          const parsed = JSON.parse(analysis);
+          this.remember({
+            type: "error_fix",
+            content: JSON.stringify({
+              testFilename,
+              originalErrors: testResult.errors.slice(0, 3).map(e => e.slice(0, 200)),
+              rootCause: parsed.root_cause || "unknown",
+              fixesApplied: (parsed.fixes_needed || []).slice(0, 5),
+            }),
+            metadata: {
+              project: state.projectName || "unknown",
+              agent: this.agentName,
+              success: true,
+              tags: ["error_fix", this.agentName, testFilename, "verified"],
+              source: "test-reviewer-fix",
+            },
+          });
+        } catch (err) {
+          logger.warn(`[AgentTestsReviewer] Failed to store fix pattern: ${err}`);
+        }
       } else {
         logger.warn(`[AgentTestsReviewer] Tests still failing after fix: ${newTestResult.passed} passed, ${newTestResult.failed} failed`);
         if (newTestResult.errors.length > 0) {

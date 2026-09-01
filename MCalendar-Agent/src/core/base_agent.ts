@@ -43,6 +43,10 @@ export abstract class BaseAgent {
   abstract getGoal(): string;
   abstract getDefaultPlan(): AgentPlan;
   abstract run(inputState?: AgentState): Promise<AgentState>;
+  
+  public setState(state: AgentState): void {
+    this.state = state;
+  }
 
   protected async reflect(output: string): Promise<ReflectionResult> {
     const criticPrompt = `You are a critic evaluating the output of the ${this.agentName} agent.
@@ -90,10 +94,10 @@ Return ONLY valid JSON:
     }
 
     return {
-      score: 75,
-      strengths: ["Completed execution"],
-      weaknesses: ["Reflection unavailable"],
-      suggestions: ["Enable critic for better quality"],
+      score: 0,
+      strengths: [],
+      weaknesses: ["Reflection unavailable - output quality unverified"],
+      suggestions: ["Investigate reflection failure", "Check provider configuration"],
       shouldRevise: false,
     };
   }

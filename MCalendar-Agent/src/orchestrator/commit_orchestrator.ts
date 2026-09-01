@@ -139,6 +139,7 @@ export async function processCommit(
 
   graph.registerCritic(AGENT_NAMES.AGENT_COMMIT_ANALYZER, new AgentCritic(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_COMMIT_ANALYZER), AGENT_NAMES.AGENT_COMMIT_ANALYZER));
   graph.registerCritic(AGENT_NAMES.AGENT_TESTS_GENERATOR, new AgentCritic(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_TESTS_GENERATOR), AGENT_NAMES.AGENT_TESTS_GENERATOR));
+  graph.registerCritic(AGENT_NAMES.AGENT_TESTS_REVIEWER, new AgentCritic(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_TESTS_REVIEWER), AGENT_NAMES.AGENT_TESTS_REVIEWER));
   graph.registerCritic(AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, new AgentCritic(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR), AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR));
   graph.registerCritic(AGENT_NAMES.AGENT_SUMMARIZE, new AgentCritic(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_SUMMARIZE), AGENT_NAMES.AGENT_SUMMARIZE));
 

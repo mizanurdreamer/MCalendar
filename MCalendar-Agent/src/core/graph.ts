@@ -305,6 +305,10 @@ export class AgenticGraph {
         
         // Create a safe copy of state to prevent mutation of original
         const stateCopy = this.safeStateCopy(state);
+        
+        // Update agent's internal state reference before running
+        agent.setState(stateCopy);
+        
         const newState = await agent.run(stateCopy);
         
         if (this.config.enableCritic && this.critics.has(agentName)) {
@@ -329,6 +333,11 @@ export class AgenticGraph {
                   fs.writeFileSync(fullPath, revised, "utf-8");
                   logger.info(`[Graph] Critic revision written to tests/${newState.testFilename}`);
                 }
+              }
+              else if (agentName === AGENT_NAMES.AGENT_TESTS_REVIEWER) {
+                // TestsReviewer output is analysis, not test content
+                // Log the revision for debugging but don't write to disk
+                logger.info(`[Graph] Critic revised TestsReviewer analysis (${revised.length} chars)`);
               }
               else if (agentName === AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR) newState.report = revised;
               else if (agentName === AGENT_NAMES.AGENT_SUMMARIZE) newState.summary = revised;
