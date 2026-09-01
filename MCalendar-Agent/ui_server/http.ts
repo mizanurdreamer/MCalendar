@@ -85,9 +85,12 @@ export async function startWebServer(options: WebServerOptions = {}): Promise<vo
     });
   });
 
-  app.get("/api/issues", async (_req: Request, res: Response) => {
+  app.get("/api/issues", async (req: Request, res: Response) => {
     try {
-      const issues = await github.listOpenIssues();
+      const status = req.query.status as string | undefined;
+      const issues = status
+        ? await github.listIssuesByProjectStatus(status)
+        : await github.listOpenIssues();
       res.json(
         issues.map((i) => ({
           number: i.number,

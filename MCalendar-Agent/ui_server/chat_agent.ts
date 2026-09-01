@@ -32,8 +32,16 @@ function buildTools(deps: ChatAgentDeps): ToolDefinition[] {
   return [
     {
       name: "list_issues",
-      description: "List open GitHub issues for the repository.",
-      inputSchema: { type: "object", properties: {} },
+      description: "List GitHub issues for the repository. Optionally filter by project status (e.g., 'ready', 'in progress', 'done').",
+      inputSchema: {
+        type: "object",
+        properties: {
+          status: {
+            type: "string",
+            description: "Filter by project status (e.g., 'ready'). Omit to list all open issues.",
+          },
+        },
+      },
     },
     {
       name: "get_issue",
@@ -131,6 +139,12 @@ You manage automated E2E test generation for the GitHub repo \`${config.repoOwne
 - When you start a job: confirm it started, mention it can take several minutes, and that a result summary will appear automatically when finished. Then feel free to help with anything else while it runs.
 - Job completion summaries are delivered to the user's chat automatically by the system — you don't need to poll or report them yourself unless asked via \`check_job_status\`.
 
+## Issues and Status
+- The \`list_issues\` tool accepts an optional \`status\` parameter to filter by project status.
+- When the user asks for issues with a specific status (e.g., "ready", "in progress", "done"), use \`list_issues\` with the \`status\` parameter.
+- Example: "get issues with status ready" → call \`list_issues\` with \`status="ready"\`
+- The status matching is case-insensitive.
+
 ## Rules
 - Answer general questions about the project directly using your knowledge plus the codebase tools.
 - When asked to do something ("run issue 12", "retry that commit"), pick the right tool and DO it without asking for confirmation.
@@ -143,9 +157,14 @@ async function executeTool(name: string, input: Record<string, unknown>, deps: C
   const { config, github, runManager } = deps;
   switch (name) {
     case "list_issues": {
-      const issues = await github.listOpenIssues();
-      if (issues.length === 0) return "No open issues.";
-      return issues
+      const status = input.status as string | undefined;
+      logger.info(`[ChatAgent] list_issues called with status="${status ?? "all"}"`);
+      const issues = status
+        ? await github.listIssuesByProjectStatus(status)
+        : await github.listOpenIssues();
+      if (issues.length === 0) return status ? `No issues with status "${status}".` : "No open issues.";
+      const header = status ? `Issues with status "${status}" (${issues.length}):` : `Open issues (${issues.length}):`;
+      return header + "\n" + issues
         .map((i: GitHubIssueShape) => `#${i.number} — ${i.title}${i.labels.length ? ` [${i.labels.map((l) => l.name).join(", ")}]` : ""}`)
         .join("\n");
     }

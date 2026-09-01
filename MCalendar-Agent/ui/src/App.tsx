@@ -4,7 +4,7 @@ import { useAgentSocket } from "./ws";
 import { Sidebar } from "./components/Sidebar";
 import { JobCard, Markdown } from "./components/JobCard";
 import { LogDrawer } from "./components/LogDrawer";
-import { LiveLogStream } from "./components/LiveLogStream";
+import { ToolActivityList } from "./components/LiveLogStream";
 import { HumanApprovalPanel } from "./components/HumanApprovalPanel";
 import { AgentStatusPanel } from "./components/AgentStatusPanel";
 import { AgentPlanPanel } from "./components/AgentPlanPanel";
@@ -224,29 +224,14 @@ export default function App() {
           {thinking && (
             <div className="msg-row msg-assistant">
               <div className="msg-bubble thinking-bubble">
-                {activity.length > 0 ? (
-                  <>
-                    <span className="thinking-label">Working…</span>
-                    <div className="activity-chips">
-                      {activity.map((a) => (
-                        <span key={`${a.name}-${a.startedAt}`} className="chip chip-running">
-                          ⚙️ {a.name}
-                        </span>
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <span className="typing-dots"><i /><i /><i /></span>
-                )}
+                <ToolActivityList
+                  activity={activity}
+                  logs={logs}
+                  running={true}
+                />
               </div>
             </div>
           )}
-
-          <LiveLogStream
-            logs={logs}
-            running={!!runningJob}
-            startedAt={jobStartRef.current}
-          />
         </div>
 
         {errorBanner && <div className="error-banner">{errorBanner}</div>}

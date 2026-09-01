@@ -98,9 +98,11 @@ export class GitHubClient {
   async listIssuesByProjectStatus(status: string): Promise<GitHubIssue[]> {
     const projectNumber = parseInt(process.env.GITHUB_PROJECT_NUMBER ?? "0", 10);
     if (!projectNumber) {
-      logger.warn(`[GitHub] GITHUB_PROJECT_NUMBER not set, falling back to listOpenIssues()`);
+      logger.warn(`[GitHub] GITHUB_PROJECT_NUMBER not set, cannot filter by status "${status}". Falling back to all open issues.`);
       return this.listOpenIssues();
     }
+
+    logger.info(`[GitHub] Fetching issues with project status "${status}" from project #${projectNumber}`);
 
     try {
       const data = await this.octokit.graphql<{
@@ -151,25 +153,39 @@ export class GitHubClient {
 
       const items = data.user.projectV2.items.nodes;
       const issueNumbers: number[] = [];
+      const statusLower = status.toLowerCase();
+
+      // Log all available fields for debugging
+      if (items.length > 0) {
+        const firstItem = items[0];
+        if (firstItem?.content?.number) {
+          const fields = firstItem.fieldValues.nodes.map(fv => `${fv.field.name}="${fv.name}"`).join(", ");
+          logger.info(`[GitHub] Project fields for issue #${firstItem.content.number}: ${fields}`);
+        }
+      }
 
       for (const item of items) {
         if (!item.content?.number) continue;
 
         const statusValue = item.fieldValues.nodes.find(
-          (fv) => fv.field.name === "Status"
+          (fv) => fv.field.name.toLowerCase() === "status"
         );
 
-        if (statusValue?.name === status) {
+        // Case-insensitive comparison
+        if (statusValue?.name.toLowerCase() === statusLower) {
           issueNumbers.push(item.content.number);
         }
       }
+
+      logger.info(`[GitHub] Found ${issueNumbers.length} issues with status "${status}": #${issueNumbers.join(", ") || "none"}`);
 
       if (issueNumbers.length === 0) return [];
 
       const issues = await this.listOpenIssues();
       return issues.filter((i) => issueNumbers.includes(i.number));
     } catch (err) {
-      logger.warn(`[GitHub] Failed to list issues by project status: ${err}`);
+      logger.error(`[GitHub] Failed to list issues by project status "${status}": ${err}`);
+      logger.warn(`[GitHub] Falling back to all open issues`);
       return this.listOpenIssues();
     }
   }

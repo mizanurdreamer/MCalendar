@@ -1160,3 +1160,147 @@ body {
 .live-log-body .log-error .log-msg { color: var(--err); }
 .live-log-body .log-warn .log-msg { color: var(--warn); }
 .live-log-body .log-debug .log-msg { color: var(--text-muted); }
+
+/* ── Tool Activity List (ChatGPT-style) ─────────── */
+.tool-activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.tool-activity-item {
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all 0.15s ease;
+}
+
+.tool-activity-item.running {
+  background: rgba(217, 119, 87, 0.08);
+  border: 1px solid rgba(217, 119, 87, 0.2);
+}
+
+.tool-activity-item.completed {
+  background: rgba(127, 176, 105, 0.05);
+  border: 1px solid rgba(127, 176, 105, 0.15);
+}
+
+.tool-activity-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+
+.tool-activity-header:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.tool-activity-item.completed .tool-activity-header {
+  cursor: pointer;
+}
+
+.tool-activity-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+}
+
+.tool-activity-item.running .tool-activity-icon .spinner {
+  width: 14px;
+  height: 14px;
+  border-width: 1.5px;
+}
+
+.tool-checkmark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  background: var(--ok);
+  color: #fff;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.tool-activity-name {
+  flex: 1;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.tool-activity-item.running .tool-activity-name {
+  color: var(--accent);
+}
+
+.tool-activity-item.completed .tool-activity-name {
+  color: var(--text-muted);
+}
+
+.tool-expand-icon {
+  font-size: 10px;
+  color: var(--text-muted);
+  transition: transform 0.15s;
+}
+
+.tool-activity-details {
+  max-height: 150px;
+  overflow-y: auto;
+  padding: 8px 12px 8px 42px;
+  background: rgba(0, 0, 0, 0.15);
+  font-family: var(--mono);
+  font-size: 11px;
+  border-top: 1px solid var(--border);
+}
+
+.tool-activity-details .log-line {
+  display: flex;
+  gap: 8px;
+  padding: 1.5px 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.tool-activity-details .log-ts {
+  color: var(--text-muted);
+  opacity: 0.6;
+  min-width: 70px;
+}
+
+.tool-activity-details .log-msg {
+  flex: 1;
+  color: var(--text);
+}
+
+.tool-activity-details .log-error .log-msg { color: var(--err); }
+.tool-activity-details .log-warn .log-msg { color: var(--warn); }
+.tool-activity-details .log-debug .log-msg { color: var(--text-muted); }
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tool-activity-item {
+  animation: fadeInUp 0.15s ease;
+}

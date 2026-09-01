@@ -15,7 +15,7 @@ export class InMemoryStore implements MemoryStore {
   private entries: Map<string, MemoryEntry> = new Map();
 
   async initialize(): Promise<void> {
-    logger.info("[Memory] In-memory store initialized");
+    //logger.info("[Memory] In-memory store initialized");
   }
 
   async store(entry: MemoryEntry): Promise<void> {

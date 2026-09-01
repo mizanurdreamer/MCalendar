@@ -93,7 +93,8 @@ export async function request<T>(url: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   getConfig: () => request<AppConfigResponse>("/api/config"),
-  getIssues: () => request<IssueSummary[]>("/api/issues"),
+  getIssues: (status?: string) =>
+    request<IssueSummary[]>(`/api/issues${status ? `?status=${encodeURIComponent(status)}` : ""}`),
   getJobStatus: () => request<JobStatus>("/api/job"),
   getRetries: () => request<RetriesResponse>("/api/retries"),
   clearRetries: () => request<{ cleared: number }>("/api/retries/clear", { method: "POST" }),
