@@ -187,6 +187,33 @@ export async function startWebServer(options: WebServerOptions = {}): Promise<vo
     res.json({ ok: true });
   });
 
+  // ── Branch Commit Endpoints ──────────────────────────────
+  app.get("/api/branches/:branch/commits", async (req: Request, res: Response) => {
+    try {
+      const branch = req.params.branch;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const commits = await github.listCommitsOnBranch(branch, limit);
+      res.json(commits);
+    } catch (err) {
+      res.status(500).json({ error: `Failed to list commits: ${err instanceof Error ? err.message : String(err)}` });
+    }
+  });
+
+  app.post("/api/jobs/branch-commit", async (req: Request, res: Response) => {
+    const parsed = z.object({ branch: z.string().min(1) }).safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Body must be { branch: string }" });
+      return;
+    }
+    try {
+      const sha = await github.getLatestCommitSha(parsed.data.branch);
+      const job = await runManager.runCommit(sha, parsed.data.branch, { source: "api" });
+      res.json(job);
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+
   app.post("/api/chat", async (req: Request, res: Response) => {
     const parsed = chatRequestSchema.safeParse(req.body);
     if (!parsed.success) {

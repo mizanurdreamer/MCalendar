@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
-import type { IssueSummary, JobStatus, RetriesResponse, MemoryStatsResponse } from "../api";
+import type { IssueSummary, JobStatus, RetriesResponse, MemoryStatsResponse, JobInfo } from "../api";
+import { BranchCommitPanel } from "./BranchCommitPanel";
 
 interface SidebarProps {
   appConfig: Awaited<ReturnType<typeof api.getConfig>> | null;
@@ -107,6 +108,13 @@ export function Sidebar({ appConfig, retriesVersion, connected, onCompose }: Sid
             </li>
           ))}
         </ul>
+      </Section>
+
+      <Section title="Branch Commits" onRefresh={refresh}>
+        <BranchCommitPanel onJobStarted={(job: JobInfo) => {
+          // Refresh job status when a new job starts
+          void refresh();
+        }} />
       </Section>
 
       <Section title={`Retry Queue (${retryCount(retries)})`} onRefresh={refresh}>

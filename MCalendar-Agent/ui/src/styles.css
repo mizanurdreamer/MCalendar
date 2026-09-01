@@ -141,6 +141,91 @@ body {
   margin-top: 2px;
 }
 
+/* Branch Commit Panel */
+.branch-commit-panel {
+  padding: 4px 0;
+}
+
+.branch-input-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.branch-input {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  color: var(--text);
+  font-size: 12px;
+  outline: none;
+}
+
+.branch-input:focus {
+  border-color: var(--accent);
+}
+
+.branch-input:disabled {
+  opacity: 0.6;
+}
+
+.branch-error {
+  color: var(--err);
+  font-size: 11px;
+  padding: 4px 0;
+}
+
+.commit-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.commit-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  background: var(--bg);
+  border-radius: 6px;
+  gap: 8px;
+}
+
+.commit-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.commit-sha {
+  font-family: monospace;
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.commit-message {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.btn-process {
+  font-size: 10px;
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+
+.btn-process:hover:not(:disabled) {
+  background: var(--accent);
+  color: white;
+}
+
 .job-mini {
   display: flex;
   align-items: center;

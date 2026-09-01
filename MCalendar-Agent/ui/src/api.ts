@@ -79,6 +79,14 @@ export interface MemoryStatsResponse {
   byType: Record<string, number>;
 }
 
+export interface CommitSummary {
+  sha: string;
+  shortSha: string;
+  message: string;
+  author: string;
+  date: string;
+}
+
 export async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     headers: { "Content-Type": "application/json" },
@@ -111,5 +119,12 @@ export const api = {
     request<{ ok: boolean }>("/api/approvals/resolve", {
       method: "POST",
       body: JSON.stringify({ id, resolution }),
+    }),
+  getBranchCommits: (branch: string, limit?: number) =>
+    request<CommitSummary[]>(`/api/branches/${encodeURIComponent(branch)}/commits?limit=${limit ?? 10}`),
+  startBranchCommitJob: (branch: string) =>
+    request<JobInfo>("/api/jobs/branch-commit", {
+      method: "POST",
+      body: JSON.stringify({ branch }),
     }),
 };
