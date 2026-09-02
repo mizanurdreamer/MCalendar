@@ -19,9 +19,10 @@ export class AppServerManager {
       const healthy = await this.waitForHealthy(port, 10000);
       if (healthy) {
         this.startedByUs = false;
+        logger.info(`[AppServer] Existing app is healthy — reusing`);
         return;
       }
-      //logger.warn(`[AppServer] Port ${port} occupied but app not healthy — killing existing process`);
+      logger.warn(`[AppServer] Port ${port} occupied but app not healthy — killing existing process`);
       await this.forceKillPort(port);
     }
 
@@ -36,32 +37,35 @@ export class AppServerManager {
 
     this.process.stdout?.on("data", (data: Buffer) => {
       const line = data.toString().trim();
-      //if (line) logger.debug(`[AppServer] stdout: ${line}`);
+      if (line) logger.debug(`[AppServer] stdout: ${line}`);
     });
 
     this.process.stderr?.on("data", (data: Buffer) => {
       const line = data.toString().trim();
-      //if (line) logger.debug(`[AppServer] stderr: ${line}`);
+      if (line) logger.debug(`[AppServer] stderr: ${line}`);
     });
 
     this.process.on("error", (err) => {
-      //logger.error(`[AppServer] Process error: ${err}`);
+      logger.error(`[AppServer] Process error: ${err.message}`);
       this.process = null;
     });
 
-    this.process.on("exit", (code) => {
-      logger.info(`[AppServer] Process exited with code ${code}`);
+    this.process.on("exit", (code, signal) => {
+      logger.info(`[AppServer] Process exited with code ${code} signal ${signal}`);
       this.process = null;
     });
 
     await this.waitForReady(port, 60000);
-    await this.waitForHealthy(port, 30000);
-    logger.success(`[AppServer] Next.js dev server ready on port ${port}`);
+    const healthy = await this.waitForHealthy(port, 30000);
+    if (healthy) {
+      logger.success(`[AppServer] Next.js dev server ready on port ${port}`);
+    } else {
+      logger.warn(`[AppServer] Next.js dev server started but health check failed on port ${port}`);
+    }
   }
 
   async stop(): Promise<void> {
     if (!this.process || !this.startedByUs) {
-      //logger.info(`[AppServer] No process to stop (startedByUs=${this.startedByUs})`);
       return;
     }
 
@@ -70,8 +74,8 @@ export class AppServerManager {
     return new Promise((resolve) => {
       const proc = this.process!;
       const killTimeout = setTimeout(() => {
-        //logger.warn(`[AppServer] Force killing process`);
-        proc.kill("SIGKILL");
+        logger.warn(`[AppServer] Force killing process`);
+        this.killProcess(proc);
         this.process = null;
         resolve();
       }, 10000);
@@ -83,8 +87,27 @@ export class AppServerManager {
         resolve();
       });
 
-      proc.kill("SIGTERM");
+      // On Windows, SIGTERM is translated but SIGKILL is not a real signal
+      if (process.platform === "win32") {
+        this.killProcess(proc);
+      } else {
+        proc.kill("SIGTERM");
+      }
     });
+  }
+
+  private killProcess(proc: ChildProcess): void {
+    try {
+      if (process.platform === "win32" && proc.pid) {
+        // On Windows, kill the entire process tree
+        const { execSync } = require("node:child_process");
+        try { execSync(`taskkill /PID ${proc.pid} /T /F`, { encoding: "utf-8" }); } catch { /* ignore */ }
+      } else {
+        proc.kill("SIGKILL");
+      }
+    } catch {
+      // ignore
+    }
   }
 
   private async isPortInUse(port: number): Promise<boolean> {
@@ -107,7 +130,6 @@ export class AppServerManager {
     try {
       const { execSync } = await import("node:child_process");
       if (process.platform === "win32") {
-        // Find and kill process on port (Windows)
         const output = execSync(`netstat -ano | findstr ":${port}" | findstr "LISTENING"`, { encoding: "utf-8" });
         const lines = output.trim().split("\n");
         for (const line of lines) {
@@ -119,10 +141,8 @@ export class AppServerManager {
           }
         }
       } else {
-        // Unix: fuser -k
         try { execSync(`fuser -k ${port}/tcp 2>/dev/null`, { encoding: "utf-8" }); } catch { /* ignore */ }
       }
-      // Wait a moment for the port to be released
       await new Promise((r) => setTimeout(r, 1000));
     } catch {
       logger.warn(`[AppServer] Could not force-kill process on port ${port}`);
@@ -171,7 +191,6 @@ export class AppServerManager {
             let body = "";
             res.on("data", (chunk: Buffer) => { body += chunk.toString(); });
             res.on("end", () => {
-              // Must be a successful response with actual content (not just a TCP stub)
               const ok = res.statusCode !== undefined && res.statusCode < 500 && body.length > 0;
               resolve(ok);
             });
