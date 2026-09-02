@@ -391,6 +391,11 @@ Return ONLY valid JSON:
     let consecutiveErrors = 0;
 
     while (iteration < maxIterations) {
+      // Check for abort
+      if (this.state.abortSignal?.aborted) {
+        throw new Error("Job stopped by user");
+      }
+      
       iteration++;
       metrics.recordIteration();
       logger.debug(`[${tag}] Tool loop iteration ${iteration}`);

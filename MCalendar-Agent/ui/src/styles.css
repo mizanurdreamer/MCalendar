@@ -527,6 +527,49 @@ body {
 .send-btn:hover:not(:disabled) { background: var(--accent-hover); }
 .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+/* Current Agent Status Bar */
+.current-agent-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  margin: 0 16px 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  animation: fadeIn 0.2s ease;
+}
+
+.current-agent-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.current-agent-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.btn-stop {
+  background: var(--err);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.btn-stop:hover { opacity: 0.85; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .btn {
   background: var(--bg-elevated);
   color: var(--text);

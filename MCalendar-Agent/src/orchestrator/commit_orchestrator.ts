@@ -46,6 +46,7 @@ export interface CommitOrchestratorConfig {
   playwrightWorkers?: number;
   pipelineTimeoutMs?: number;
   memoryType?: "local" | "postgres";
+  abortSignal?: AbortSignal;
 }
 
 export async function processCommit(
@@ -119,6 +120,7 @@ export async function processCommit(
     baseBranch: targetBranch,
     branchName,
     apiBaseUrl: config.apiBaseUrl,
+    abortSignal: config.abortSignal,
   });
 
   const graph = createAgenticGraph({

@@ -78,6 +78,7 @@ export class RunManager {
   private config: AppConfig;
   private current: JobInfo | null = null;
   private history: JobInfo[] = [];
+  private abortController: AbortController | null = null;
 
   constructor(config: AppConfig) {
     this.config = config;
@@ -89,6 +90,13 @@ export class RunManager {
       current: this.current,
       history: [...this.history],
     };
+  }
+
+  stop(): boolean {
+    if (!this.current || !this.abortController) return false;
+    logger.info(`[job] Stopping — ${this.current.label}`);
+    this.abortController.abort();
+    return true;
   }
 
   async runIssue(issueNumber: number, opts: JobStartOptions = {}): Promise<JobInfo> {
@@ -105,7 +113,7 @@ export class RunManager {
       source: opts.source,
     };
 
-    return this.execute(job, () =>
+    return this.execute(job, (signal) =>
       processIssue(issue, {
         agentConfig: this.config.agentConfig,
         githubClient: github,
@@ -121,6 +129,7 @@ export class RunManager {
         apiBaseUrl: this.config.apiBaseUrl,
         commitAutoApprove: this.config.commitAutoApprove,
         memoryType: this.config.memoryType,
+        abortSignal: signal,
       })
     ).then((finished) => {
       if (finished.status === PIPELINE_STATUS.COMPLETED) {
@@ -147,7 +156,7 @@ export class RunManager {
       source: opts.source,
     };
 
-    return this.execute(job, () =>
+    return this.execute(job, (signal) =>
       processCommit(diff, {
         agentConfig: this.config.agentConfig,
         githubClient: github,
@@ -163,6 +172,7 @@ export class RunManager {
         apiBaseUrl: this.config.apiBaseUrl,
         commitAutoApprove: this.config.commitAutoApprove,
         memoryType: this.config.memoryType,
+        abortSignal: signal,
       })
     ).then((finished) => {
       if (finished.status === PIPELINE_STATUS.COMPLETED) {
@@ -183,7 +193,7 @@ export class RunManager {
 
   private async execute(
     job: JobInfo,
-    fn: () => Promise<TaskResult & { skipped?: boolean }>
+    fn: (signal: AbortSignal) => Promise<TaskResult & { skipped?: boolean }>
   ): Promise<JobInfo> {
     if (this.current) {
       throw new Error(
@@ -191,6 +201,7 @@ export class RunManager {
       );
     }
 
+    this.abortController = new AbortController();
     this.current = job;
     this.broadcastJob(job);
     logger.info(`[job:${job.type}] Started — ${job.label}`);
@@ -199,19 +210,32 @@ export class RunManager {
     logCollector.start();
 
     try {
-      const result = await fn();
-      job.result = result;
-      job.status = result.success ? PIPELINE_STATUS.COMPLETED : PIPELINE_STATUS.FAILED;
-      if (!result.success) job.error = truncate(result.output ?? "Unknown failure", 500);
-      logger.info(`[job:${job.type}] ${job.status === PIPELINE_STATUS.COMPLETED ? "Finished" : "Failed"} — ${job.label}`);
+      const result = await fn(this.abortController.signal);
+      if (this.abortController.signal.aborted) {
+        job.status = PIPELINE_STATUS.FAILED;
+        job.error = "Job stopped by user";
+        logger.info(`[job:${job.type}] Stopped by user — ${job.label}`);
+      } else {
+        job.result = result;
+        job.status = result.success ? PIPELINE_STATUS.COMPLETED : PIPELINE_STATUS.FAILED;
+        if (!result.success) job.error = truncate(result.output ?? "Unknown failure", 500);
+        logger.info(`[job:${job.type}] ${job.status === PIPELINE_STATUS.COMPLETED ? "Finished" : "Failed"} — ${job.label}`);
+      }
     } catch (err) {
-      job.status = PIPELINE_STATUS.FAILED;
-      job.error = String(err instanceof Error ? err.message : err);
-      logger.error(`[job:${job.type}] Failed — ${job.label}: ${job.error}`);
+      if (this.abortController.signal.aborted) {
+        job.status = PIPELINE_STATUS.FAILED;
+        job.error = "Job stopped by user";
+        logger.info(`[job:${job.type}] Stopped by user — ${job.label}`);
+      } else {
+        job.status = PIPELINE_STATUS.FAILED;
+        job.error = String(err instanceof Error ? err.message : err);
+        logger.error(`[job:${job.type}] Failed — ${job.label}: ${job.error}`);
+      }
     } finally {
       logCollector.stop();
       job.finishedAt = Date.now();
       this.current = null;
+      this.abortController = null;
       this.history.unshift(job);
       if (this.history.length > HISTORY_LIMIT) this.history.pop();
       this.broadcastJob(job);

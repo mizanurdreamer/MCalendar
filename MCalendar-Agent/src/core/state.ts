@@ -211,6 +211,7 @@ export interface AgentState {
   
   status: typeof PIPELINE_STATUS.RUNNING | typeof PIPELINE_STATUS.COMPLETED | typeof PIPELINE_STATUS.FAILED | typeof PIPELINE_STATUS.SKIPPED | typeof PIPELINE_STATUS.AWAITING_HUMAN;
   error?: string;
+  abortSignal?: AbortSignal;
 }
 
 export function createInitialAgentState(input: {
@@ -238,6 +239,7 @@ export function createInitialAgentState(input: {
   branchName: string;
   playwrightWorkers?: number;
   apiBaseUrl?: string;
+  abortSignal?: AbortSignal;
 }): AgentState {
   const agentNames: AgentName[] = [
     CORE_AGENT_NAMES.SUPERVISOR,
@@ -288,5 +290,6 @@ export function createInitialAgentState(input: {
     humanApprovals: [],
     stepHistory: [],
     status: PIPELINE_STATUS.RUNNING,
+    abortSignal: input.abortSignal,
   };
 }

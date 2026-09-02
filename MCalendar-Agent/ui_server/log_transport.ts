@@ -1,6 +1,8 @@
 import Transport from "winston-transport";
 import { winstonInstance } from "../src/utils/logger.js";
 import { broadcast } from "./ws_hub.js";
+import { agentEvents } from "../src/core/agent_events.js";
+import type { CoreAgentEvent } from "../src/core/agent_events.js";
 
 const MAX_MESSAGE_LENGTH = 4000;
 let attached = false;
@@ -27,5 +29,14 @@ class BroadcastTransport extends Transport {
 export function attachLogBroadcast(): void {
   if (attached) return;
   winstonInstance.add(new BroadcastTransport());
+  
+  // Subscribe to core agent events and broadcast via WebSocket
+  agentEvents.on("agent:status", (event: CoreAgentEvent) => {
+    broadcast(event);
+  });
+  agentEvents.on("agent:step", (event: CoreAgentEvent) => {
+    broadcast(event);
+  });
+  
   attached = true;
 }

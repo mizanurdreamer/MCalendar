@@ -108,6 +108,11 @@ export async function startWebServer(options: WebServerOptions = {}): Promise<vo
     res.json(runManager.getStatus());
   });
 
+  app.post("/api/jobs/stop", (_req: Request, res: Response) => {
+    const stopped = runManager.stop();
+    res.json({ stopped });
+  });
+
   app.post("/api/jobs/issue", async (req: Request, res: Response) => {
     const parsed = z.object({ number: z.number().int().positive() }).safeParse(req.body);
     if (!parsed.success) {

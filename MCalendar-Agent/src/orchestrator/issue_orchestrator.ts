@@ -46,6 +46,7 @@ export interface OrchestratorConfig {
   playwrightWorkers?: number;
   pipelineTimeoutMs?: number;
   memoryType?: "local" | "postgres";
+  abortSignal?: AbortSignal;
 }
 
 export async function processIssue(
@@ -124,6 +125,7 @@ export async function processIssue(
     branchName,
     playwrightWorkers: config.playwrightWorkers ?? 6,
     apiBaseUrl: config.apiBaseUrl,
+    abortSignal: config.abortSignal,
   });
 
   const graph = createAgenticGraph({

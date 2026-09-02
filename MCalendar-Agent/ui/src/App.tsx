@@ -37,7 +37,7 @@ export default function App() {
   const [appConfig, setAppConfig] = useState<Awaited<ReturnType<typeof api.getConfig>> | null>(null);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
 
-  const { connected, logs, jobs, activity, retriesVersion, chatSummaries } = useAgentSocket();
+  const { connected, logs, jobs, activity, retriesVersion, chatSummaries, currentAgent } = useAgentSocket();
   const shownJobsRef = useRef<Set<string>>(new Set());
   const shownSummariesRef = useRef<Set<number>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -112,6 +112,14 @@ export default function App() {
     textareaRef.current?.focus();
   }, []);
 
+  const handleStop = useCallback(async () => {
+    try {
+      await api.stopJob();
+    } catch (err) {
+      setErrorBanner(err instanceof Error ? err.message : "Failed to stop job");
+    }
+  }, []);
+
   const send = useCallback(async () => {
     const text = input.trim();
     if (!text || thinkingRef.current) return;
@@ -184,6 +192,19 @@ export default function App() {
           <AgentStepsPanel />
           <CheckpointPanel />
         </div>
+
+        {/* Current Agent Status + Stop Button */}
+        {currentAgent && (
+          <div className="current-agent-bar">
+            <div className="current-agent-info">
+              <span className="spinner" />
+              <span className="current-agent-name">Running: {formatAgentName(currentAgent.agent)}</span>
+            </div>
+            <button className="btn btn-stop" onClick={handleStop}>
+              Stop
+            </button>
+          </div>
+        )}
 
         <div className="messages" ref={scrollRef}>
           {messages.map((msg) =>
@@ -264,4 +285,11 @@ export default function App() {
       </main>
     </div>
   );
+}
+
+function formatAgentName(name: string): string {
+  return name
+    .replace(/^agent_/, "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 }

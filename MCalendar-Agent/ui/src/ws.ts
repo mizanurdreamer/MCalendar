@@ -95,6 +95,7 @@ export function useAgentSocket() {
   const [reflections, setReflections] = useState<Reflection[]>([]);
   const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
   const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
+  const [currentAgent, setCurrentAgent] = useState<{ agent: string; status: string } | null>(null);
   const logIdRef = useRef(0);
   const summaryIdRef = useRef(0);
   const stepIdRef = useRef(0);
@@ -182,6 +183,12 @@ export function useAgentSocket() {
             });
             return next;
           });
+          // Track current executing agent
+          if (msg.status === "executing") {
+            setCurrentAgent({ agent: msg.agent, status: msg.status });
+          } else if (msg.status === "completed" || msg.status === "failed") {
+            setCurrentAgent((prev) => prev?.agent === msg.agent ? null : prev);
+          }
           break;
         }
         case "agent:plan": {
@@ -263,5 +270,6 @@ export function useAgentSocket() {
     reflections,
     checkpoints,
     pendingApprovals,
+    currentAgent,
   };
 }

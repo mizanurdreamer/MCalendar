@@ -127,4 +127,5 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ branch }),
     }),
+  stopJob: () => request<{ stopped: boolean }>("/api/jobs/stop", { method: "POST" }),
 };

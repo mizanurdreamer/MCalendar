@@ -3,6 +3,7 @@ import { BaseAgent } from "./base_agent.js";
 import { logger } from "../utils/logger.js";
 import { metrics } from "./metrics.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
+import { agentEvents } from "./agent_events.js";
 import { CORE_AGENT_NAMES, GRAPH_NODE, ROUTING_ACTION, PIPELINE_STATUS, MODE, APPROVAL_RESOLUTION, APPROVED_BY } from "../utils/constants.js";
 
 export type RoutingDecision = 
@@ -350,6 +351,7 @@ export class Supervisor {
 
     this.state.currentAgent = agentName;
     logger.info(`[Supervisor] Executing agent: ${agentName}`);
+    agentEvents.emitAgentStatus(agentName, "executing");
 
     // Pass plan context to agent
     const masterPlan = this.state.plans?.planner;
@@ -360,8 +362,11 @@ export class Supervisor {
     });
 
     try {
-      return await agent.run();
+      const result = await agent.run();
+      agentEvents.emitAgentStatus(agentName, "completed");
+      return result;
     } catch (err) {
+      agentEvents.emitAgentStatus(agentName, "failed");
       this.state.status = PIPELINE_STATUS.FAILED;
       this.state.error = `Agent ${agentName} failed: ${err}`;
       logger.error(`[Supervisor] Agent ${agentName} failed: ${err}`);
