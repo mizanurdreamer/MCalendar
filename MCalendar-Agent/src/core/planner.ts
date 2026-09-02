@@ -199,7 +199,7 @@ ${availableAgents.map(a => `- ${a}: ${agentDescriptions[a] || "Unknown"}`).join(
 Current state:
 - Mode: ${this.state.mode}
 - ${this.state.mode === MODE.ISSUE ? `Issue: #${this.state.issue?.number} - ${this.state.issue?.title}` : `Commit: ${this.state.commitDiff?.sha.slice(0,7)}`}
-- Retries: ${this.state.retries}/${this.state.maxRetries}
+- Retries: ${this.state.retries}/${this.state.testReviewMaxRetries}
 
 Create a REVISED plan as JSON with this exact structure:
 {
@@ -262,7 +262,7 @@ ${availableAgents.map(a => `- ${a}: ${agentDescriptions[a] || "Unknown"}`).join(
 Current state:
 - Mode: ${this.state.mode}
 - ${this.state.mode === MODE.ISSUE ? `Issue: #${this.state.issue?.number} - ${this.state.issue?.title}` : `Commit: ${this.state.commitDiff?.sha.slice(0,7)}`}
-- Retries: ${this.state.retries}/${this.state.maxRetries}
+- Retries: ${this.state.retries}/${this.state.testReviewMaxRetries}
 ${pastDecisions}
 ${projectContext}
 Create a plan as JSON with this exact structure:

@@ -31,7 +31,7 @@ export interface AppConfig {
   testProjectPath: string;
   projectName: string;
   pollIntervalMin: number;
-  maxRetries: number;
+  testReviewMaxRetries: number;
   maxIterations: number;
   maxPipelineSteps: number;
   runMaxRetries: number;
@@ -52,6 +52,7 @@ export interface AppConfig {
   playwrightMcpBrowser: string;
   playwrightWorkers: number;
   memoryType: "local" | "postgres";
+  codeFixMaxRetries: number;
 }
 
 export function loadConfig(): AppConfig {
@@ -130,7 +131,7 @@ export function loadConfig(): AppConfig {
     testProjectPath: testProject.resolvedPath,
     projectName: project.projectName,
     pollIntervalMin: parseInt(process.env.POLL_INTERVAL_MIN ?? "1", 10),
-    maxRetries: parseInt(process.env.AGENT_MAX_RETRIES ?? "3", 10),
+    testReviewMaxRetries: parseInt(process.env.TEST_REVIEW_MAX_RETRIES ?? "3", 10),
     maxIterations: parseInt(process.env.AGENT_MAX_ITERATIONS ?? "50", 10),
     maxPipelineSteps: parseInt(process.env.MAX_PIPELINE_STEPS ?? "50", 10),
     runMaxRetries: parseInt(process.env.RUN_MAX_RETRIES ?? "1", 10),
@@ -151,5 +152,6 @@ export function loadConfig(): AppConfig {
     playwrightMcpBrowser: process.env.PLAYWRIGHT_MCP_BROWSER ?? "chromium",
     playwrightWorkers: parseInt(process.env.PLAYWRIGHT_WORKERS ?? "6", 10),
     memoryType: (process.env.MEMORY_TYPE ?? "local") as "local" | "postgres",
+    codeFixMaxRetries: parseInt(process.env.CODE_FIX_MAX_RETRIES ?? "2", 10),
   };
 }

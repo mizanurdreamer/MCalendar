@@ -12,7 +12,7 @@ import { getMcpToolDefinitions } from "../mcp/tools.js";
 import { callMcpTool, isMcpTool } from "../mcp/client.js";
 import { logger } from "../utils/logger.js";
 
-const ALL_ROLES = ["issue_analyzer", "commit_analyzer", "tests_generator", "tests_reviewer", "tests_report_generator", "summarize"] as const;
+const ALL_ROLES = ["issue_analyzer", "commit_analyzer", "tests_generator", "tests_reviewer", "tests_report_generator", "summarize", "code_fixer"] as const;
 
 function sanitizeTestFilename(filename: string): string {
   return filename.replace(/^(tests[/\\])+/, "");
@@ -86,6 +86,18 @@ export function registerAllTools(
         },
       },
     },
+    {
+      name: "write_source_file",
+      description: "Write/overwrite a file in the target project source code. Use relative paths from the project root (e.g., 'app/api/route.ts').",
+      inputSchema: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Relative path from the target project root" },
+          content: { type: "string", description: "The complete file content to write" },
+        },
+        required: ["path", "content"],
+      },
+    },
   ];
 
   // Register core tools
@@ -140,9 +152,25 @@ export function registerAllTools(
           return JSON.stringify(result, null, 2);
         };
         break;
+      case "write_source_file":
+        handler = async (input: Record<string, unknown>) => {
+          const filePath = input.path as string;
+          const content = input.content as string;
+          const fullPath = path.join(context.codebasePath, filePath);
+          const dir = path.dirname(fullPath);
+          if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+          fs.writeFileSync(fullPath, content, "utf-8");
+          return `Source file written: ${filePath}`;
+        };
+        break;
     }
 
-    registry.register(tool, handler!, metadata);
+    // write_source_file is scoped to code_fixer only
+    const toolMetadata = tool.name === "write_source_file"
+      ? { category: "core" as const, roles: ["code_fixer" as const] }
+      : metadata;
+
+    registry.register(tool, handler!, toolMetadata);
   }
 
   // Register diagnostic tools

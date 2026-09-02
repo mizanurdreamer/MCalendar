@@ -19,6 +19,7 @@ import { AgentTestsGenerator } from "../agents/agent_tests_generator.js";
 import { AgentTestsReviewer } from "../agents/agent_tests_reviewer.js";
 import { AgentTestsReportGenerator } from "../agents/agent_tests_report_generator.js";
 import { AgentSummarize } from "../agents/agent_summarize.js";
+import { AgentCodeFixer } from "../agents/agent_code_fixer.js";
 import { AgentCritic } from "../core/agent_critic.js";
 import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers/registry.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
@@ -31,7 +32,7 @@ export interface OrchestratorConfig {
   githubClient: GitHubClient;
   codebasePath: string;
   testProjectPath: string;
-  maxRetries: number;
+  testReviewMaxRetries: number;
   maxIterations: number;
   maxPipelineSteps: number;
   projectName: string;
@@ -47,13 +48,14 @@ export interface OrchestratorConfig {
   pipelineTimeoutMs?: number;
   memoryType?: "local" | "postgres";
   abortSignal?: AbortSignal;
+  codeFixMaxRetries?: number;
 }
 
 export async function processIssue(
   issue: GitHubIssue,
   config: OrchestratorConfig
 ): Promise<TaskResult> {
-  const { agentConfig, githubClient, codebasePath, testProjectPath, maxRetries, maxIterations, maxPipelineSteps, projectName } = config;
+  const { agentConfig, githubClient, codebasePath, testProjectPath, testReviewMaxRetries, maxIterations, maxPipelineSteps, projectName } = config;
   const reader = new CodebaseReader(codebasePath);
   const testReader = new CodebaseReader(testProjectPath);
   const runner = new PlaywrightRunner(testProjectPath, config.playwrightWorkers ?? 6);
@@ -116,7 +118,7 @@ export async function processIssue(
     testProjectPath,
     testOutputPath,
     projectName,
-    maxRetries,
+    testReviewMaxRetries,
     maxIterations,
     maxPipelineSteps,
     commitAutoApprove: config.commitAutoApprove ?? true,
@@ -126,6 +128,7 @@ export async function processIssue(
     playwrightWorkers: config.playwrightWorkers ?? 6,
     apiBaseUrl: config.apiBaseUrl,
     abortSignal: config.abortSignal,
+    codeFixMaxRetries: config.codeFixMaxRetries,
   });
 
   const graph = createAgenticGraph({
@@ -143,6 +146,7 @@ export async function processIssue(
   graph.registerAgent(AGENT_NAMES.AGENT_TESTS_REVIEWER, new AgentTestsReviewer(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_TESTS_REVIEWER)));
   graph.registerAgent(AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, new AgentTestsReportGenerator(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR)));
   graph.registerAgent(AGENT_NAMES.AGENT_SUMMARIZE, new AgentSummarize(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_SUMMARIZE)));
+  graph.registerAgent(AGENT_NAMES.AGENT_CODE_FIXER, new AgentCodeFixer(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_CODE_FIXER)));
 
   graph.registerCritic(AGENT_NAMES.AGENT_ISSUE_ANALYZER, new AgentCritic(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_ISSUE_ANALYZER), AGENT_NAMES.AGENT_ISSUE_ANALYZER));
   graph.registerCritic(AGENT_NAMES.AGENT_TESTS_GENERATOR, new AgentCritic(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_TESTS_GENERATOR), AGENT_NAMES.AGENT_TESTS_GENERATOR));
@@ -288,6 +292,6 @@ function createTaskContext(state: any, agentName: string) {
     maxTokens: state.agentConfig[agentName]?.maxTokens,
     temperature: state.agentConfig[agentName]?.temperature,
     promptCaching: state.agentConfig[agentName]?.promptCaching,
-    maxRetries: state.maxRetries,
+    testReviewMaxRetries: state.testReviewMaxRetries,
   };
 }

@@ -25,7 +25,7 @@ export interface SharedContext {
   testProjectPath: string;
   testOutputPath: string;
   projectName: string;
-  maxRetries: number;
+  testReviewMaxRetries: number;
   maxIterations: number;
   maxPipelineSteps: number;
   commitAutoApprove: boolean;
@@ -62,7 +62,7 @@ export function toSharedContext(state: AgentState): SharedContext {
     testProjectPath: state.testProjectPath,
     testOutputPath: state.testOutputPath,
     projectName: state.projectName,
-    maxRetries: state.maxRetries,
+    testReviewMaxRetries: state.testReviewMaxRetries,
     maxIterations: state.maxIterations,
     maxPipelineSteps: state.maxPipelineSteps,
     commitAutoApprove: state.commitAutoApprove,

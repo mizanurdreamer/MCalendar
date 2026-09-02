@@ -21,6 +21,7 @@ export const AGENT_ROLES = {
   [AGENT_NAMES.AGENT_TESTS_REVIEWER]: "tests_reviewer",
   [AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR]: "tests_report_generator",
   [AGENT_NAMES.AGENT_SUMMARIZE]: "summarize",
+  [AGENT_NAMES.AGENT_CODE_FIXER]: "code_fixer",
 } as const;
 
 export type AgentRole = (typeof AGENT_ROLES)[keyof typeof AGENT_ROLES];

@@ -27,6 +27,7 @@ src/
 │   ├── agent_commit_analyzer.ts    # Decide if commit needs tests
 │   ├── agent_tests_generator.ts    # Generate Playwright test code (agentic tool-use loop)
 │   ├── agent_tests_reviewer.ts     # Review + fix failing tests (agentic tool-use loop + MCP debug)
+│   ├── agent_code_fixer.ts        # Fix bugs in target app source code (not test files)
 │   ├── agent_tests_report_generator.ts  # Format test results
 │   └── agent_summarize.ts          # Format GitHub comment
 ├── orchestrator/                   # Thin setup shells (delegate to agentic graph)
@@ -89,7 +90,8 @@ src/
 | `agent_issue_analyzer` | `src/agents/agent_issue_analyzer.ts` | Reads a GitHub issue, explores the codebase, and determines what E2E test scenarios to write. |
 | `agent_commit_analyzer` | `src/agents/agent_commit_analyzer.ts` | Reads a commit diff and decides whether it needs new or updated E2E tests. |
 | `agent_tests_generator` | `src/agents/agent_tests_generator.ts` | Generates Playwright test code based on analysis. Uses agentic tool-use loop to write test files. On retry (after reviewer fixes), writes fixed content directly and re-runs tests. |
-| `agent_tests_reviewer` | `src/agents/agent_tests_reviewer.ts` | Reviews generated tests and fixes failures. Runs in an agentic tool-use loop (up to 10 iterations). Can debug live apps via Playwright MCP to diagnose failures. |
+| `agent_tests_reviewer` | `src/agents/agent_tests_reviewer.ts` | Reviews generated tests and fixes failures. Runs in an agentic tool-use loop (up to 10 iterations). Classifies fixes by scope: test-scope fixes applied directly, target-scope issues routed to code fixer. Can debug live apps via Playwright MCP to diagnose failures. |
+| `agent_code_fixer` | `src/agents/agent_code_fixer.ts` | Fixes bugs in the target application's source code when the reviewer identifies test failures caused by app bugs. Uses `write_source_file` (exclusively scoped to this agent). |
 | `agent_tests_report_generator` | `src/agents/agent_tests_report_generator.ts` | Formats test results into a structured report. |
 | `agent_summarize` | `src/agents/agent_summarize.ts` | Formats test results into a GitHub comment and posts it. |
 
@@ -139,12 +141,17 @@ Supervisor → agent_tests_generator (AgentTestsGenerator)
         |                                     → completed
         |
         |--- tests fail? --- no ---> Supervisor → agent_tests_reviewer (AgentTestsReviewer)
-                                        → analyze failures (optionally debug live app via MCP)
-                                        → fix test content
-                                        → retries++
-                                        → route back to agent_tests_generator
-                                        → (generator writes fixed content + re-runs tests)
-                                        → loop until pass or max retries
+                                        → analyze failures, classify fixes by scope
+                                        → test-scope: fix test content directly
+                                        → target-scope: populate targetCodeIssues
+                                        |
+                                        |--- targetCodeIssues + codeFixRetries < 2? --- yes ---> CodeFixer
+                                        |                                                              → fix source via write_source_file
+                                        |                                                              → re-run tests (inner loop)
+                                        |
+                                        |--- retries < 3? --- yes ---> TestsGenerator (with reviewer feedback, outer loop)
+                                        |
+                                        |--- both exhausted? --- FAIL
 ```
 
 ### Commit Mode
@@ -170,11 +177,17 @@ Supervisor → agent_tests_generator (AgentTestsGenerator)
         |                                     → completed
         |
         |--- tests fail? --- no ---> Supervisor → agent_tests_reviewer (AgentTestsReviewer)
-                                        → analyze failures (optionally debug live app via MCP)
-                                        → fix test content
-                                        → retries++
-                                        → route back to agent_tests_generator
-                                        → loop until pass or max retries
+                                        → analyze failures, classify fixes by scope
+                                        → test-scope: fix test content directly
+                                        → target-scope: populate targetCodeIssues
+                                        |
+                                        |--- targetCodeIssues + codeFixRetries < 2? --- yes ---> CodeFixer
+                                        |                                                              → fix source via write_source_file
+                                        |                                                              → re-run tests (inner loop)
+                                        |
+                                        |--- retries < 3? --- yes ---> TestsGenerator (with reviewer feedback, outer loop)
+                                        |
+                                        |--- both exhausted? --- FAIL
 ```
 
 ## Features
@@ -185,7 +198,7 @@ Supervisor → agent_tests_generator (AgentTestsGenerator)
 - **One-line provider switch** — change `PROVIDER` in `.env`, all tasks use it automatically
 - **Model auto-selection** — set `MODEL=auto` and the provider discovers available models from its API (first one wins), or specify an exact model for all tasks; new model releases need no code changes
 - **Auto-create branches, commits, and PRs** for generated tests
-- **Retry loop** for fixing failing tests (configurable max retries)
+- **Two-level retry loop** — reviewer classifies fixes by scope (test vs target); app bugs loop through code fixer (`CODE_FIX_MAX_RETRIES`, default 2), test issues loop through generator (`TEST_REVIEW_MAX_RETRIES`, default 3)
 - **Agentic tool-use loops** — Generator and Reviewer can iterate up to 10 times per step, calling tools and self-correcting
 - **Playwright MCP browser automation** — agents can navigate to live apps, take screenshots, inspect console/network errors, and read DOM to diagnose test failures
 - **Auto-retry failed runs** — crashed pipelines or runs ending with failing tests are requeued and retried on the next poll (`RUN_MAX_RETRIES`, default 1); inspect via `npm start -- retry list`
@@ -374,7 +387,7 @@ The API server binds to `127.0.0.1` on port `3002` by default — change via `WE
 | `PROJECT_PATH` | Yes | Local path or git URL to source project (name auto-extracted) |
 | `TEST_PROJECT_PATH` | Yes | Local path or git URL to test project |
 | `POLL_INTERVAL_MIN` | No | Polling interval in minutes (default: 1) |
-| `AGENT_MAX_RETRIES` | No | Max test fix retries (default: 3) |
+| `TEST_REVIEW_MAX_RETRIES` | No | Max test review retries (default: 3) |
 | `AGENT_MAX_ITERATIONS` | No | Max agent loop iterations per step (default: 50) |
 | `MAX_PIPELINE_STEPS` | No | Max pipeline steps before abort (default: 50) |
 | `RUN_MAX_RETRIES` | No | Auto-retries of failed runs (crash or failing tests) by the watcher (default: 1; `0` disables) |
@@ -386,6 +399,7 @@ The API server binds to `127.0.0.1` on port `3002` by default — change via `WE
 | `PLAYWRIGHT_MCP_ENABLED` | No | Enable Playwright MCP browser automation (default: `false`). When enabled, agents can browse live apps to debug test failures |
 | `PLAYWRIGHT_MCP_BROWSER` | No | Browser for Playwright MCP (default: `chromium`). Options: `chromium`, `firefox`, `webkit` |
 | `PLAYWRIGHT_WORKERS` | No | Number of parallel workers for Playwright test runs (default: `6`) |
+| `CODE_FIX_MAX_RETRIES` | No | Max source code fix attempts per pipeline run (default: `2`) |
 | `WEB_PORT` | No | Web UI API server port (default: `3002`) |
 | `WEB_HOST` | No | Web UI bind address (default: `127.0.0.1`) |
 | `DATABASE_URL` | For diagnostic tools | PostgreSQL connection string for MCalendar app DB |
@@ -453,7 +467,7 @@ Per-task tuning for `maxTokens` and `temperature`. Provider and model come from 
 
 All agents have access to these tools. The AI decides which tools to use based on context.
 
-### Core Tools (4)
+### Core Tools (5)
 
 | Tool | Description |
 |------|-------------|
@@ -461,6 +475,7 @@ All agents have access to these tools. The AI decides which tools to use based o
 | `list_directory` | List directory contents |
 | `write_test_file` | Write Playwright test files |
 | `run_playwright_test` | Run Playwright tests |
+| `write_source_file` | Write/overwrite target project source code *(code_fixer role only)* |
 
 ### Diagnostic Tools (12)
 
@@ -653,7 +668,7 @@ Ensure `.env` has the API key for your chosen provider.
 The agent needs git to create branches and commits. Ensure MCalendar is a git repo.
 
 ### "Playwright tests fail"
-Tests mock API responses, so no database is needed. If tests still fail, the agent will retry up to `AGENT_MAX_RETRIES` times. With `PLAYWRIGHT_MCP_ENABLED=true`, the reviewer agent can debug live apps to diagnose failures.
+Tests mock API responses, so no database is needed. If tests still fail, the agent will retry up to `TEST_REVIEW_MAX_RETRIES` times. With `PLAYWRIGHT_MCP_ENABLED=true`, the reviewer agent can debug live apps to diagnose failures.
 
 ### "Provider not found"
 Ensure the provider is uncommented in `src/providers/registry.ts` and the npm package is installed.

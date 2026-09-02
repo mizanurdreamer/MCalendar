@@ -96,6 +96,7 @@ export const AGENT_EVENT = {
   REPORT_GENERATED: "report_generated",
   SUMMARY_CREATED: "summary_created",
   PIPELINE_COMPLETE: "pipeline_complete",
+  CODE_FIXED: "code_fixed",
 } as const;
 
 // --- Approved By ---

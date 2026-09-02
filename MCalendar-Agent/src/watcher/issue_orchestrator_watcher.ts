@@ -19,7 +19,7 @@ export interface WatcherConfig {
   githubClient: GitHubClient;
   codebasePath: string;
   testProjectPath: string;
-  maxRetries: number;
+  testReviewMaxRetries: number;
   maxIterations: number;
   maxPipelineSteps: number;
   runMaxRetries: number;
@@ -37,7 +37,7 @@ export interface WatcherConfig {
 }
 
 export async function startWatcher(config: WatcherConfig): Promise<void> {
-  const { agentConfig, githubClient, codebasePath, testProjectPath, maxRetries, maxIterations, maxPipelineSteps, runMaxRetries, pollIntervalMin, stateDir, watchBranch, projectName } = config;
+  const { agentConfig, githubClient, codebasePath, testProjectPath, testReviewMaxRetries, maxIterations, maxPipelineSteps, runMaxRetries, pollIntervalMin, stateDir, watchBranch, projectName } = config;
   const stateManager = new StateManager(stateDir);
   const commitState = new CommitStateManager(stateDir);
 
@@ -58,7 +58,7 @@ export async function startWatcher(config: WatcherConfig): Promise<void> {
     githubClient,
     codebasePath,
     testProjectPath,
-    maxRetries,
+    testReviewMaxRetries,
     maxIterations,
     maxPipelineSteps,
     projectName,
@@ -102,7 +102,7 @@ export async function startWatcher(config: WatcherConfig): Promise<void> {
         githubClient,
         codebasePath,
         testProjectPath,
-        maxRetries,
+        testReviewMaxRetries,
         maxIterations,
         maxPipelineSteps,
         targetBranch,

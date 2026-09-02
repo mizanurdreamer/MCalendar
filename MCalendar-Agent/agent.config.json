@@ -24,6 +24,11 @@
     "temperature": 0.2,
     "promptCaching": true
   },
+  "agent_code_fixer": {
+    "maxTokens": 16384,
+    "temperature": 0.2,
+    "promptCaching": true
+  },
   "agent_summarize": {
     "maxTokens": 2048,
     "temperature": 0.3,

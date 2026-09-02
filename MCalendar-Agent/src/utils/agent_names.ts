@@ -5,6 +5,7 @@ export const AGENT_NAMES = {
   AGENT_TESTS_REVIEWER: "agent_tests_reviewer",
   AGENT_TESTS_REPORT_GENERATOR: "agent_tests_report_generator",
   AGENT_SUMMARIZE: "agent_summarize",
+  AGENT_CODE_FIXER: "agent_code_fixer",
 } as const;
 
 export type AgentName = (typeof AGENT_NAMES)[keyof typeof AGENT_NAMES];

@@ -129,7 +129,7 @@ export interface AgentState {
   testOutputPath: string;
   projectName: string;
   
-  maxRetries: number;
+  testReviewMaxRetries: number;
   maxIterations: number;
   maxPipelineSteps: number;
   commitAutoApprove: boolean;
@@ -189,7 +189,15 @@ export interface AgentState {
     errors: string[];
     analysis?: string;
   }>;
-  
+
+  targetCodeIssues?: Array<{
+    file: string;
+    issue: string;
+    fix: string;
+  }>;
+  codeFixRetries: number;
+  maxCodeFixRetries: number;
+
   currentAgent: AgentName;
   agentStatus: Record<AgentName, AgentStatus> & { parallelQueue?: AgentName[] };
   
@@ -230,7 +238,7 @@ export function createInitialAgentState(input: {
   testProjectPath: string;
   testOutputPath: string;
   projectName: string;
-  maxRetries: number;
+  testReviewMaxRetries: number;
   maxIterations: number;
   maxPipelineSteps: number;
   commitAutoApprove?: boolean;
@@ -240,6 +248,7 @@ export function createInitialAgentState(input: {
   playwrightWorkers?: number;
   apiBaseUrl?: string;
   abortSignal?: AbortSignal;
+  codeFixMaxRetries?: number;
 }): AgentState {
   const agentNames: AgentName[] = [
     CORE_AGENT_NAMES.SUPERVISOR,
@@ -251,6 +260,7 @@ export function createInitialAgentState(input: {
     AGENT_NAMES.AGENT_TESTS_REVIEWER,
     AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR,
     AGENT_NAMES.AGENT_SUMMARIZE,
+    AGENT_NAMES.AGENT_CODE_FIXER,
   ];
   
   return {
@@ -269,7 +279,7 @@ export function createInitialAgentState(input: {
     testProjectPath: input.testProjectPath,
     testOutputPath: input.testOutputPath,
     projectName: input.projectName,
-    maxRetries: input.maxRetries,
+    testReviewMaxRetries: input.testReviewMaxRetries,
     maxIterations: input.maxIterations,
     maxPipelineSteps: input.maxPipelineSteps,
     commitAutoApprove: input.commitAutoApprove ?? true,
@@ -281,6 +291,8 @@ export function createInitialAgentState(input: {
     branchName: input.branchName,
     apiBaseUrl: input.apiBaseUrl,
     retryHistory: [],
+    codeFixRetries: 0,
+    maxCodeFixRetries: input.codeFixMaxRetries ?? 2,
     currentAgent: CORE_AGENT_NAMES.SUPERVISOR,
     agentStatus: agentNames.reduce((acc, name) => ({ ...acc, [name]: AGENT_STATUS.IDLE }), {} as Record<AgentName, AgentStatus> & { parallelQueue: [] }),
     plans: {} as Record<AgentName, AgentPlan>,

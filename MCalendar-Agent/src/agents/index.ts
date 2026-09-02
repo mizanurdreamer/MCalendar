@@ -4,3 +4,4 @@ export { AgentTestsGenerator } from "./agent_tests_generator.js";
 export { AgentTestsReviewer } from "./agent_tests_reviewer.js";
 export { AgentTestsReportGenerator } from "./agent_tests_report_generator.js";
 export { AgentSummarize } from "./agent_summarize.js";
+export { AgentCodeFixer } from "./agent_code_fixer.js";

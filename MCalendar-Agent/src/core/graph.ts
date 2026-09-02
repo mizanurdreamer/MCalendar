@@ -35,7 +35,7 @@ const AgentStateAnnotation = Annotation.Root({
   testProjectPath: Annotation<string>(),
   testOutputPath: Annotation<string>(),
   projectName: Annotation<string>(),
-  maxRetries: Annotation<number>(),
+  testReviewMaxRetries: Annotation<number>(),
   maxIterations: Annotation<number>(),
   maxPipelineSteps: Annotation<number>(),
   commitAutoApprove: Annotation<boolean>(),
@@ -106,6 +106,7 @@ export class AgenticGraph {
     workflow.addNode(AGENT_NAMES.AGENT_TESTS_REVIEWER, this.agentNode(AGENT_NAMES.AGENT_TESTS_REVIEWER));
     workflow.addNode(AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, this.agentNode(AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR));
     workflow.addNode(AGENT_NAMES.AGENT_SUMMARIZE, this.agentNode(AGENT_NAMES.AGENT_SUMMARIZE));
+    workflow.addNode(AGENT_NAMES.AGENT_CODE_FIXER, this.agentNode(AGENT_NAMES.AGENT_CODE_FIXER));
     workflow.addNode(GRAPH_NODE.CRITIC, this.criticNode.bind(this));
     workflow.addNode(GRAPH_NODE.HUMAN_APPROVAL, this.humanApprovalNode.bind(this));
 
@@ -130,6 +131,7 @@ export class AgenticGraph {
       [AGENT_NAMES.AGENT_TESTS_REVIEWER]: AGENT_NAMES.AGENT_TESTS_REVIEWER,
       [AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR]: AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR,
       [AGENT_NAMES.AGENT_SUMMARIZE]: AGENT_NAMES.AGENT_SUMMARIZE,
+      [AGENT_NAMES.AGENT_CODE_FIXER]: AGENT_NAMES.AGENT_CODE_FIXER,
       [GRAPH_NODE.CRITIC]: GRAPH_NODE.CRITIC,
       [GRAPH_NODE.HUMAN_APPROVAL]: GRAPH_NODE.HUMAN_APPROVAL,
       [GRAPH_NODE.RUN_TESTS]: GRAPH_NODE.RUN_TESTS,
@@ -143,7 +145,8 @@ export class AgenticGraph {
       AGENT_NAMES.AGENT_TESTS_GENERATOR,
       AGENT_NAMES.AGENT_TESTS_REVIEWER,
       AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR,
-      AGENT_NAMES.AGENT_SUMMARIZE
+      AGENT_NAMES.AGENT_SUMMARIZE,
+      AGENT_NAMES.AGENT_CODE_FIXER,
     ] as AgentName[]) {
       workflow.addEdge(agentName as any, GRAPH_NODE.SUPERVISOR as any);
     }
@@ -378,6 +381,9 @@ export class AgenticGraph {
       stepHistory: state.stepHistory.map(s => ({ ...s })),
       status: state.status,
       error: state.error,
+      targetCodeIssues: state.targetCodeIssues?.map(i => ({ ...i })),
+      codeFixRetries: state.codeFixRetries,
+      maxCodeFixRetries: state.maxCodeFixRetries,
       // Preserve shared coordination data (deep copy to avoid cross-agent mutation)
       plans: Object.fromEntries(
         Object.entries(state.plans).map(([k, v]) => [k, { ...v, steps: v.steps.map(s => ({ ...s })) }])
@@ -405,7 +411,7 @@ export class AgenticGraph {
       testProjectPath: state.testProjectPath,
       testOutputPath: state.testOutputPath,
       projectName: state.projectName,
-      maxRetries: state.maxRetries,
+      testReviewMaxRetries: state.testReviewMaxRetries,
       maxIterations: state.maxIterations,
       maxPipelineSteps: state.maxPipelineSteps,
       commitAutoApprove: state.commitAutoApprove,
@@ -530,7 +536,7 @@ export class AgenticGraph {
       "report", "reportPath", "summary", "prUrl", "branchName", "retries",
       "retryHistory", "currentAgent", "agentStatus", "plans", "messages",
       "memory", "reflectionHistory", "humanApprovals", "stepHistory", "status", "error",
-      "projectContext",
+      "projectContext", "targetCodeIssues", "codeFixRetries", "maxCodeFixRetries",
     ];
 
     for (const key of keys) {

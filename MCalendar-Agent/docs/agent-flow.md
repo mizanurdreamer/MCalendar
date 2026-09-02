@@ -42,6 +42,7 @@ Agent Nodes:
     +-- TestsGenerator
     +-- [run_tests] (Built-in Node)
     +-- TestsReviewer
+    +-- CodeFixer
     +-- TestsReportGenerator
     +-- Summarize
     +-- Critic (Per-Agent)
@@ -57,6 +58,7 @@ AGENT_NAMES = {
   AGENT_COMMIT_ANALYZER:         "agent_commit_analyzer",
   AGENT_TESTS_GENERATOR:         "agent_tests_generator",
   AGENT_TESTS_REVIEWER:          "agent_tests_reviewer",
+  AGENT_CODE_FIXER:              "agent_code_fixer",
   AGENT_TESTS_REPORT_GENERATOR:  "agent_tests_report_generator",
   AGENT_SUMMARIZE:               "agent_summarize",
 }
@@ -167,7 +169,7 @@ interface AgentState {
   messageBus?: MessageBus
 
   // Configuration
-  maxRetries: number
+  testReviewMaxRetries: number
   maxIterations: number
   maxPipelineSteps: number
   commitAutoApprove: boolean
@@ -183,6 +185,11 @@ interface AgentState {
   report?: string
   summary?: string
   prUrl?: string
+
+  // Code fixer state
+  targetCodeIssues?: Array<{ file: string; issue: string; fix: string }>
+  codeFixRetries: number
+  maxCodeFixRetries: number
 
   // Coordination
   retries: number
@@ -242,17 +249,21 @@ START
 [Supervisor] -- Route to TestsReviewer
   |
   v
-[AgentTestsReviewer] -- Analyze failures, fix tests
+[AgentTestsReviewer] -- Analyze failures, classify fixes by scope
   |  Input: testContent, testResult.errors, retryHistory
-  |  Processing: Debug via MCP, read source, analyze errors, apply fixes, re-run
-  |  Output: Updated testContent (written to disk), new testResult
-  |  State changes: testContent, testResult, retryHistory, reflectionHistory
+  |  Processing: Debug via MCP, read source, analyze errors, classify each fix by scope
+  |  Output: submit_analysis with scope per fix ("test" or "target")
+  |  State changes: targetCodeIssues (target-scope fixes), testContent (test-scope fixes),
+  |                 testResult (re-run), retryHistory, reflectionHistory
   |
   v
-[Supervisor] -- Decision: tests pass?
-  |  YES (testResult.success) -> route to TestsReportGenerator
-  |  NO (retries < maxRetries) -> increment retries, route back to TestsGenerator
-  |  NO (retries >= maxRetries) -> FAIL pipeline
+[Supervisor] -- Decision after reviewer
+  |  tests pass? -> TestsReportGenerator
+  |  targetCodeIssues exist AND codeFixRetries < maxCodeFixRetries?
+  |      YES -> CodeFixer (inner loop)
+  |  retries < testReviewMaxRetries?
+  |      YES -> TestsGenerator (outer loop, with reviewer feedback)
+  |  NO -> FAIL
   |
   v (if tests pass)
 [AgentTestsReportGenerator] -- Generate markdown report
@@ -278,18 +289,31 @@ START
 [Orchestrator] -- Commit, push, create PR, update issue status
 ```
 
-### Retry Loop in Issue Mode
+### Retry Loops in Issue Mode
 
+The system has **two nested retry loops**:
+
+**Inner Loop — Code Fix Retries** (default: `CODE_FIX_MAX_RETRIES=2`):
+```
+TestsReviewer -> [targetCodeIssues exist?] -> CodeFixer -> run_tests -> TestsReviewer
+                                                     ^                      |
+                                                     |___ codeFixRetries __|
+                                                          < max?
+```
+When the reviewer identifies test failures caused by application bugs (not test bugs), it classifies those fixes with `scope="target"` and populates `state.targetCodeIssues`. The supervisor routes to `CodeFixer`, which fixes source code and re-runs tests. This loop continues until tests pass or `codeFixRetries` is exhausted.
+
+**Outer Loop — Test Review Retries** (default: `TEST_REVIEW_MAX_RETRIES=3`):
 ```
 TestsGenerator -> run_tests -> TestsReviewer -> [tests fail?]
-                                                      |
-                                    retries < max? ---+--- retries >= max?
-                                        |                    |
-                                        v                    v
-                               TestsGenerator           FAIL
-                              (with retryHistory,
-                               reviewer feedback)
+                                                       |
+                                     retries < max? ---+--- retries >= max?
+                                         |                    |
+                                         v                    v
+                                TestsGenerator           FAIL
+                               (with retryHistory,
+                                reviewer feedback)
 ```
+When the code fixer budget is exhausted (or no target issues were found), the system falls back to the general retry path. The reviewer sends a `FEEDBACK` message to `TestsGenerator` with errors and analysis.
 
 When retrying:
 1. `TestsReviewer` sends a `FEEDBACK` message to `TestsGenerator` with errors and analysis
@@ -331,7 +355,7 @@ START
 [run_tests] -- Execute Playwright tests
   |
   v
-[AgentTestsReviewer] -- Fix failing tests (same retry loop)
+[AgentTestsReviewer] -- Fix failing tests (same two-level retry loop as Issue mode)
   |
   v
 [AgentTestsReportGenerator] -- Generate report
@@ -487,7 +511,7 @@ This is a built-in graph node, not an agent. It does not use the LLM.
 
 ### AgentTestsReviewer (`src/agents/agent_tests_reviewer.ts`)
 
-**Purpose**: Analyze test failures and fix the test code.
+**Purpose**: Analyze test failures and classify fixes by scope (test file vs application source code).
 
 **Input**: `state.testFilename`, `state.testResult`, `state.testContent`, `state.retryHistory`
 
@@ -503,23 +527,57 @@ This is a built-in graph node, not an agent. It does not use the LLM.
      - Map URLs to Next.js app directory structure
      - Read the corresponding source files
    - Build analysis prompt with test content, errors, retry history, MCP debug info, source files, past fixes, lessons
-   - Use `submit_analysis` tool to get structured fix plan:
+   - Use `submit_analysis` tool to get structured fix plan with **scope classification** per fix:
      ```json
      {
        "root_cause": "...",
-       "fixes_needed": [{"file": "...", "issue": "...", "fix": "..."}],
+       "fixes_needed": [
+         {"file": "...", "issue": "...", "fix": "...", "scope": "test"},
+         {"file": "...", "issue": "...", "fix": "...", "scope": "target"}
+       ],
        "priority": "high|medium|low"
      }
      ```
-4. **Fix Phase** (`runFix()`):
-   - Build prompt with analysis, current test content, errors
-   - Enter `runToolLoop()` with tests_reviewer tools
-   - LLM calls `write_test_file` to save the fixed test
-5. **Re-run Phase**: Execute the test again after fixing
+   - **Scope classification**: Each fix entry must include `scope`:
+     - `scope="test"` — the fix is to the test file itself (wrong selector, wrong assertion, missing setup)
+     - `scope="target"` — the fix is to the application source code (the bug is in the app, not the test)
+4. **Scope Separation**:
+   - Test-scope fixes are applied directly via `write_test_file`
+   - Target-scope fixes are stored in `state.targetCodeIssues` for the `CodeFixer` agent
+5. **Re-run Phase**: Execute the test again after fixing (test-scope fixes only)
 6. If tests now pass: store the fix pattern in memory for future recall
 7. If tests still failing: send `FEEDBACK` message to `TestsGenerator`
 
-**Output**: Updated `state.testContent`, `state.testResult` (re-run results), `state.retryHistory`
+**Output**: Updated `state.testContent`, `state.testResult` (re-run results), `state.retryHistory`, `state.targetCodeIssues` (target-scope fixes for CodeFixer)
+
+---
+
+### AgentCodeFixer (`src/agents/agent_code_fixer.ts`)
+
+**Purpose**: Fix bugs in the target application's source code when test failures are caused by application bugs (not test bugs).
+
+**Input**: `state.targetCodeIssues` (populated by TestsReviewer when `scope="target"`)
+
+**Processing**:
+1. Read target issues from state — each entry has `file`, `issue`, and `fix` descriptions
+2. Format issues into a numbered list with test error context from `state.testResult`
+3. Enter `runToolLoop()` with `code_fixer` role tools
+4. LLM reads source files via `read_file`, investigates the bug, applies fixes via `write_source_file`
+5. Clear `state.targetCodeIssues` to `[]` after fixing (prevents the supervisor from routing back)
+
+**Output**: Updated source files on disk, cleared `state.targetCodeIssues`
+
+**Tools**: Uses `getByRole("code_fixer")` — includes all core, diagnostic, database, and dev tools, PLUS `write_source_file` (exclusively scoped to this role).
+
+**System Prompt**: "You are the Code Fixer agent. Your job is to fix bugs in the TARGET PROJECT's source code (the application under test), NOT the test files. Use all available tools to investigate and fix the source code. Return the fixed source via write_source_file tool."
+
+**State Changes**:
+| Field | Change |
+|-------|--------|
+| `state.targetCodeIssues` | Set to `[]` (cleared after fixing) |
+| `state.agentStatus[code_fixer]` | `COMPLETED` or `FAILED` |
+| `state.stepHistory` | New entry: `{ name: "fix_source", output: "Fixed N source file(s)" }` |
+| `state.messages` | `NOTIFICATION` to Supervisor with `CODE_FIXED` event |
 
 ---
 
@@ -604,14 +662,16 @@ If no master plan is available, the supervisor uses hardcoded routing:
 ```
 supervisor -> issue_analyzer -> [needs_tests?] -> tests_generator -> run_tests
     -> tests_reviewer -> [tests pass?] -> tests_report_generator -> summarize -> COMPLETE
-                                          [fail + retries < max] -> tests_generator (retry)
+                        [fail + targetCodeIssues + codeFixRetries < max] -> code_fixer -> run_tests (loop)
+                        [fail + retries < testReviewMaxRetries] -> tests_generator (retry)
 ```
 
 **Commit Mode** (`routeCommitMode()`):
 ```
 supervisor -> commit_analyzer -> [needsTests?] -> tests_generator -> run_tests
     -> tests_reviewer -> [tests pass?] -> tests_report_generator -> summarize -> COMPLETE
-                                          [fail + retries < max] -> tests_generator (retry)
+                        [fail + targetCodeIssues + codeFixRetries < max] -> code_fixer -> run_tests (loop)
+                        [fail + retries < testReviewMaxRetries] -> tests_generator (retry)
 ```
 
 ### executeDecision()
@@ -841,8 +901,9 @@ MESSAGE_TYPE = {
 4. **TestsGenerator -> Supervisor**: `NOTIFICATION` with `TESTS_GENERATED` event
 5. **TestsReviewer -> TestsGenerator**: `FEEDBACK` with errors and analysis (on retry)
 6. **TestsReviewer -> Supervisor**: `NOTIFICATION` with `TESTS_REVIEWED` event
-7. **TestsReportGenerator -> Supervisor**: `NOTIFICATION` with `REPORT_GENERATED` event
-8. **Summarize -> Supervisor**: `NOTIFICATION` with `SUMMARY_CREATED` event
+7. **CodeFixer -> Supervisor**: `NOTIFICATION` with `CODE_FIXED` event
+8. **TestsReportGenerator -> Supervisor**: `NOTIFICATION` with `REPORT_GENERATED` event
+9. **Summarize -> Supervisor**: `NOTIFICATION` with `SUMMARY_CREATED` event
 
 ### Message History
 
@@ -890,6 +951,9 @@ Each tool has:
 - `append_test_file` — Append test cases to existing file
 - `run_playwright_test` — Execute Playwright tests
 
+**Code Fixer Tools** (scoped to `code_fixer` role only):
+- `write_source_file` — Write/overwrite a file in the target project source code (uses relative paths from project root)
+
 **Diagnostic Tools** (registered from `diagnostic_tools.ts`):
 - `find_usage` — Find where a function/variable is used
 - `find_definition` — Find where a function/variable is defined
@@ -928,6 +992,7 @@ AGENT_ROLES = {
   agent_commit_analyzer:         "commit_analyzer"
   agent_tests_generator:         "tests_generator"
   agent_tests_reviewer:          "tests_reviewer"
+  agent_code_fixer:              "code_fixer"
   agent_tests_report_generator:  "tests_report_generator"
   agent_summarize:               "summarize"
 }
@@ -1020,23 +1085,19 @@ Uses LangGraph's native `interrupt()` and `Command({ resume })`:
 
 ## Retry and Error Handling
 
-### Test Retry Loop
+### Two-Level Retry System
 
-```
-TestsGenerator -> run_tests -> TestsReviewer
-  |
-  +-- testResult.success == true -> TestsReportGenerator (exit loop)
-  |
-  +-- testResult.success == false AND retries < maxRetries:
-  |     1. reviewer sends FEEDBACK to TestsGenerator
-  |     2. reviewer re-runs tests (may pass after fix)
-  |     3. If re-run passes: store fix pattern in memory
-  |     4. Supervisor increments retries, routes to TestsGenerator
-  |     5. TestsGenerator detects retries > 0, uses reviewer's fixed content
-  |
-  +-- testResult.success == false AND retries >= maxRetries:
-        Supervisor returns FAIL
-```
+The system has **two nested retry loops** with independent budgets:
+
+**Inner Loop — Code Fix Retries** (`CODE_FIX_MAX_RETRIES`, default 2):
+
+When the reviewer identifies test failures caused by app bugs, it classifies fixes with `scope="target"` and populates `state.targetCodeIssues`. The supervisor routes to `CodeFixer`, which fixes source code via `write_source_file` and re-runs tests. This loop continues until tests pass or `codeFixRetries` is exhausted. After the code fixer completes, tests are always re-run via the `run_tests` node.
+
+**Outer Loop — Test Review Retries** (`TEST_REVIEW_MAX_RETRIES`, default 3):
+
+When the code fixer budget is exhausted (or no target issues were found), the system falls back to the general retry path. The reviewer sends a `FEEDBACK` message to `TestsGenerator` with errors and analysis. The generator re-generates tests with the reviewer's feedback context.
+
+**Both exhausted**: The supervisor returns `FAIL` with message "Tests failed after N retries".
 
 ### Error Handling at Each Level
 
@@ -1139,7 +1200,7 @@ Orchestrator: processIssue(issue, config)
   1. Infrastructure setup (reader, runner, git, tools, MCP)
   2. createInitialAgentState(mode=ISSUE)
   3. createAgenticGraph()
-  4. Register 5 agents + 5 critics
+  4. Register 6 agents + 6 critics
   5. Generate master plan (AdvancedPlanner)
   6. Create git branch
   7. graph.invoke(initialState)
@@ -1156,9 +1217,14 @@ Orchestrator: processIssue(issue, config)
      +-> Supervisor routes to run_tests
      +-> run_tests executes Playwright, returns testResult
      +-> Supervisor routes to TestsReviewer
-     +-> TestsReviewer analyzes errors, fixes tests, re-runs
+     +-> TestsReviewer analyzes errors, classifies fixes by scope
+     +-> TestsReviewer applies test-scope fixes, populates targetCodeIssues
      +-> TestsReviewer reflects, returns
      +-> [Critic evaluates fix quality]
+     +-> Supervisor routes to CodeFixer (if targetCodeIssues exist)
+     +-> CodeFixer reads source, fixes app bugs via write_source_file
+     +-> Supervisor routes to run_tests (re-verify after fix)
+     +-> ... (code fix loop until pass or CODE_FIX_MAX_RETRIES exhausted)
      +-> Supervisor routes to TestsReportGenerator
      +-> TestsReportGenerator generates markdown report
      +-> [Critic evaluates report]
@@ -1188,7 +1254,7 @@ Orchestrator: processCommit(diff, config)
      +-> Supervisor routes to CommitAnalyzer
      +-> CommitAnalyzer reads changed files, explores app, assesses risk
      +-> CommitAnalyzer determines needsTests (may skip)
-     +-> If needsTests: same pipeline as Issue mode (TestsGenerator -> run_tests -> ...)
+     +-> If needsTests: same pipeline as Issue mode (TestsGenerator -> run_tests -> TestsReviewer -> CodeFixer -> ...)
      +-> If !needsTests: SKIP status, early return
   8. Commit, push, create PR (if tests passed)
 ```

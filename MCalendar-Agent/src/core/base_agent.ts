@@ -17,7 +17,7 @@ export interface TaskContext {
   maxTokens?: number;
   temperature?: number;
   promptCaching?: boolean;
-  maxRetries?: number;
+  testReviewMaxRetries?: number;
   currentPlanStep?: PlanStep;
   overallPlan?: AgentPlan;
 }
@@ -214,6 +214,7 @@ Return ONLY valid JSON:
       [AGENT_NAMES.AGENT_TESTS_REVIEWER]: "tests_reviewer",
       [AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR]: "tests_report_generator",
       [AGENT_NAMES.AGENT_SUMMARIZE]: "summarize",
+      [AGENT_NAMES.AGENT_CODE_FIXER]: "code_fixer",
     };
     return mapping[agentName] || "issue_analyzer";
   }

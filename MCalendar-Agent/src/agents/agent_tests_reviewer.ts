@@ -68,7 +68,7 @@ Use all available tools to debug and fix tests. Return the fixed test file conte
   }
 
   getGoal(): string {
-    return `Fix failing tests for ${this.state.testFilename} (attempt ${this.state.retries + 1}/${this.state.maxRetries})`;
+    return `Fix failing tests for ${this.state.testFilename} (attempt ${this.state.retries + 1}/${this.state.testReviewMaxRetries})`;
   }
 
   getDefaultPlan(): import("../core/state.js").AgentPlan {
@@ -145,13 +145,14 @@ Use all available tools to debug and fix tests. Return the fixed test file conte
 
       // Log the error analysis result
       logger.info(`[AgentTestsReviewer] Error analysis result:`);
+      let parsed: any;
       try {
-        const parsed = JSON.parse(analysis);
+        parsed = JSON.parse(analysis);
         if (parsed.root_cause) logger.info(`  Root cause: ${parsed.root_cause}`);
         if (parsed.fixes_needed?.length) {
           logger.info(`  Fixes needed:`);
           for (const fix of parsed.fixes_needed) {
-            logger.info(`    - ${fix.issue} → ${fix.fix}`);
+            logger.info(`    - [${fix.scope || 'test'}] ${fix.issue} → ${fix.fix}`);
           }
         }
         if (parsed.priority) logger.info(`  Priority: ${parsed.priority}`);
@@ -160,18 +161,51 @@ Use all available tools to debug and fix tests. Return the fixed test file conte
         logger.info(`  Analysis: ${analysis.slice(0, 1000)}`);
       }
 
-      logger.info(`[AgentTestsReviewer] Applying fixes...`);
-      await this.runFix(testContent, analysis);
+      // Separate fixes by scope: test fixes vs target source fixes
+      const allFixes = parsed?.fixes_needed ?? [];
+      const targetIssues = allFixes.filter((f: any) => f.scope === "target");
+      const testFixes = allFixes.filter((f: any) => f.scope !== "target");
 
-      const path = await import("node:path");
-      const testFile = path.join(state.testOutputPath, testFilename);
-      const fs = await import("node:fs");
-      if (fs.existsSync(testFile)) {
-        state.testContent = fs.readFileSync(testFile, "utf-8");
-        logger.success(`[AgentTestsReviewer] Fix applied to ${testFilename}`);
+      // Store target code issues for the code fixer agent
+      if (targetIssues.length > 0) {
+        state.targetCodeIssues = targetIssues.map((f: any) => ({
+          file: f.file,
+          issue: f.issue,
+          fix: f.fix,
+        }));
+        logger.info(`[AgentTestsReviewer] Found ${targetIssues.length} target code issue(s) to route to code fixer`);
       }
 
-      // Re-run tests after fixing to validate the fix
+      // Apply test-scope fixes only (target fixes are handled by code_fixer)
+      if (testFixes.length > 0) {
+        const testOnlyAnalysis = JSON.stringify({ ...parsed, fixes_needed: testFixes });
+        logger.info(`[AgentTestsReviewer] Applying ${testFixes.length} test fix(es)...`);
+        await this.runFix(testContent, testOnlyAnalysis);
+
+        const path = await import("node:path");
+        const testFile = path.join(state.testOutputPath, testFilename);
+        const fs = await import("node:fs");
+        if (fs.existsSync(testFile)) {
+          state.testContent = fs.readFileSync(testFile, "utf-8");
+          logger.success(`[AgentTestsReviewer] Fix applied to ${testFilename}`);
+        }
+      }
+
+      // If there are target issues, don't re-run tests yet - let code fixer handle it
+      if (targetIssues.length > 0) {
+        this.recordStep("review_analyze", `Found ${targetIssues.length} target code issue(s), routing to code fixer`, "next");
+        this.updateStatus(AGENT_STATUS.COMPLETED);
+
+        this.sendMessage(CORE_AGENT_NAMES.SUPERVISOR, MESSAGE_TYPE.NOTIFICATION, {
+          event: AGENT_EVENT.TESTS_REVIEWED,
+          filename: testFilename,
+          attempt: state.retries,
+          targetIssues: targetIssues.length,
+        });
+        return state;
+      }
+
+      // Re-run tests after fixing (only test-scope fixes)
       logger.info(`[AgentTestsReviewer] Re-running tests after fix: ${testFilename}`);
       const newTestResult = this.taskContext.runner.run(testFilename);
       state.testResult = newTestResult;
@@ -394,11 +428,15 @@ You have access to all tools to investigate:
 
 When you have finished investigating, call the submit_analysis tool with your findings.
 
+IMPORTANT: For each fix, classify its scope:
+- scope="test" if the fix is to the test file itself (wrong selector, wrong assertion, missing setup)
+- scope="target" if the fix is to the APPLICATION source code (the bug is in the app, not the test)
+
 Output structure:
 {
   "root_cause": "description of the root cause",
   "fixes_needed": [
-    {"file": "test file path", "issue": "what's wrong", "fix": "how to fix it"}
+    {"file": "file path", "issue": "what's wrong", "fix": "how to fix it", "scope": "test|target"}
   ],
   "priority": "high|medium|low"
 }`;
@@ -435,8 +473,9 @@ Use tools to investigate the root cause, then call submit_analysis with your fix
                 file: { type: "string" },
                 issue: { type: "string" },
                 fix: { type: "string" },
+                scope: { type: "string", enum: ["test", "target"], description: "test = fix the test file, target = fix the application source code" },
               },
-              required: ["file", "issue", "fix"],
+              required: ["file", "issue", "fix", "scope"],
             },
             description: "List of fixes needed",
           },

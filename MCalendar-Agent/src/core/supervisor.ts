@@ -112,12 +112,12 @@ export class Supervisor {
     }
 
     // Fallback to hardcoded routing if no plan
-    const { mode, currentAgent, agentStatus, issueAnalysis, commitAnalysis, testResult, retries, maxRetries } = this.state;
+    const { mode, currentAgent, agentStatus, issueAnalysis, commitAnalysis, testResult, retries, testReviewMaxRetries: maxRetries, targetCodeIssues, codeFixRetries, maxCodeFixRetries } = this.state;
 
     if (mode === MODE.ISSUE) {
-      return this.routeIssueMode(currentAgent, agentStatus, issueAnalysis, testResult, retries, maxRetries);
+      return this.routeIssueMode(currentAgent, agentStatus, issueAnalysis, testResult, retries, maxRetries, targetCodeIssues, codeFixRetries, maxCodeFixRetries);
     } else {
-      return this.routeCommitMode(currentAgent, agentStatus, commitAnalysis, testResult, retries, maxRetries);
+      return this.routeCommitMode(currentAgent, agentStatus, commitAnalysis, testResult, retries, maxRetries, targetCodeIssues, codeFixRetries, maxCodeFixRetries);
     }
   }
 
@@ -205,7 +205,10 @@ export class Supervisor {
     issueAnalysis: AgentState["issueAnalysis"],
     testResult: AgentState["testResult"],
     retries: number,
-    maxRetries: number
+    maxRetries: number,
+    targetCodeIssues: AgentState["targetCodeIssues"],
+    codeFixRetries: number,
+    maxCodeFixRetries: number
   ): RoutingDecision {
     switch (currentAgent) {
       case CORE_AGENT_NAMES.SUPERVISOR:
@@ -227,6 +230,12 @@ export class Supervisor {
         if (testResult?.success) {
           return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, reason: "Tests passed, generate report" };
         }
+        // Route to code fixer if target code issues found and retries remain
+        if (targetCodeIssues && targetCodeIssues.length > 0 && codeFixRetries < maxCodeFixRetries) {
+          this.state.codeFixRetries = (codeFixRetries || 0) + 1;
+          logger.info(`[Supervisor] Code fix ${this.state.codeFixRetries}/${maxCodeFixRetries}: routing to code fixer for target source`);
+          return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_CODE_FIXER, reason: `Fixing target source code (${this.state.codeFixRetries}/${maxCodeFixRetries})` };
+        }
         if (retries < maxRetries) {
           this.state.retries = retries + 1;
           metrics.recordRetry();
@@ -234,6 +243,9 @@ export class Supervisor {
           return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_GENERATOR, reason: `Tests failed, retry ${this.state.retries}/${maxRetries}` };
         }
         return { action: ROUTING_ACTION.FAIL, reason: `Tests failed after ${maxRetries} retries` };
+
+      case AGENT_NAMES.AGENT_CODE_FIXER:
+        return { action: ROUTING_ACTION.ROUTE, nextAgent: GRAPH_NODE.RUN_TESTS as AgentName, reason: "Re-run tests after source code fix" };
 
       case AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR:
         return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_SUMMARIZE, reason: "Report generated, summarize" };
@@ -252,7 +264,10 @@ export class Supervisor {
     commitAnalysis: AgentState["commitAnalysis"],
     testResult: AgentState["testResult"],
     retries: number,
-    maxRetries: number
+    maxRetries: number,
+    targetCodeIssues: AgentState["targetCodeIssues"],
+    codeFixRetries: number,
+    maxCodeFixRetries: number
   ): RoutingDecision {
     switch (currentAgent) {
       case CORE_AGENT_NAMES.SUPERVISOR:
@@ -274,6 +289,12 @@ export class Supervisor {
         if (testResult?.success) {
           return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, reason: "Tests passed, generate report" };
         }
+        // Route to code fixer if target code issues found and retries remain
+        if (targetCodeIssues && targetCodeIssues.length > 0 && codeFixRetries < maxCodeFixRetries) {
+          this.state.codeFixRetries = (codeFixRetries || 0) + 1;
+          logger.info(`[Supervisor] Code fix ${this.state.codeFixRetries}/${maxCodeFixRetries}: routing to code fixer for target source`);
+          return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_CODE_FIXER, reason: `Fixing target source code (${this.state.codeFixRetries}/${maxCodeFixRetries})` };
+        }
         if (retries < maxRetries) {
           this.state.retries = retries + 1;
           metrics.recordRetry();
@@ -281,6 +302,9 @@ export class Supervisor {
           return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_GENERATOR, reason: `Tests failed, retry ${this.state.retries}/${maxRetries}` };
         }
         return { action: ROUTING_ACTION.FAIL, reason: `Tests failed after ${maxRetries} retries` };
+
+      case AGENT_NAMES.AGENT_CODE_FIXER:
+        return { action: ROUTING_ACTION.ROUTE, nextAgent: GRAPH_NODE.RUN_TESTS as AgentName, reason: "Re-run tests after source code fix" };
 
       case AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR:
         return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_SUMMARIZE, reason: "Report generated, summarize" };
