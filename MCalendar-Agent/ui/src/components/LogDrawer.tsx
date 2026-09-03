@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { LogEntry } from "../ws";
 
-export function LogDrawer({ logs }: { logs: LogEntry[] }) {
+export function LogDrawer({ logs, onClear }: { logs: LogEntry[]; onClear: () => void }) {
   const [open, setOpen] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
   const stickRef = useRef(true);
@@ -19,9 +19,16 @@ export function LogDrawer({ logs }: { logs: LogEntry[] }) {
 
   return (
     <div className={`log-drawer ${open ? "open" : ""}`}>
-      <button className="log-toggle" onClick={() => setOpen(!open)}>
-        {open ? "▾" : "▴"} Agent Logs ({logs.length})
-      </button>
+      <div className="log-toggle-row">
+        <button className="log-toggle" onClick={() => setOpen(!open)}>
+          {open ? "▾" : "▴"} Agent Logs ({logs.length})
+        </button>
+        {logs.length > 0 && (
+          <button className="log-clear-btn" onClick={onClear} title="Clear logs">
+            Clear
+          </button>
+        )}
+      </div>
       <div className="log-body" ref={bodyRef} onScroll={handleScroll}>
         {logs.length === 0 && <div className="muted">Waiting for agent activity…</div>}
         {logs.map((entry) => (

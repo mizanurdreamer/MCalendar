@@ -34,7 +34,7 @@ export default function App() {
   const [appConfig, setAppConfig] = useState<Awaited<ReturnType<typeof api.getConfig>> | null>(null);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
 
-  const { connected, logs, jobs, activity, retriesVersion, chatSummaries, currentAgent, agentSteps } = useAgentSocket();
+  const { connected, logs, clearLogs, jobs, activity, retriesVersion, chatSummaries, currentAgent, agentSteps } = useAgentSocket();
   const shownJobsRef = useRef<Set<string>>(new Set());
   const shownSummariesRef = useRef<Set<number>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -177,6 +177,8 @@ export default function App() {
         retriesVersion={retriesVersion}
         connected={connected}
         onCompose={compose}
+        onStopJob={handleStop}
+        runningJob={runningJob}
       />
 
       <main className="main">
@@ -270,7 +272,7 @@ export default function App() {
           </button>
         </div>
 
-        <LogDrawer logs={logs} />
+        <LogDrawer logs={logs} onClear={clearLogs} />
       </main>
     </div>
   );

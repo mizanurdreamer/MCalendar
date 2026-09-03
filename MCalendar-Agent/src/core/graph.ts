@@ -168,6 +168,16 @@ export class AgenticGraph {
   }
 
   private async supervisorNode(state: AgentState): Promise<Partial<AgentState>> {
+    // Check for abort signal
+    if (state.abortSignal?.aborted) {
+      logger.info(`[AgenticGraph] Pipeline aborted by user`);
+      return { 
+        status: PIPELINE_STATUS.FAILED, 
+        error: "Job stopped by user",
+        currentAgent: END as AgentName 
+      };
+    }
+
     // If pipeline already completed or failed, stop the graph
     if (state.status === PIPELINE_STATUS.COMPLETED || state.status === PIPELINE_STATUS.FAILED) {
       logger.info(`[AgenticGraph] Pipeline ${state.status}, stopping`);
@@ -296,6 +306,16 @@ export class AgenticGraph {
 
   private agentNode(agentName: AgentName) {
     return async (state: AgentState): Promise<Partial<AgentState>> => {
+      // Check for abort signal before running agent
+      if (state.abortSignal?.aborted) {
+        logger.info(`[AgenticGraph] Agent ${agentName} skipped — pipeline aborted`);
+        return { 
+          status: PIPELINE_STATUS.FAILED, 
+          error: "Job stopped by user",
+          currentAgent: CORE_AGENT_NAMES.SUPERVISOR 
+        };
+      }
+
       const agent = this.agents.get(agentName);
       if (!agent) {
         return { status: PIPELINE_STATUS.FAILED, error: `Agent not found: ${agentName}`, currentAgent: CORE_AGENT_NAMES.SUPERVISOR };
@@ -421,6 +441,7 @@ export class AgenticGraph {
       issueAnalysis: state.issueAnalysis ? { ...state.issueAnalysis } : undefined,
       commitAnalysis: state.commitAnalysis ? { ...state.commitAnalysis } : undefined,
       currentAgent: state.currentAgent,
+      abortSignal: state.abortSignal,
     };
   }
 
@@ -488,6 +509,16 @@ export class AgenticGraph {
   }
 
   private async runTestsNode(state: AgentState): Promise<Partial<AgentState>> {
+    // Check for abort signal
+    if (state.abortSignal?.aborted) {
+      logger.info(`[runTests] Skipped — pipeline aborted`);
+      return { 
+        status: PIPELINE_STATUS.FAILED, 
+        error: "Job stopped by user",
+        currentAgent: CORE_AGENT_NAMES.SUPERVISOR 
+      };
+    }
+
     const testFilename = state.testFilename;
     if (!testFilename) {
       logger.error(`[runTests] No test filename in state`);
@@ -503,7 +534,7 @@ export class AgenticGraph {
         return { status: PIPELINE_STATUS.FAILED, error: "No test runner available", currentAgent: CORE_AGENT_NAMES.SUPERVISOR };
       }
 
-      const testResult = runner.run(testFilename);
+      const testResult = await runner.run(testFilename, state.abortSignal);
       state.testResult = testResult;
 
       if (testResult.success) {
@@ -650,12 +681,18 @@ export class AgenticGraph {
     // Use thread_id from runId for checkpointing
     const threadId = config?.configurable?.thread_id || initialState.runId;
     
-    return this.graph.invoke(initialState, { configurable: { thread_id: threadId } });
+    return this.graph.invoke(initialState, { 
+      configurable: { thread_id: threadId },
+      signal: initialState.abortSignal,
+    });
   }
 
   async stream(initialState: AgentState, config?: { configurable?: { thread_id: string } }) {
     const threadId = config?.configurable?.thread_id || initialState.runId;
-    return this.graph.stream(initialState, { configurable: { thread_id: threadId } });
+    return this.graph.stream(initialState, { 
+      configurable: { thread_id: threadId },
+      signal: initialState.abortSignal,
+    });
   }
 
   // Resume from interrupt (human approval)

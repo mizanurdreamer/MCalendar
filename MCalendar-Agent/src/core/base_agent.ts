@@ -81,6 +81,7 @@ Return ONLY valid JSON:
         maxTokens: 2048,
         temperature: 0.1,
         promptCaching,
+        signal: this.state.abortSignal,
       });
 
       const textBlocks = response.content.filter((b): b is { type: "text"; text: string } => b.type === "text");
@@ -191,6 +192,12 @@ Return ONLY valid JSON:
   private async waitForApprovalResolution(approvalId: string, state: AgentState): Promise<boolean> {
     return new Promise((resolve) => {
       const checkInterval = setInterval(() => {
+        if (state.abortSignal?.aborted) {
+          clearInterval(checkInterval);
+          logger.info(`[${this.agentName}] Approval wait cancelled — pipeline aborted`);
+          resolve(false);
+          return;
+        }
         const approval = state.humanApprovals.find(a => a.id === approvalId);
         if (approval?.resolved) {
           clearInterval(checkInterval);
@@ -427,6 +434,7 @@ Return ONLY valid JSON:
         maxTokens: this.state.agentConfig[tag]?.maxTokens,
         temperature: this.state.agentConfig[tag]?.temperature,
         promptCaching,
+        signal: this.state.abortSignal,
       });
 
       // Record token usage
@@ -472,6 +480,11 @@ Return ONLY valid JSON:
       // Execute remaining tools
       const toolResults: ContentBlock[] = [];
       for (const toolBlock of toolBlocks) {
+        // Check abort before each tool execution
+        if (this.state.abortSignal?.aborted) {
+          throw new Error("Job stopped by user");
+        }
+
         metrics.recordToolCall();
 
         logger.info(`[${tag}] Executing tool: ${toolBlock.name}`);

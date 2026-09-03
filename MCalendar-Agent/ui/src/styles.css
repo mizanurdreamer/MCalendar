@@ -599,6 +599,20 @@ body {
 }
 .btn-stop:hover { opacity: 0.85; }
 
+.btn-stop-sidebar {
+  margin-left: auto;
+  background: var(--err);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.btn-stop-sidebar:hover { opacity: 0.85; }
+
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(-4px); }
   to { opacity: 1; transform: translateY(0); }
@@ -642,6 +656,27 @@ body {
   font-family: inherit;
 }
 .log-toggle:hover { color: var(--accent); }
+
+.log-toggle-row {
+  display: flex;
+  align-items: center;
+}
+
+.log-toggle-row .log-toggle {
+  flex: 1;
+}
+
+.log-clear-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  padding: 10px 16px;
+  cursor: pointer;
+  font-size: 11px;
+  font-family: inherit;
+  transition: color 0.15s;
+}
+.log-clear-btn:hover { color: var(--err); }
 
 .log-body {
   height: 0;
@@ -817,354 +852,6 @@ body {
 }
 .btn-approval.primary:hover { background: var(--accent-hover); }
 .btn-approval.secondary:hover { background: var(--bg-hover); }
-
-/* ── Agentic Panels ─────────────────────────────── */
-.agentic-panels {
-  margin: 16px 32px 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.agentic-panel {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px 16px;
-  animation: slideDown 0.2s ease;
-}
-
-.agentic-panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--accent);
-}
-
-.agentic-panel-count {
-  font-size: 11px;
-  color: var(--text-muted);
-  font-weight: 400;
-}
-
-/* Agent Status Panel */
-.agent-status-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 8px;
-}
-
-.agent-status-card {
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
-  transition: all 0.15s;
-}
-
-.agent-status-card:hover {
-  border-color: var(--accent);
-}
-
-.agent-status-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 4px;
-}
-
-.agent-name {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.agent-icon {
-  font-size: 14px;
-}
-
-.agent-status-label {
-  font-size: 10.5px;
-  color: var(--text-muted);
-  text-transform: capitalize;
-}
-
-.agent-updated {
-  font-size: 9.5px;
-  color: var(--text-muted);
-  opacity: 0.7;
-  margin-top: 4px;
-}
-
-.agent-status-card.status-idle { border-left: 3px solid var(--text-muted); }
-.agent-status-card.status-planning { border-left: 3px solid var(--warn); }
-.agent-status-card.status-executing { border-left: 3px solid var(--accent); }
-.agent-status-card.status-reflecting { border-left: 3px solid #6b73ff; }
-.agent-status-card.status-awaiting_approval { border-left: 3px solid #ff9f1c; }
-.agent-status-card.status-completed { border-left: 3px solid var(--ok); }
-.agent-status-card.status-failed { border-left: 3px solid var(--err); }
-
-/* Agent Plan Panel */
-.plan-card {
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 12px;
-  margin-bottom: 8px;
-}
-
-.plan-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.plan-agent {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--accent);
-}
-
-.plan-risk {
-  font-size: 10px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-
-.plan-risk.risk-low { background: rgba(127, 176, 105, 0.2); color: var(--ok); }
-.plan-risk.risk-medium { background: rgba(245, 166, 35, 0.2); color: var(--warn); }
-.plan-risk.risk-high { background: rgba(229, 72, 77, 0.2); color: var(--err); }
-
-.plan-goal {
-  font-size: 12px;
-  color: var(--text);
-  margin-bottom: 8px;
-}
-
-.plan-steps {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.plan-step {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  background: var(--bg-elevated);
-  border-radius: 4px;
-  font-size: 11px;
-}
-
-.step-number {
-  width: 20px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--accent);
-  color: #fff;
-  border-radius: 50%;
-  font-size: 10px;
-  font-weight: 600;
-}
-
-.plan-step .step-tool {
-  font-family: var(--mono);
-  font-size: 10px;
-  color: var(--text-muted);
-  min-width: 80px;
-}
-
-.plan-step .step-outcome {
-  flex: 1;
-  color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.step-parallel {
-  font-size: 9px;
-  color: var(--ok);
-  background: rgba(127, 176, 105, 0.15);
-  padding: 1px 6px;
-  border-radius: 4px;
-}
-
-.plan-parallel-groups {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border);
-  font-size: 10px;
-}
-
-.parallel-label {
-  color: var(--text-muted);
-  margin-right: 8px;
-}
-
-.parallel-group {
-  background: var(--bg-elevated);
-  padding: 2px 6px;
-  border-radius: 4px;
-  margin-right: 4px;
-}
-
-/* Agent Steps Panel */
-.steps-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.step-item {
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 12px;
-  transition: all 0.15s;
-}
-
-.step-item:hover {
-  border-color: var(--accent);
-}
-
-.step-item .step-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.step-item .step-agent {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--accent);
-}
-
-.step-item .step-icon {
-  font-size: 14px;
-}
-
-.step-item .step-status {
-  font-size: 10px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-weight: 600;
-  text-transform: capitalize;
-}
-
-.step-pending { background: rgba(168, 164, 155, 0.2); color: var(--text-muted); }
-.step-running { background: rgba(217, 119, 87, 0.2); color: var(--accent); }
-.step-completed { background: rgba(127, 176, 105, 0.2); color: var(--ok); }
-.step-failed { background: rgba(229, 72, 77, 0.2); color: var(--err); }
-
-.step-details {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 11px;
-}
-
-.step-tool-row, .step-outcome-row, .step-reasoning {
-  display: flex;
-  gap: 8px;
-}
-
-.step-tool-label, .step-outcome-label, .step-reasoning-label {
-  color: var(--text-muted);
-  min-width: 80px;
-  font-size: 10px;
-}
-
-.step-tool-value {
-  font-family: var(--mono);
-  color: var(--text);
-  background: var(--bg-elevated);
-  padding: 1px 6px;
-  border-radius: 4px;
-  font-size: 10px;
-}
-
-.step-outcome-value, .step-reasoning-value {
-  color: var(--text);
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.step-timing {
-  display: flex;
-  gap: 12px;
-  margin-top: 4px;
-  font-size: 10px;
-  color: var(--text-muted);
-}
-
-.step-duration {
-  color: var(--accent);
-  font-weight: 600;
-}
-
-/* Checkpoint Panel */
-.checkpoints-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.checkpoint-item {
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 12px;
-}
-
-.checkpoint-main {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 4px;
-}
-
-.checkpoint-step {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--accent);
-}
-
-.checkpoint-agent {
-  font-size: 11px;
-  color: var(--text);
-}
-
-.checkpoint-status {
-  font-size: 10px;
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: var(--bg-elevated);
-  color: var(--text-muted);
-}
-
-.checkpoint-meta {
-  display: flex;
-  gap: 16px;
-  font-size: 10px;
-  color: var(--text-muted);
-}
-
-.checkpoint-run {
-  font-family: var(--mono);
-}
 
 /* ── Thought Bubble (inline agent activity in JobCard) ── */
 .job-thought-bubble {

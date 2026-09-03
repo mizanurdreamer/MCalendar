@@ -259,6 +259,7 @@ export function useAgentSocket() {
   return { 
     connected, 
     logs, 
+    clearLogs: () => setLogs([]),
     jobs, 
     activity, 
     retriesVersion, 

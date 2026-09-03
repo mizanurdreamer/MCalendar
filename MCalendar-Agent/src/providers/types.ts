@@ -11,6 +11,7 @@ export interface ChatParams {
   maxTokens?: number;
   temperature?: number;
   promptCaching?: boolean;
+  signal?: AbortSignal;
 }
 
 export interface ChatMessage {

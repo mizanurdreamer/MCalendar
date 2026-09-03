@@ -92,6 +92,7 @@ export class AdvancedPlanner {
         maxTokens: 4096,
         temperature: 0.2,
         promptCaching: true,
+        signal: this.state.abortSignal,
       });
 
       const textBlocks = response.content.filter((b): b is { type: "text"; text: string } => b.type === "text");
@@ -134,6 +135,7 @@ export class AdvancedPlanner {
         maxTokens: 4096,
         temperature: 0.2,
         promptCaching: true,
+        signal: this.state.abortSignal,
       });
 
       const textBlocks = response.content.filter((b): b is { type: "text"; text: string } => b.type === "text");

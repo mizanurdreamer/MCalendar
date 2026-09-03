@@ -47,6 +47,7 @@ export class AnthropicProvider implements ProviderInterface {
     maxTokens = 4096,
     temperature = 0.3,
     promptCaching = false,
+    signal,
   }: ChatParams): Promise<ChatResponse> {
     const effectiveModel =
       this.defaultModel === "auto"
@@ -100,7 +101,7 @@ export class AnthropicProvider implements ProviderInterface {
       messages: apiMessages,
       // Prompt caching: add cache_control at top level for automatic caching
       ...(promptCaching && { cache_control: { type: "ephemeral" } }),
-    });
+    }, { signal });
 
     // Log cache usage if available
     if (promptCaching) {

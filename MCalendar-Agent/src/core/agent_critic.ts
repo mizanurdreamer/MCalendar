@@ -104,6 +104,7 @@ Return ONLY valid JSON:
         maxTokens: 4096,
         temperature: 0.1,
         promptCaching: this.state.agentConfig[CORE_AGENT_NAMES.CRITIC]?.promptCaching ?? true,
+        signal: this.state.abortSignal,
       });
 
       const textBlocks = response.content.filter((b): b is { type: "text"; text: string } => b.type === "text");
@@ -135,6 +136,12 @@ Return ONLY valid JSON:
     let revisions = 0;
 
     while (revisions < this.config.maxRevisions) {
+      // Check abort before each revision
+      if (this.state.abortSignal?.aborted) {
+        logger.info(`[AgentCritic] Critique aborted — pipeline stopped`);
+        break;
+      }
+
       const result = await this.critique(currentOutput, context);
       
       this.recordReflection(result);
@@ -217,7 +224,7 @@ Return ONLY valid JSON:
       if (testFilename && this.taskContext.runner) {
         try {
           logger.info(`[AgentCritic] Running tests to verify revision: ${testFilename}`);
-          const testResult = this.taskContext.runner.run(testFilename);
+          const testResult = await this.taskContext.runner.run(testFilename, this.state.abortSignal);
           if (testResult.success) {
             logger.success(`[AgentCritic] Revision verified: tests passing (${testResult.passed}/${testResult.total})`);
             return true;

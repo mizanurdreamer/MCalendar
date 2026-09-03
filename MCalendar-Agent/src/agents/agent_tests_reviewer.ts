@@ -207,7 +207,7 @@ Use all available tools to debug and fix tests. Return the fixed test file conte
 
       // Re-run tests after fixing (only test-scope fixes)
       logger.info(`[AgentTestsReviewer] Re-running tests after fix: ${testFilename}`);
-      const newTestResult = this.taskContext.runner.run(testFilename);
+      const newTestResult = await this.taskContext.runner.run(testFilename, this.state.abortSignal);
       state.testResult = newTestResult;
 
       if (newTestResult.success) {

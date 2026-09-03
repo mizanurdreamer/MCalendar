@@ -48,6 +48,7 @@ export class GoogleProvider implements ProviderInterface {
     maxTokens = 4096,
     temperature = 0.3,
     promptCaching = false,
+    signal,
   }: ChatParams): Promise<ChatResponse> {
     const effectiveModel =
       this.defaultModel === "auto"
@@ -95,6 +96,11 @@ export class GoogleProvider implements ProviderInterface {
           : undefined,
       }
     );
+
+    // Check abort after the call completes
+    if (signal?.aborted) {
+      throw new Error("Job stopped by user");
+    }
 
     const text = response.text ?? "";
     const toolCalls = response.functionCalls?.map((fc: { name: string; args: Record<string, unknown> }) => ({

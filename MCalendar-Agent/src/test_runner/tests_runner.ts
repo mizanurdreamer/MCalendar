@@ -3,11 +3,12 @@ import { logger } from "../utils/logger.js";
 
 export async function runTests(
   runner: PlaywrightRunner,
-  testFilename: string
+  testFilename: string,
+  signal?: AbortSignal
 ): Promise<TestResult> {
   logger.task("Tests_Runner", `running ${testFilename}`);
 
-  const result = runner.run(testFilename);
+  const result = await runner.run(testFilename, signal);
 
   if (result.success) {
     logger.success(`${result.passed}/${result.total} tests passed`);

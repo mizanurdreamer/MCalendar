@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { exec } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { logger } from "../utils/logger.js";
@@ -22,26 +22,60 @@ export class PlaywrightRunner {
     this.workers = workers;
   }
 
-  run(filename?: string): TestResult {
+  async run(filename?: string, signal?: AbortSignal): Promise<TestResult> {
     const testPath = filename ? `tests/${filename}` : "tests/";
     const cmd = `npx playwright test ${testPath} --reporter=json,html --workers=${this.workers}`;
 
-    try {
-      const output = execSync(cmd, {
+    // Check abort before starting
+    if (signal?.aborted) {
+      return {
+        success: false,
+        total: 0,
+        passed: 0,
+        failed: 1,
+        output: "Test run cancelled — pipeline aborted",
+        errors: ["Job stopped by user"],
+      };
+    }
+
+    return new Promise<TestResult>((resolve) => {
+      const child = exec(cmd, {
         cwd: this.codebasePath,
         encoding: "utf-8",
         timeout: 300_000,
-        stdio: ["pipe", "pipe", "pipe"],
+      }, (error: { stdout?: string; stderr?: string; message?: string } | null, stdout: string, stderr: string) => {
+        if (signal?.aborted) {
+          logger.info(`[playwright] Test cancelled — pipeline aborted`);
+          resolve({
+            success: false,
+            total: 0,
+            passed: 0,
+            failed: 1,
+            output: "Test run cancelled — pipeline aborted",
+            errors: ["Job stopped by user"],
+          });
+          return;
+        }
+
+        if (error) {
+          const output = stdout ?? stderr ?? error.message ?? "";
+          logger.error(`[playwright] Test failed (exit code non-zero)`);
+          if (output) logger.error(`[playwright] Output: ${output.slice(0, 500)}`);
+          resolve(this.parseOutput(output, false));
+        } else {
+          logger.info(`[playwright] Test completed successfully`);
+          resolve(this.parseOutput(stdout ?? "", true));
+        }
       });
-      logger.info(`[playwright] Test completed successfully`);
-      return this.parseOutput(output, true);
-    } catch (err: unknown) {
-      const error = err as { stdout?: string; stderr?: string; message?: string };
-      const output = error.stdout ?? error.stderr ?? error.message ?? "";
-      logger.error(`[playwright] Test failed (exit code non-zero)`);
-      if (output) logger.error(`[playwright] Output: ${output.slice(0, 500)}`);
-      return this.parseOutput(output, false);
-    }
+
+      // Kill process on abort
+      if (signal) {
+        signal.addEventListener("abort", () => {
+          logger.info(`[playwright] Aborting test process...`);
+          child.kill("SIGTERM");
+        }, { once: true });
+      }
+    });
   }
 
   /**

@@ -2,19 +2,17 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
 import type { IssueSummary, JobStatus, RetriesResponse, MemoryStatsResponse, JobInfo } from "../api";
 import { BranchCommitPanel } from "./BranchCommitPanel";
-import { AgentStatusPanel } from "./AgentStatusPanel";
-import { AgentPlanPanel } from "./AgentPlanPanel";
-import { AgentStepsPanel } from "./AgentStepsPanel";
-import { CheckpointPanel } from "./CheckpointPanel";
 
 interface SidebarProps {
   appConfig: Awaited<ReturnType<typeof api.getConfig>> | null;
   retriesVersion: number;
   connected: boolean;
   onCompose: (text: string) => void;
+  onStopJob: () => void;
+  runningJob: JobInfo | null;
 }
 
-export function Sidebar({ appConfig, retriesVersion, connected, onCompose }: SidebarProps) {
+export function Sidebar({ appConfig, retriesVersion, connected, onCompose, onStopJob, runningJob }: SidebarProps) {
   const [issues, setIssues] = useState<IssueSummary[]>([]);
   const [retries, setRetries] = useState<RetriesResponse | null>(null);
   const [jobStatus, setJobStatus] = useState<JobStatus | null>(null);
@@ -81,10 +79,13 @@ export function Sidebar({ appConfig, retriesVersion, connected, onCompose }: Sid
         title="Current Job"
         onRefresh={refresh}
       >
-        {jobStatus?.current ? (
+        {runningJob ? (
           <div className="job-mini running">
             <span className="spinner" />
-            <span>{jobStatus.current.label}</span>
+            <span>{runningJob.label}</span>
+            <button className="btn-stop-sidebar" onClick={onStopJob} title="Stop job">
+              Stop
+            </button>
           </div>
         ) : (
           <div className="muted">Idle — no job running</div>
@@ -153,22 +154,6 @@ export function Sidebar({ appConfig, retriesVersion, connected, onCompose }: Sid
           ))}
         </Section>
       )}
-
-      <Section title="Agent Status" onRefresh={refresh}>
-        <AgentStatusPanel />
-      </Section>
-
-      <Section title="Execution Plans" onRefresh={refresh}>
-        <AgentPlanPanel />
-      </Section>
-
-      <Section title="Agent Steps" onRefresh={refresh}>
-        <AgentStepsPanel />
-      </Section>
-
-      <Section title="Checkpoints" onRefresh={refresh}>
-        <CheckpointPanel />
-      </Section>
 
       <div className="sidebar-footer">
         Suggested prompts:

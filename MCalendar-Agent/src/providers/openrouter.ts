@@ -61,6 +61,7 @@ export class OpenRouterProvider implements ProviderInterface {
     maxTokens = 4096,
     temperature = 0.3,
     promptCaching = false,
+    signal,
   }: ChatParams): Promise<ChatResponse> {
     // Prompt caching depends on the underlying provider via OpenRouter
     if (promptCaching) {
@@ -93,7 +94,7 @@ export class OpenRouterProvider implements ProviderInterface {
       tools: openaiTools,
       max_tokens: maxTokens,
       temperature,
-    });
+    }, { signal });
 
     const choice = response.choices[0];
     const contentBlocks: ContentBlock[] = [];
