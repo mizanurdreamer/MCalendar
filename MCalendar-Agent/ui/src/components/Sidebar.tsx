@@ -2,6 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
 import type { IssueSummary, JobStatus, RetriesResponse, MemoryStatsResponse, JobInfo } from "../api";
 import { BranchCommitPanel } from "./BranchCommitPanel";
+import { AgentStatusPanel } from "./AgentStatusPanel";
+import { AgentPlanPanel } from "./AgentPlanPanel";
+import { AgentStepsPanel } from "./AgentStepsPanel";
+import { CheckpointPanel } from "./CheckpointPanel";
 
 interface SidebarProps {
   appConfig: Awaited<ReturnType<typeof api.getConfig>> | null;
@@ -149,6 +153,22 @@ export function Sidebar({ appConfig, retriesVersion, connected, onCompose }: Sid
           ))}
         </Section>
       )}
+
+      <Section title="Agent Status" onRefresh={refresh}>
+        <AgentStatusPanel />
+      </Section>
+
+      <Section title="Execution Plans" onRefresh={refresh}>
+        <AgentPlanPanel />
+      </Section>
+
+      <Section title="Agent Steps" onRefresh={refresh}>
+        <AgentStepsPanel />
+      </Section>
+
+      <Section title="Checkpoints" onRefresh={refresh}>
+        <CheckpointPanel />
+      </Section>
 
       <div className="sidebar-footer">
         Suggested prompts:

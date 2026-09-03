@@ -4,6 +4,7 @@ import type { PlaywrightRunner } from "../test_runner/playwright.js";
 import { getToolRegistry, type AgentRole, type ToolHandlerContext } from "./tool_registry.js";
 import { logger } from "../utils/logger.js";
 import { metrics } from "./metrics.js";
+import { agentEvents } from "./agent_events.js";
 import type { AgentState, AgentName, AgentPlan, PlanStep, AgentMessage, ReflectionResult, MemoryEntry, HumanApprovalRequest } from "./state.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
 import { CORE_AGENT_NAMES, AGENT_STATUS, PIPELINE_STATUS, RISK_LEVEL, APPROVED_BY, APPROVAL_RESOLUTION, APPROVAL_TYPE, MESSAGE_TYPE, MODE } from "../utils/constants.js";
@@ -439,6 +440,21 @@ Return ONLY valid JSON:
         (b): b is { type: "tool_use"; id: string; name: string; input: Record<string, unknown> } =>
           b.type === "tool_use"
       );
+
+      // Emit step events for all tool calls
+      for (const toolBlock of toolBlocks) {
+        const stepId = `step-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        agentEvents.emitAgentStep(tag, {
+          stepId,
+          tool: toolBlock.name,
+          args: toolBlock.input,
+          expectedOutcome: `Execute ${toolBlock.name}`,
+          reasoning: "",
+          status: "completed",
+          startedAt: Date.now(),
+          completedAt: Date.now(),
+        });
+      }
 
       if (toolBlocks.length === 0 || response.stopReason !== "tool_use") {
         logger.debug(`[${tag}] Tool loop completed after ${iteration} iterations`);

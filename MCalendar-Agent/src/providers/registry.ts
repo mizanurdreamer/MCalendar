@@ -4,7 +4,6 @@ import { OpenAIProvider } from "./openai.js";
 import { GoogleProvider } from "./google.js";
 import { OllamaProvider } from "./ollama.js";
 import { OpenRouterProvider } from "./openrouter.js";
-
 const providerInstances = new Map<string, ProviderInterface>();
 
 export function createProvider(name: string, apiKey: string, model?: string): ProviderInterface {

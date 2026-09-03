@@ -6,10 +6,7 @@ import { JobCard, Markdown } from "./components/JobCard";
 import { LogDrawer } from "./components/LogDrawer";
 import { ToolActivityList } from "./components/LiveLogStream";
 import { HumanApprovalPanel } from "./components/HumanApprovalPanel";
-import { AgentStatusPanel } from "./components/AgentStatusPanel";
-import { AgentPlanPanel } from "./components/AgentPlanPanel";
-import { AgentStepsPanel } from "./components/AgentStepsPanel";
-import { CheckpointPanel } from "./components/CheckpointPanel";
+
 
 type UiMessage =
   | { kind: "text"; id: string; role: "user" | "assistant"; content: string }
@@ -37,7 +34,7 @@ export default function App() {
   const [appConfig, setAppConfig] = useState<Awaited<ReturnType<typeof api.getConfig>> | null>(null);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
 
-  const { connected, logs, jobs, activity, retriesVersion, chatSummaries, currentAgent } = useAgentSocket();
+  const { connected, logs, jobs, activity, retriesVersion, chatSummaries, currentAgent, agentSteps } = useAgentSocket();
   const shownJobsRef = useRef<Set<string>>(new Set());
   const shownSummariesRef = useRef<Set<number>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -184,14 +181,6 @@ export default function App() {
 
       <main className="main">
         <HumanApprovalPanel />
-        
-        {/* Agentic Panels */}
-        <div className="agentic-panels">
-          <AgentStatusPanel />
-          <AgentPlanPanel />
-          <AgentStepsPanel />
-          <CheckpointPanel />
-        </div>
 
         {/* Current Agent Status + Stop Button */}
         {currentAgent && (
@@ -236,7 +225,7 @@ export default function App() {
             ) : (
               jobs.get(msg.jobId) && (
                 <div key={msg.id} className="msg-row msg-job">
-                  <JobCard job={jobs.get(msg.jobId)!} />
+                  <JobCard job={jobs.get(msg.jobId)!} currentAgent={currentAgent} agentSteps={agentSteps} />
                 </div>
               )
             )
