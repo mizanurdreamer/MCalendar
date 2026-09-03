@@ -2,7 +2,7 @@ import type { AgentState, AgentName, AgentPlan, PlanStep, ReflectionResult, Memo
 import { logger } from "../utils/logger.js";
 import type { ProviderInterface } from "../providers/types.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
-import { CORE_AGENT_NAMES, MODE, RISK_LEVEL } from "../utils/constants.js";
+import { CORE_AGENT_NAMES, GRAPH_NODE, MODE, RISK_LEVEL } from "../utils/constants.js";
 
 export interface PlannerConfig {
   enabled: boolean;
@@ -362,7 +362,8 @@ Rules:
       steps.push(
         { id: "analyze", agent: AGENT_NAMES.AGENT_ISSUE_ANALYZER, tool: "analyze_issue", args: {}, expectedOutcome: "Issue analysis", reasoning: "Analyze issue", dependsOn: [], canRunParallel: false },
         { id: "generate", agent: AGENT_NAMES.AGENT_TESTS_GENERATOR, tool: "write_test_file", args: {}, expectedOutcome: "Test file", reasoning: "Generate tests", dependsOn: ["analyze"], canRunParallel: false },
-        { id: "review", agent: AGENT_NAMES.AGENT_TESTS_REVIEWER, tool: "write_test_file", args: {}, expectedOutcome: "Fixed tests", reasoning: "Review and fix", dependsOn: ["generate"], canRunParallel: false },
+        { id: "run_tests", agent: GRAPH_NODE.RUN_TESTS as any, tool: "run_playwright_test", args: {}, expectedOutcome: "Test results", reasoning: "Execute generated tests", dependsOn: ["generate"], canRunParallel: false },
+        { id: "review", agent: AGENT_NAMES.AGENT_TESTS_REVIEWER, tool: "write_test_file", args: {}, expectedOutcome: "Fixed tests", reasoning: "Review and fix", dependsOn: ["run_tests"], canRunParallel: false },
         { id: "report", agent: AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, tool: "generate_report", args: {}, expectedOutcome: "Report", reasoning: "Generate report", dependsOn: ["review"], canRunParallel: true },
         { id: "summarize", agent: AGENT_NAMES.AGENT_SUMMARIZE, tool: "generate_summary", args: {}, expectedOutcome: "Summary", reasoning: "Create summary", dependsOn: ["report"], canRunParallel: false }
       );
@@ -370,7 +371,8 @@ Rules:
       steps.push(
         { id: "analyze", agent: AGENT_NAMES.AGENT_COMMIT_ANALYZER, tool: "analyze_commit", args: {}, expectedOutcome: "Commit analysis", reasoning: "Analyze commit", dependsOn: [], canRunParallel: false },
         { id: "generate", agent: AGENT_NAMES.AGENT_TESTS_GENERATOR, tool: "write_test_file", args: {}, expectedOutcome: "Test file", reasoning: "Generate tests", dependsOn: ["analyze"], canRunParallel: false },
-        { id: "review", agent: AGENT_NAMES.AGENT_TESTS_REVIEWER, tool: "write_test_file", args: {}, expectedOutcome: "Fixed tests", reasoning: "Review and fix", dependsOn: ["generate"], canRunParallel: false },
+        { id: "run_tests", agent: GRAPH_NODE.RUN_TESTS as any, tool: "run_playwright_test", args: {}, expectedOutcome: "Test results", reasoning: "Execute generated tests", dependsOn: ["generate"], canRunParallel: false },
+        { id: "review", agent: AGENT_NAMES.AGENT_TESTS_REVIEWER, tool: "write_test_file", args: {}, expectedOutcome: "Fixed tests", reasoning: "Review and fix", dependsOn: ["run_tests"], canRunParallel: false },
         { id: "report", agent: AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, tool: "generate_report", args: {}, expectedOutcome: "Report", reasoning: "Generate report", dependsOn: ["review"], canRunParallel: true },
         { id: "summarize", agent: AGENT_NAMES.AGENT_SUMMARIZE, tool: "generate_summary", args: {}, expectedOutcome: "Summary", reasoning: "Create summary", dependsOn: ["report"], canRunParallel: false }
       );

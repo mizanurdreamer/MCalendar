@@ -94,7 +94,7 @@ export async function processIssue(
   logger.info(`Fetching issue #${issue.number}: ${issue.title}`);
 
   const defaultBranch = await githubClient.getDefaultBranch();
-  //const baseBranch = config.baseBranch || defaultBranch;
+    //const baseBranch = config.baseBranch || defaultBranch;
   const baseBranch = "main-agentic-ai-v2";
   const branchName = GitBranch.branchName(issue.number, issue.title);
 
@@ -163,123 +163,122 @@ export async function processIssue(
   } catch (err) {
     logger.warn(`[Orchestrator] Branch creation failed, continuing on current branch: ${err}`);
   }
-  
+
   // Apply pipeline-level timeout
   const pipelineTimeoutMs = config.pipelineTimeoutMs ?? 30 * 60 * 1000; // 30 min default
+  let pipelineTimerId: NodeJS.Timeout | undefined;
   const pipelineTimer = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error(`Pipeline timed out after ${pipelineTimeoutMs}ms`)), pipelineTimeoutMs)
+    { pipelineTimerId = setTimeout(() => reject(new Error(`Pipeline timed out after ${pipelineTimeoutMs}ms`)), pipelineTimeoutMs); }
   );
 
   let result: Awaited<ReturnType<typeof graph.invoke>>;
   try {
-    result = await Promise.race([
-      graph.invoke(initialState, { configurable: { thread_id: threadId } }),
-      pipelineTimer,
-    ]);
-  } catch (err) {
-    if (err instanceof Error && err.message.includes("timed out")) {
-      logger.error(`[Orchestrator] Pipeline timed out after ${pipelineTimeoutMs}ms`);
-      result = { ...initialState, status: PIPELINE_STATUS.FAILED, error: err.message };
-    } else {
-      throw err;
-    }
-  }
-
-  // Handle human approval interrupts
-  while (result.status === PIPELINE_STATUS.AWAITING_HUMAN) {
-    const pending = result.humanApprovals?.find(a => !a.resolved);
-    if (!pending) break;
-
-    logger.info(`[Orchestrator] Human approval required: ${pending.title}`);
-    
-    // Auto-approve if commitAutoApprove is true, otherwise reject
-    const resolution = config.commitAutoApprove ? "approve" : "reject";
-    logger.info(`[Orchestrator] Auto-approving: ${config.commitAutoApprove}`);
-    
-    result = await graph.resumeAfterApproval(threadId, resolution);
-  }
-
-  if (result.testResult) {
-    logger.success(
-      `Issue #${issue.number} complete — ${result.testResult.passed} passed, ${result.testResult.failed} failed`
-    );
-  }
-
-  // Commit, push, and create PR if tests passed
-  if (result.testResult?.success && result.testFilename) {
     try {
-      const commitMsg = `test: add E2E tests for issue #${issue.number}`;
-      await git.commitAndPush(commitMsg, branchName, testOutputPath);
-      
-      const pr = await git.createPR(githubClient, {
-        title: `Test: Issue #${issue.number} — ${issue.title}`,
-        body: result.summary ?? `Automated E2E tests for issue #${issue.number}\n\n${result.testResult.passed} tests passed.`,
-        head: branchName,
-        base: baseBranch,
-      });
-      result.prUrl = pr.html_url;
-      logger.success(`[Orchestrator] PR created: ${pr.html_url}`);
+      result = await Promise.race([
+        graph.invoke(initialState, { configurable: { thread_id: threadId } }),
+        pipelineTimer,
+      ]);
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("timed out")) {
+        logger.error(`[Orchestrator] Pipeline timed out after ${pipelineTimeoutMs}ms`);
+        result = { ...initialState, status: PIPELINE_STATUS.FAILED, error: err.message };
+      } else {
+        throw err;
+      }
+    } finally {
+      if (pipelineTimerId !== undefined) clearTimeout(pipelineTimerId);
+    }
 
-      // Update project status to "In review" after successful PR creation
+    // Handle human approval interrupts
+    while (result.status === PIPELINE_STATUS.AWAITING_HUMAN) {
+      const pending = result.humanApprovals?.find(a => !a.resolved);
+      if (!pending) break;
+
+      logger.info(`[Orchestrator] Human approval required: ${pending.title}`);
+      
+      // Auto-approve if commitAutoApprove is true, otherwise reject
+      const resolution = config.commitAutoApprove ? "approve" : "reject";
+      logger.info(`[Orchestrator] Auto-approving: ${config.commitAutoApprove}`);
+      
+      result = await graph.resumeAfterApproval(threadId, resolution);
+    }
+
+    if (result.testResult) {
+      logger.success(
+        `Issue #${issue.number} complete — ${result.testResult.passed} passed, ${result.testResult.failed} failed`
+      );
+    }
+
+    // Commit, push, and create PR if tests passed
+    if (result.testResult?.success && result.testFilename) {
+      try {
+        const commitMsg = `test: add E2E tests for issue #${issue.number}`;
+        await git.commitAndPush(commitMsg, branchName, testOutputPath);
+        
+        const pr = await git.createPR(githubClient, {
+          title: `Test: Issue #${issue.number} — ${issue.title}`,
+          body: result.summary ?? `Automated E2E tests for issue #${issue.number}\n\n${result.testResult.passed} tests passed.`,
+          head: branchName,
+          base: baseBranch,
+        });
+        result.prUrl = pr.html_url;
+        logger.success(`[Orchestrator] PR created: ${pr.html_url}`);
+
+        // Update project status to "In review" after successful PR creation
+        try {
+          const issueNodeId = await githubClient.getIssueNodeId(issue.number);
+          if (issueNodeId) {
+            await githubClient.updateProjectStatus(issueNodeId, "In review");
+            logger.success(`[Orchestrator] Issue #${issue.number} status updated to "In review"`);
+          }
+        } catch (statusErr) {
+          logger.warn(`[Orchestrator] Failed to update issue status: ${statusErr}`);
+        }
+      } catch (err) {
+        logger.error(`[Orchestrator] Failed to commit/push/create PR: ${err}`);
+      }
+    }
+
+    // Update project status to "In progress" when no tests were needed
+    if (result.status === PIPELINE_STATUS.COMPLETED && !result.testFilename) {
       try {
         const issueNodeId = await githubClient.getIssueNodeId(issue.number);
         if (issueNodeId) {
-          await githubClient.updateProjectStatus(issueNodeId, "In review");
-          logger.success(`[Orchestrator] Issue #${issue.number} status updated to "In review"`);
+          await githubClient.updateProjectStatus(issueNodeId, "In progress");
+          logger.success(`[Orchestrator] Issue #${issue.number} status updated to "In progress"`);
         }
       } catch (statusErr) {
         logger.warn(`[Orchestrator] Failed to update issue status: ${statusErr}`);
       }
-    } catch (err) {
-      logger.error(`[Orchestrator] Failed to commit/push/create PR: ${err}`);
+    }
+
+    metrics.endPipeline(
+      result.status === PIPELINE_STATUS.COMPLETED && (result.testResult?.success ?? false) ? "completed" : "failed",
+      result.error
+    );
+
+    return {
+      success: result.status === PIPELINE_STATUS.COMPLETED && (result.testResult ? result.testResult.success : true),
+      output: result.testFilename
+        ? `Pushed to ${result.branchName} with ${result.testResult?.passed ?? 0} tests passed`
+        : `Completed — no tests needed for issue #${issue.number}`,
+      filesWritten: result.testFilename ? [result.testFilename] : [],
+      testsPassed: result.testResult?.passed ?? 0,
+      testsFailed: result.testResult?.failed ?? 0,
+      retries: result.retries,
+      retryHistory: result.retryHistory,
+      report: result.report,
+      reportPath: result.reportPath,
+    };
+  } finally {
+    // Always clean up resources — even on error
+    if (config.playwrightMcpEnabled) {
+      try { await shutdownMcpClient(); } catch { /* ignore */ }
+    }
+    if (appServer) {
+      try { await appServer.stop(); } catch { /* ignore */ }
     }
   }
-
-  // Shutdown Playwright MCP if it was initialized
-  if (config.playwrightMcpEnabled) {
-    try {
-      await shutdownMcpClient();
-    } catch (err) {
-      logger.warn(`[Orchestrator] Failed to shutdown Playwright MCP: ${err}`);
-    }
-  }
-
-  // Stop app server if we started it
-  if (appServer) {
-    await appServer.stop();
-  }
-
-  // Update project status to "In progress" when no tests were needed
-  if (result.status === PIPELINE_STATUS.COMPLETED && !result.testFilename) {
-    try {
-      const issueNodeId = await githubClient.getIssueNodeId(issue.number);
-      if (issueNodeId) {
-        await githubClient.updateProjectStatus(issueNodeId, "In progress");
-        logger.success(`[Orchestrator] Issue #${issue.number} status updated to "In progress"`);
-      }
-    } catch (statusErr) {
-      logger.warn(`[Orchestrator] Failed to update issue status: ${statusErr}`);
-    }
-  }
-
-  metrics.endPipeline(
-    result.status === PIPELINE_STATUS.COMPLETED && (result.testResult?.success ?? false) ? "completed" : "failed",
-    result.error
-  );
-
-  return {
-    success: result.status === PIPELINE_STATUS.COMPLETED && (result.testResult ? result.testResult.success : true),
-    output: result.testFilename
-      ? `Pushed to ${result.branchName} with ${result.testResult?.passed ?? 0} tests passed`
-      : `Completed — no tests needed for issue #${issue.number}`,
-    filesWritten: result.testFilename ? [result.testFilename] : [],
-    testsPassed: result.testResult?.passed ?? 0,
-    testsFailed: result.testResult?.failed ?? 0,
-    retries: result.retries,
-    retryHistory: result.retryHistory,
-    report: result.report,
-    reportPath: result.reportPath,
-  };
 }
 
 function createTaskContext(state: any, agentName: string) {

@@ -77,6 +77,13 @@ export async function initMcpClient(browser = "chromium"): Promise<void> {
 
 async function destroyMcpClient(): Promise<void> {
   try {
+    if (transport) {
+      await (transport as any).close().catch(() => {});
+    }
+  } catch {
+    // ignore close errors
+  }
+  try {
     if (client) {
       await client.close().catch(() => {});
     }

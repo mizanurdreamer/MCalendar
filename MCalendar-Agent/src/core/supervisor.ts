@@ -329,10 +329,10 @@ export class Supervisor {
   async executeDecision(decision: RoutingDecision): Promise<AgentState> {
     switch (decision.action) {
       case ROUTING_ACTION.ROUTE:
-        return this.executeAgent(decision.nextAgent);
+        return this.routeAgent(decision.nextAgent);
 
       case ROUTING_ACTION.PARALLEL:
-        return this.executeParallel(decision.agents);
+        return this.routeAgents(decision.agents);
 
       case ROUTING_ACTION.WAIT:
         logger.info(`[Supervisor] Waiting: ${decision.reason}`);
@@ -365,7 +365,7 @@ export class Supervisor {
     }
   }
 
-  private async executeAgent(agentName: AgentName): Promise<AgentState> {
+  private routeAgent(agentName: AgentName): AgentState {
     const agent = this.agents.get(agentName);
     if (!agent) {
       this.state.status = PIPELINE_STATUS.FAILED;
@@ -374,10 +374,10 @@ export class Supervisor {
     }
 
     this.state.currentAgent = agentName;
-    logger.info(`[Supervisor] Executing agent: ${agentName}`);
+    logger.info(`[Supervisor] Routing to agent: ${agentName}`);
     agentEvents.emitAgentStatus(agentName, "executing");
 
-    // Pass plan context to agent
+    // Pass plan context to agent — the agent node will execute it
     const masterPlan = this.state.plans?.planner;
     const currentStep = masterPlan?.steps[this.currentPlanStepIndex];
     agent.updateTaskContext({
@@ -385,98 +385,29 @@ export class Supervisor {
       overallPlan: masterPlan,
     });
 
-    try {
-      const result = await agent.run();
-      agentEvents.emitAgentStatus(agentName, "completed");
-      return result;
-    } catch (err) {
-      agentEvents.emitAgentStatus(agentName, "failed");
-      this.state.status = PIPELINE_STATUS.FAILED;
-      this.state.error = `Agent ${agentName} failed: ${err}`;
-      logger.error(`[Supervisor] Agent ${agentName} failed: ${err}`);
-      return this.state;
-    }
+    return this.state;
   }
 
-  private async executeParallel(agents: AgentName[]): Promise<AgentState> {
-    logger.info(`[Supervisor] Executing parallel: ${agents.join(", ")}`);
+  private routeAgents(agents: AgentName[]): AgentState {
+    logger.info(`[Supervisor] Routing to agents (sequential): ${agents.join(", ")}`);
     
-    // Pass plan context to all parallel agents
+    // Execute sequentially — parallel state merge has data loss issues
+    // The agent node will run the first agent; subsequent agents routed via supervisor loop
+    const firstAgent = agents[0];
+    this.state.currentAgent = firstAgent;
+    
+    // Pass plan context to agent
     const masterPlan = this.state.plans?.planner;
     const currentStep = masterPlan?.steps[this.currentPlanStepIndex];
-    
-    // Create state copies for each agent to prevent race conditions
-    const stateCopies = agents.map(() => ({ ...this.state }));
-    
-    const promises = agents.map(async (name, index) => {
-      const agent = this.agents.get(name);
-      if (!agent) throw new Error(`Agent not registered: ${name}`);
-      
-      // Pass plan context to agent
+    const agent = this.agents.get(firstAgent);
+    if (agent) {
       agent.updateTaskContext({
         currentPlanStep: currentStep,
         overallPlan: masterPlan,
       });
-      
-      // Run agent with its own state copy
-      const agentState = await agent.run(stateCopies[index]);
-      return { agentName: name, state: agentState };
-    });
-
-    try {
-      const results = await Promise.all(promises);
-      
-      // Merge state changes from all parallel agents
-      for (const { agentName, state: agentState } of results) {
-        this.mergeAgentState(agentName, agentState);
-      }
-      
-      // Reset currentAgent to supervisor after parallel execution
-      this.state.currentAgent = CORE_AGENT_NAMES.SUPERVISOR;
-      
-      return this.state;
-    } catch (err) {
-      this.state.status = PIPELINE_STATUS.FAILED;
-      this.state.error = `Parallel execution failed: ${err}`;
-      return this.state;
-    }
-  }
-
-  private mergeAgentState(agentName: AgentName, agentState: AgentState): void {
-    // Merge key fields that agents modify
-    const mergeFields: (keyof AgentState)[] = [
-      "testFilename", "testContent", "testResult", "report", "reportPath", 
-      "summary", "prUrl", "branchName", "retries", "retryHistory",
-      "projectContext", "issueAnalysis", "commitAnalysis", "status", "error"
-    ];
-    
-    for (const field of mergeFields) {
-      if (agentState[field] !== undefined && agentState[field] !== this.state[field]) {
-        (this.state as any)[field] = agentState[field];
-      }
     }
     
-    // Merge arrays
-    if (agentState.retryHistory.length > this.state.retryHistory.length) {
-      this.state.retryHistory = agentState.retryHistory;
-    }
-    if (agentState.stepHistory.length > this.state.stepHistory.length) {
-      this.state.stepHistory = agentState.stepHistory;
-    }
-    if (agentState.messages.length > this.state.messages.length) {
-      this.state.messages = agentState.messages;
-    }
-    if (agentState.memory.length > this.state.memory.length) {
-      this.state.memory = agentState.memory;
-    }
-    
-    // Merge reflection history
-    for (const [agent, reflections] of Object.entries(agentState.reflectionHistory)) {
-      if (!this.state.reflectionHistory[agent as AgentName]) {
-        this.state.reflectionHistory[agent as AgentName] = [];
-      }
-      this.state.reflectionHistory[agent as AgentName].push(...reflections);
-    }
+    return this.state;
   }
 
   private recordRouting(from: AgentName, decision: RoutingDecision): void {

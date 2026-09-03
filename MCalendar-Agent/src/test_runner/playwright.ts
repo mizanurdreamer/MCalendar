@@ -58,7 +58,7 @@ export class PlaywrightRunner {
         }
 
         if (error) {
-          const output = stdout ?? stderr ?? error.message ?? "";
+          const output = stdout || stderr || error?.message || "";
           logger.error(`[playwright] Test failed (exit code non-zero)`);
           if (output) logger.error(`[playwright] Output: ${output.slice(0, 500)}`);
           resolve(this.parseOutput(output, false));

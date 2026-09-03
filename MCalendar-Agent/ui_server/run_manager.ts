@@ -101,7 +101,26 @@ export class RunManager {
 
   async runIssue(issueNumber: number, opts: JobStartOptions = {}): Promise<JobInfo> {
     const github = this.createGithubClient();
-    const issue = await github.getIssue(issueNumber);
+    let issue: GitHubIssue;
+    try {
+      issue = await github.getIssue(issueNumber);
+    } catch (err) {
+      const job: JobInfo = {
+        id: randomUUID(),
+        type: MODE.ISSUE,
+        label: `Issue #${issueNumber}`,
+        ref: String(issueNumber),
+        status: PIPELINE_STATUS.FAILED,
+        startedAt: Date.now(),
+        finishedAt: Date.now(),
+        error: `Failed to fetch issue: ${err instanceof Error ? err.message : err}`,
+        source: opts.source,
+      };
+      this.history.unshift(job);
+      if (this.history.length > HISTORY_LIMIT) this.history.pop();
+      this.broadcastJob(job);
+      return job;
+    }
 
     const job: JobInfo = {
       id: randomUUID(),
@@ -141,9 +160,28 @@ export class RunManager {
 
   async runCommit(sha: string, branch?: string, opts: JobStartOptions = {}): Promise<JobInfo> {
     const github = this.createGithubClient();
-    const targetBranch =
-      branch ?? this.config.watchBranch ?? (await github.getDefaultBranch());
-    const diff = await github.getCommitDiff(sha);
+    let targetBranch: string;
+    let diff: Awaited<ReturnType<GitHubClient["getCommitDiff"]>>;
+    try {
+      targetBranch = branch ?? this.config.watchBranch ?? (await github.getDefaultBranch());
+      diff = await github.getCommitDiff(sha);
+    } catch (err) {
+      const job: JobInfo = {
+        id: randomUUID(),
+        type: MODE.COMMIT,
+        label: `Commit ${sha.slice(0, 7)}`,
+        ref: sha,
+        status: PIPELINE_STATUS.FAILED,
+        startedAt: Date.now(),
+        finishedAt: Date.now(),
+        error: `Failed to fetch commit: ${err instanceof Error ? err.message : err}`,
+        source: opts.source,
+      };
+      this.history.unshift(job);
+      if (this.history.length > HISTORY_LIMIT) this.history.pop();
+      this.broadcastJob(job);
+      return job;
+    }
 
     const job: JobInfo = {
       id: randomUUID(),

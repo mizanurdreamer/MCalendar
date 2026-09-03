@@ -144,21 +144,26 @@ Return ONLY valid JSON:
       return true;
     }
 
-    // Check if there's already a pending approval for this plan
+    // Check if there's already a resolved approval for this plan
     const existingApproval = s.humanApprovals.find(
-      a => a.agent === this.agentName && a.type === APPROVAL_TYPE.PLAN && !a.resolved
+      a => a.agent === this.agentName && a.type === APPROVAL_TYPE.PLAN && a.resolved
     );
     
     if (existingApproval) {
-      // If already resolved, return the result
-      if (existingApproval.resolved) {
-        plan.approved = existingApproval.resolution === APPROVAL_RESOLUTION.APPROVE;
-        plan.approvedBy = existingApproval.resolution === APPROVAL_RESOLUTION.APPROVE ? APPROVED_BY.HUMAN : APPROVED_BY.SUPERVISOR;
-        return plan.approved;
-      }
-      // If pending but not resolved, wait for resolution
-      logger.warn(`[${this.agentName}] Waiting for human approval (${existingApproval.id})`);
-      return this.waitForApprovalResolution(existingApproval.id, s);
+      plan.approved = existingApproval.resolution === APPROVAL_RESOLUTION.APPROVE;
+      plan.approvedBy = existingApproval.resolution === APPROVAL_RESOLUTION.APPROVE ? APPROVED_BY.HUMAN : APPROVED_BY.SUPERVISOR;
+      return plan.approved;
+    }
+
+    // Check if there's a pending (unresolved) approval — don't create duplicates
+    const pendingApproval = s.humanApprovals.find(
+      a => a.agent === this.agentName && a.type === APPROVAL_TYPE.PLAN && !a.resolved
+    );
+    
+    if (pendingApproval) {
+      // Approval already pending — return false, graph will interrupt and handle resolution
+      logger.warn(`[${this.agentName}] Approval already pending (${pendingApproval.id})`);
+      return false;
     }
 
     // Create new approval request
@@ -185,28 +190,10 @@ Return ONLY valid JSON:
     
     logger.warn(`[${this.agentName}] Awaiting human approval for plan (${request.id})`);
     
-    // Wait for human resolution
-    return this.waitForApprovalResolution(request.id, s);
-  }
-  
-  private async waitForApprovalResolution(approvalId: string, state: AgentState): Promise<boolean> {
-    return new Promise((resolve) => {
-      const checkInterval = setInterval(() => {
-        if (state.abortSignal?.aborted) {
-          clearInterval(checkInterval);
-          logger.info(`[${this.agentName}] Approval wait cancelled — pipeline aborted`);
-          resolve(false);
-          return;
-        }
-        const approval = state.humanApprovals.find(a => a.id === approvalId);
-        if (approval?.resolved) {
-          clearInterval(checkInterval);
-          const approved = approval.resolution === APPROVAL_RESOLUTION.APPROVE;
-          logger.info(`[${this.agentName}] Approval ${approved ? "granted" : "rejected"} (${approvalId})`);
-          resolve(approved);
-        }
-      }, 1000);
-    });
+    // Don't block here — return false so the agent returns,
+    // graph routes to humanApprovalNode which uses LangGraph's interrupt(),
+    // and on resume the agent re-runs finding the resolved approval.
+    return false;
   }
 
   protected getAvailableTools(): ToolDefinition[] {
