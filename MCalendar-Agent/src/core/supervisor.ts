@@ -366,24 +366,29 @@ export class Supervisor {
   }
 
   private routeAgent(agentName: AgentName): AgentState {
-    const agent = this.agents.get(agentName);
-    if (!agent) {
-      this.state.status = PIPELINE_STATUS.FAILED;
-      this.state.error = `Agent not registered: ${agentName}`;
-      return this.state;
+    const graphNodes = [GRAPH_NODE.RUN_TESTS, GRAPH_NODE.HUMAN_APPROVAL, GRAPH_NODE.CRITIC] as string[];
+    const isGraphNode = graphNodes.includes(agentName);
+
+    if (!isGraphNode) {
+      const agent = this.agents.get(agentName);
+      if (!agent) {
+        this.state.status = PIPELINE_STATUS.FAILED;
+        this.state.error = `Agent not registered: ${agentName}`;
+        return this.state;
+      }
+
+      // Pass plan context to agent — the agent node will execute it
+      const masterPlan = this.state.plans?.planner;
+      const currentStep = masterPlan?.steps[this.currentPlanStepIndex];
+      agent.updateTaskContext({
+        currentPlanStep: currentStep,
+        overallPlan: masterPlan,
+      });
     }
 
     this.state.currentAgent = agentName;
     logger.info(`[Supervisor] Routing to agent: ${agentName}`);
     agentEvents.emitAgentStatus(agentName, "executing");
-
-    // Pass plan context to agent — the agent node will execute it
-    const masterPlan = this.state.plans?.planner;
-    const currentStep = masterPlan?.steps[this.currentPlanStepIndex];
-    agent.updateTaskContext({
-      currentPlanStep: currentStep,
-      overallPlan: masterPlan,
-    });
 
     return this.state;
   }

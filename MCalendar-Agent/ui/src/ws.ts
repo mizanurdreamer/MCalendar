@@ -16,7 +16,7 @@ export type WsEvent =
   | { type: "agent:reflection"; agent: string; reflection: any; timestamp: string }
   | { type: "checkpoint:saved"; runId: string; step: number; agent: string; timestamp: string }
   | { type: "human:approval:requested"; request: any }
-  | { type: "human:approval:resolved"; requestId: string; resolution: string; timestamp: string };
+  | { type: "approval:resolved"; approval: { id: string; resolution: string; resolvedAt: number } };
 
 export interface LogEntry {
   id: number;
@@ -240,8 +240,8 @@ export function useAgentSocket() {
           setPendingApprovals((prev) => [...prev, { ...msg.request, requestedAt: Date.now() }]);
           break;
         }
-        case "human:approval:resolved": {
-          setPendingApprovals((prev) => prev.filter(a => a.id !== msg.requestId));
+        case "approval:resolved": {
+          setPendingApprovals((prev) => prev.filter(a => a.id !== msg.approval.id));
           break;
         }
       }

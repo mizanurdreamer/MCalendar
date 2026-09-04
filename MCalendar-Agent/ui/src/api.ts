@@ -61,6 +61,11 @@ export interface ApprovalsResponse {
   approvals: ApprovalRequest[];
 }
 
+export interface RetriesResponse {
+  issues: PendingRetry[];
+  commits: PendingRetry[];
+}
+
 export interface AppConfigResponse {
   repoOwner: string;
   repoName: string;
