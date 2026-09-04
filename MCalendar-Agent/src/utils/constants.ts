@@ -91,11 +91,9 @@ export const AGENT_EVENT = {
   ISSUE_ANALYZED: "issue_analyzed",
   COMMIT_ANALYZED: "commit_analyzed",
   TESTS_GENERATED: "tests_generated",
-  TESTS_FAILED: "tests_failed",
   TESTS_REVIEWED: "tests_reviewed",
   REPORT_GENERATED: "report_generated",
   SUMMARY_CREATED: "summary_created",
-  PIPELINE_COMPLETE: "pipeline_complete",
   CODE_FIXED: "code_fixed",
 } as const;
 

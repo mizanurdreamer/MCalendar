@@ -350,14 +350,6 @@ Use the write_test_file tool to save the test as "${testFilename}".${planContext
     return getToolRegistry().getByRole("tests_generator");
   }
 
-  private async executeTool(name: string, input: Record<string, unknown>): Promise<string> {
-    return getToolRegistry().execute(name, input, {
-      codebasePath: this.taskContext.codebasePath,
-      testOutputPath: this.taskContext.testOutputPath,
-      testProjectPath: this.taskContext.testOutputPath,
-    });
-  }
-
   private async fallbackExtractAndWrite(testFilename: string): Promise<boolean> {
     try {
       // Build context for the fallback LLM call

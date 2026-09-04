@@ -3,7 +3,7 @@ import { BaseAgent } from "../core/base_agent.js";
 import { logger } from "../utils/logger.js";
 import * as path from "node:path";
 import * as fs from "node:fs";
-import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers/registry.js";
+import { getTaskProviderName, getTaskModel } from "../providers/registry.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
 import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL, MESSAGE_TYPE, AGENT_EVENT, CORE_AGENT_NAMES } from "../utils/constants.js";
 import { getToolRegistry } from "../core/tool_registry.js";

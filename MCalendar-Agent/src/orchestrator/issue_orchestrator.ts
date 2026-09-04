@@ -23,7 +23,7 @@ import { AgentCodeFixer } from "../agents/agent_code_fixer.js";
 import { AgentCritic } from "../core/agent_critic.js";
 import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers/registry.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
-import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL } from "../utils/constants.js";
+import { PIPELINE_STATUS, MODE } from "../utils/constants.js";
 import { initMcpClient, shutdownMcpClient } from "../mcp/client.js";
 import { AppServerManager } from "../utils/app_server.js";
 

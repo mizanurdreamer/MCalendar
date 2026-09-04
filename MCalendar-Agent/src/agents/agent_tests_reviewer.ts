@@ -5,7 +5,7 @@ import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers
 import { AGENT_NAMES } from "../utils/agent_names.js";
 import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL, MESSAGE_TYPE, AGENT_EVENT, CORE_AGENT_NAMES } from "../utils/constants.js";
 import { getToolRegistry } from "../core/tool_registry.js";
-import { isMcpTool, callMcpTool, isMcpAlive } from "../mcp/client.js";
+import { callMcpTool, isMcpAlive } from "../mcp/client.js";
 import type { ToolDefinition } from "../providers/types.js";
 
 export class AgentTestsReviewer extends BaseAgent {
@@ -546,13 +546,5 @@ Use tools to investigate the root cause, then call submit_analysis with your fix
 
   protected getAvailableTools(): ToolDefinition[] {
     return getToolRegistry().getByRole("tests_reviewer");
-  }
-
-  private async executeTool(name: string, input: Record<string, unknown>): Promise<string> {
-    return getToolRegistry().execute(name, input, {
-      codebasePath: this.taskContext.codebasePath,
-      testOutputPath: this.taskContext.testOutputPath,
-      testProjectPath: this.taskContext.testOutputPath,
-    });
   }
 }

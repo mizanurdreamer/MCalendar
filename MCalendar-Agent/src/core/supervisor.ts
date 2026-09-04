@@ -4,7 +4,7 @@ import { logger } from "../utils/logger.js";
 import { metrics } from "./metrics.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
 import { agentEvents } from "./agent_events.js";
-import { CORE_AGENT_NAMES, GRAPH_NODE, ROUTING_ACTION, PIPELINE_STATUS, MODE, APPROVAL_RESOLUTION, APPROVED_BY } from "../utils/constants.js";
+import { CORE_AGENT_NAMES, GRAPH_NODE, ROUTING_ACTION, PIPELINE_STATUS, MODE } from "../utils/constants.js";
 
 export type RoutingDecision = 
   | { action: typeof ROUTING_ACTION.ROUTE; nextAgent: AgentName; reason: string; planStep?: PlanStep }
@@ -420,18 +420,5 @@ export class Supervisor {
       decision,
       timestamp: Date.now(),
     });
-  }
-
-  getRoutingHistory() {
-    return this.routingHistory;
-  }
-
-  resolveApproval(requestId: string, resolution: string): void {
-    const request = this.state.humanApprovals.find(a => a.id === requestId);
-    if (request) {
-      request.resolved = true;
-      request.resolution = resolution;
-      logger.info(`[Supervisor] Approval ${requestId} resolved: ${resolution}`);
-    }
   }
 }

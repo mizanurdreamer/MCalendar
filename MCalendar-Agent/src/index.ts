@@ -8,24 +8,13 @@ import { StateManager } from "./watcher/issue_state_tracker.js";
 import { CommitStateManager } from "./watcher/commit_state_tracker.js";
 import { logger } from "./utils/logger.js";
 import { createAgenticGraph } from "./core/graph.js";
-import { createInitialAgentState } from "./core/state.js";
-import { AgentIssueAnalyzer } from "./agents/agent_issue_analyzer.js";
-import { AgentTestsGenerator } from "./agents/agent_tests_generator.js";
-import { AgentTestsReviewer } from "./agents/agent_tests_reviewer.js";
-import { AgentTestsReportGenerator } from "./agents/agent_tests_report_generator.js";
-import { AgentSummarize } from "./agents/agent_summarize.js";
-import { AgentCommitAnalyzer } from "./agents/agent_commit_analyzer.js";
-import { AgentCritic } from "./core/agent_critic.js";
 import { getTaskProvider, getTaskProviderName, getTaskModel } from "./providers/registry.js";
 import { AGENT_NAMES } from "./utils/agent_names.js";
 import { CodebaseReader } from "./codebase/reader.js";
 import { PlaywrightRunner } from "./test_runner/playwright.js";
 import { GitBranch } from "./github/git_operations.js";
 import path from "node:path";
-import { setDiagnosticConfig } from "./utils/diagnostic_tools.js";
-import { setDatabaseUrl } from "./utils/database_tools.js";
 import { setupGlobalErrorHandlers } from "./utils/errors.js";
-import { initMcpClient, shutdownMcpClient } from "./mcp/client.js";
 
 setupGlobalErrorHandlers();
 

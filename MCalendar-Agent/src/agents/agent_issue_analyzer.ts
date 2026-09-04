@@ -148,14 +148,6 @@ When you have enough information, call submit_analysis with your complete analys
     return getToolRegistry().getByRole("issue_analyzer");
   }
 
-  private async executeTool(name: string, input: Record<string, unknown>): Promise<string> {
-    return getToolRegistry().execute(name, input, {
-      codebasePath: this.taskContext.codebasePath,
-      testOutputPath: this.taskContext.testOutputPath,
-      testProjectPath: this.taskContext.testOutputPath,
-    });
-  }
-
   private async exploreProject(): Promise<string> {
     const projectInfo: string[] = [];
     const reader = this.taskContext.reader;

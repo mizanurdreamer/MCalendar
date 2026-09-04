@@ -5,7 +5,7 @@ import { logger } from "./logger.js";
 
 const CACHE_DIR = path.join(process.cwd(), ".cache", "repos");
 
-export function isRepoUrl(input: string): boolean {
+function isRepoUrl(input: string): boolean {
   return /^(https?:\/\/|git@)/.test(input);
 }
 
@@ -18,7 +18,7 @@ function extractProjectName(input: string): string {
   return lastSegment || "project";
 }
 
-export function extractOwnerRepo(url: string): { owner: string; repo: string } | null {
+function extractOwnerRepo(url: string): { owner: string; repo: string } | null {
   // https://github.com/owner/repo → { owner: "owner", repo: "repo" }
   // git@github.com:owner/repo.git → { owner: "owner", repo: "repo" }
   const httpsMatch = url.match(/https?:\/\/github\.com\/([^/]+)\/([^/]+)/);

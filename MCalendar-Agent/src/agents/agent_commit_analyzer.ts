@@ -127,14 +127,6 @@ When you have enough information, call submit_commit_analysis with your complete
     return getToolRegistry().getByRole("commit_analyzer");
   }
 
-  private async executeTool(name: string, input: Record<string, unknown>): Promise<string> {
-    return getToolRegistry().execute(name, input, {
-      codebasePath: this.taskContext.codebasePath,
-      testOutputPath: this.taskContext.testOutputPath,
-      testProjectPath: this.taskContext.testOutputPath,
-    });
-  }
-
   private async exploreChangedFiles(files: { filename: string }[]): Promise<string> {
     const projectInfo: string[] = [];
     const reader = this.taskContext.reader;
