@@ -1,5 +1,6 @@
 import type { MemoryEntry, AgentName } from "./state.js";
 import { logger } from "../utils/logger.js";
+import { MEMORY_TYPE } from "../utils/constants.js";
 
 export interface MemoryStore {
   initialize(): Promise<void>;
@@ -55,8 +56,8 @@ export class InMemoryStore implements MemoryStore {
   }
 }
 
-export function createMemoryStore(type: "local" | "postgres" = "local", databaseUrl?: string): MemoryStore {
-  if (type === "postgres") {
+export function createMemoryStore(type: typeof MEMORY_TYPE[keyof typeof MEMORY_TYPE] = MEMORY_TYPE.LOCAL, databaseUrl?: string): MemoryStore {
+  if (type === MEMORY_TYPE.POSTGRES) {
     const { PostgresMemoryStore } = require("./postgres_memory.js");
     return new PostgresMemoryStore(databaseUrl);
   }

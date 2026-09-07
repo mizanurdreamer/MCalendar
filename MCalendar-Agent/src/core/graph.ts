@@ -10,10 +10,10 @@ import { MessageBus } from "./message_bus.js";
 import { logger } from "../utils/logger.js";
 import { Command, interrupt } from "@langchain/langgraph";
 import { AGENT_NAMES } from "../utils/agent_names.js";
-import { CORE_AGENT_NAMES, GRAPH_NODE, MODE, PIPELINE_STATUS, ROUTING_ACTION } from "../utils/constants.js";
+import { CORE_AGENT_NAMES, GRAPH_NODE, MODE, PIPELINE_STATUS, ROUTING_ACTION, MEMORY_TYPE } from "../utils/constants.js";
 
 export interface AgenticGraphConfig {
-  memoryType: "local" | "postgres";
+  memoryType: typeof MEMORY_TYPE[keyof typeof MEMORY_TYPE];
   databaseUrl?: string;
   agentMemoryDatabaseUrl?: string;
   enableCritic: boolean;
@@ -81,7 +81,7 @@ export class AgenticGraph {
 
   constructor(config: Partial<AgenticGraphConfig> = {}) {
     this.config = {
-      memoryType: "local",
+      memoryType: MEMORY_TYPE.LOCAL,
       enableCritic: true,
       enableHumanGates: true,
       maxParallelAgents: 3,

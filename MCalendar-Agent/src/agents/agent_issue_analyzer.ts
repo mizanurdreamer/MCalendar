@@ -148,33 +148,6 @@ When you have enough information, call submit_analysis with your complete analys
     return getToolRegistry().getByRole("issue_analyzer");
   }
 
-  private async exploreProject(): Promise<string> {
-    const projectInfo: string[] = [];
-    const reader = this.taskContext.reader;
-
-    try {
-      const rootEntries = reader.listDirectory(".");
-      projectInfo.push(`Project root: ${rootEntries.join(", ")}`);
-
-      const srcEntries = reader.listDirectory("src");
-      if (srcEntries) projectInfo.push(`src/: ${srcEntries.join(", ")}`);
-
-      const appEntries = reader.listDirectory("app");
-      if (appEntries) projectInfo.push(`app/: ${appEntries.join(", ")}`);
-
-      const pkgContent = reader.readFile("package.json");
-      if (pkgContent && !pkgContent.startsWith("Error")) {
-        const pkg = JSON.parse(pkgContent);
-        const deps = Object.keys(pkg.dependencies ?? {}).slice(0, 15);
-        projectInfo.push(`Dependencies: ${deps.join(", ")}`);
-      }
-    } catch (err) {
-      logger.warn(`[AgentIssueAnalyzer] Project exploration failed: ${err}`);
-    }
-
-    return projectInfo.join("\n\n");
-  }
-
   async run(inputState?: AgentState): Promise<AgentState> {
     const state = inputState || this.state;
     if (!state.issue) {
@@ -216,12 +189,40 @@ When you have enough information, call submit_analysis with your complete analys
       logger.warn(`[AgentIssueAnalyzer] MCP exploration skipped: ${err}`);
     }
 
-    // Explore project structure
+    // Explore project structure and discover context
     let projectExploration = "";
     try {
-      projectExploration = await this.exploreProject();
+      const { discoverProjectContext, saveProjectContextToDisk, loadProjectContextFromDisk, generateProjectExplorationText } = await import("../core/project_context.js");
+      const cached = loadProjectContextFromDisk(state.projectName, undefined, state.codebasePath);
+      if (cached) {
+        state.projectContext = cached;
+        projectExploration = generateProjectExplorationText(cached);
+        logger.info(`[AgentIssueAnalyzer] Loaded cached project context`);
+      } else {
+        const projectContext = await discoverProjectContext(
+          this.taskContext.reader,
+          state.codebasePath,
+          state.testProjectPath
+        );
+        saveProjectContextToDisk(projectContext, state.projectName);
+        state.projectContext = projectContext;
+        projectExploration = generateProjectExplorationText(projectContext);
+        // Store in memory for cross-run recall
+        this.remember({
+          type: "project_context",
+          content: JSON.stringify(projectContext),
+          metadata: {
+            project: state.projectName,
+            agent: this.agentName,
+            success: true,
+            tags: ["project_context", "framework", "test-runner", state.projectName],
+            source: "project-discovery",
+          },
+        });
+        logger.info(`[AgentIssueAnalyzer] Project context discovered and saved`);
+      }
     } catch (err) {
-      logger.warn(`[AgentIssueAnalyzer] Project exploration skipped: ${err}`);
+      logger.warn(`[AgentIssueAnalyzer] Project context save failed: ${err}`);
     }
 
     try {

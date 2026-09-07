@@ -7,7 +7,7 @@ import { checkForNewCommits } from "./commit_orchestrator_watcher.js";
 import { CommitStateManager } from "./commit_state_tracker.js";
 import { StateManager } from "./issue_state_tracker.js";
 import { logger } from "../utils/logger.js";
-import { PIPELINE_STATUS } from "../utils/constants.js";
+import { PIPELINE_STATUS, MEMORY_TYPE } from "../utils/constants.js";
 
 interface RunOutcome {
   ok: boolean;
@@ -33,7 +33,7 @@ export interface WatcherConfig {
   commitAutoApprove?: boolean;
   playwrightMcpEnabled?: boolean;
   playwrightMcpBrowser?: string;
-  memoryType?: "local" | "postgres";
+  memoryType?: typeof MEMORY_TYPE[keyof typeof MEMORY_TYPE];
 }
 
 export async function startWatcher(config: WatcherConfig): Promise<void> {

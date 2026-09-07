@@ -23,7 +23,7 @@ import { AgentCodeFixer } from "../agents/agent_code_fixer.js";
 import { AgentCritic } from "../core/agent_critic.js";
 import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers/registry.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
-import { PIPELINE_STATUS, MODE } from "../utils/constants.js";
+import { PIPELINE_STATUS, MODE, MEMORY_TYPE } from "../utils/constants.js";
 import { initMcpClient, shutdownMcpClient } from "../mcp/client.js";
 import { AppServerManager } from "../utils/app_server.js";
 
@@ -46,7 +46,7 @@ export interface CommitOrchestratorConfig {
   playwrightMcpBrowser?: string;
   playwrightWorkers?: number;
   pipelineTimeoutMs?: number;
-  memoryType?: "local" | "postgres";
+  memoryType?: typeof MEMORY_TYPE[keyof typeof MEMORY_TYPE];
   abortSignal?: AbortSignal;
   codeFixMaxRetries?: number;
 }
@@ -127,7 +127,7 @@ export async function processCommit(
   });
 
   const graph = createAgenticGraph({
-    memoryType: config.memoryType || "local",
+    memoryType: config.memoryType || MEMORY_TYPE.LOCAL,
     agentMemoryDatabaseUrl: config.agentMemoryDatabaseUrl,
     enableCritic: true,
     enableHumanGates: !config.commitAutoApprove,

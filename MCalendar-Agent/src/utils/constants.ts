@@ -102,3 +102,9 @@ export const APPROVED_BY = {
   HUMAN: "human",
   SUPERVISOR: "supervisor",
 } as const;
+
+// --- Memory Store Type ---
+export const MEMORY_TYPE = {
+  LOCAL: "local",
+  POSTGRES: "postgres",
+} as const;

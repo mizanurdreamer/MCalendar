@@ -3,6 +3,7 @@ import path from "node:path";
 import dotenv from "dotenv";
 import type { AgentConfig } from "../providers/types.js";
 import { resolveProjectPath } from "../utils/repo_resolver.js";
+import { MEMORY_TYPE } from "../utils/constants.js";
 
 const DEFAULT_MODELS: Record<string, string> = {
   anthropic: "claude-haiku-4-5",
@@ -51,7 +52,7 @@ export interface AppConfig {
   playwrightMcpEnabled: boolean;
   playwrightMcpBrowser: string;
   playwrightWorkers: number;
-  memoryType: "local" | "postgres";
+  memoryType: typeof MEMORY_TYPE[keyof typeof MEMORY_TYPE];
   codeFixMaxRetries: number;
 }
 
@@ -95,14 +96,13 @@ export function loadConfig(): AppConfig {
 
   const githubToken = process.env.GITHUB_TOKEN;
   const projectPath = process.env.PROJECT_PATH;
-  const testProjectPath = process.env.TEST_PROJECT_PATH;
+  const testProjectPath = process.env.TEST_PROJECT_PATH || process.env.PROJECT_PATH;
 
   if (!githubToken) throw new Error("Missing required env var: GITHUB_TOKEN");
   if (!projectPath) throw new Error("Missing required env var: PROJECT_PATH");
-  if (!testProjectPath) throw new Error("Missing required env var: TEST_PROJECT_PATH");
 
   const project = resolveProjectPath(projectPath);
-  const testProject = resolveProjectPath(testProjectPath);
+  const testProject = resolveProjectPath(testProjectPath!);
 
   // Derive repoOwner/repoName from PROJECT_PATH if URL, otherwise require env vars
   let repoOwner: string;
@@ -151,7 +151,14 @@ export function loadConfig(): AppConfig {
     playwrightMcpEnabled: (process.env.PLAYWRIGHT_MCP_ENABLED ?? "false").toLowerCase() === "true",
     playwrightMcpBrowser: process.env.PLAYWRIGHT_MCP_BROWSER ?? "chromium",
     playwrightWorkers: parseInt(process.env.PLAYWRIGHT_WORKERS ?? "6", 10),
-    memoryType: (process.env.MEMORY_TYPE ?? "local") as "local" | "postgres",
+    memoryType: normalizeMemoryType(process.env.MEMORY_TYPE),
     codeFixMaxRetries: parseInt(process.env.CODE_FIX_MAX_RETRIES ?? "2", 10),
   };
+}
+
+function normalizeMemoryType(type?: string): typeof MEMORY_TYPE[keyof typeof MEMORY_TYPE] {
+  if (!type) return MEMORY_TYPE.LOCAL;
+  const normalized = type.toLowerCase().trim();
+  if (normalized === "persistent" || normalized === "postgres") return MEMORY_TYPE.POSTGRES;
+  return MEMORY_TYPE.LOCAL;
 }

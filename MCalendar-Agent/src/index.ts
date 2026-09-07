@@ -10,6 +10,7 @@ import { logger } from "./utils/logger.js";
 import { createAgenticGraph } from "./core/graph.js";
 import { getTaskProvider, getTaskProviderName, getTaskModel } from "./providers/registry.js";
 import { AGENT_NAMES } from "./utils/agent_names.js";
+import { MEMORY_TYPE } from "./utils/constants.js";
 import { CodebaseReader } from "./codebase/reader.js";
 import { PlaywrightRunner } from "./test_runner/playwright.js";
 import { GitBranch } from "./github/git_operations.js";
@@ -452,7 +453,7 @@ program
 
       // We need to resume an existing graph - create a minimal graph to resume
       const graph = createAgenticGraph({
-        memoryType: "local",
+        memoryType: MEMORY_TYPE.LOCAL,
         enableCritic: true,
         enableHumanGates: true,
         maxParallelAgents: 3,
