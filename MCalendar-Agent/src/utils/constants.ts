@@ -36,14 +36,12 @@ export const ROUTING_ACTION = {
 // --- Core Agent Names (non-worker agents) ---
 export const CORE_AGENT_NAMES = {
   SUPERVISOR: "supervisor",
-  CRITIC: "critic",
   PLANNER: "planner",
 } as const;
 
 // --- Graph Node Names ---
 export const GRAPH_NODE = {
   SUPERVISOR: "supervisor",
-  CRITIC: "critic",
   HUMAN_APPROVAL: "human_approval",
   RUN_TESTS: "run_tests",
 } as const;

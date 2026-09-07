@@ -57,7 +57,7 @@ Commander parses command
 processIssue(issue, config)
   -> creates readers, runner, git, tool registry
   -> starts AppServer + Playwright MCP (if enabled)
-  -> creates AgenticGraph, registers 6 agents + 5 critics
+  -> creates AgenticGraph, registers 6 agents
   -> creates test branch (git checkout -b)
   -> graph.invoke(initialState) -- starts pipeline
   -> handles human approval interrupts
@@ -70,7 +70,6 @@ processIssue(issue, config)
 ```
 START -> SUPERVISOR -> (routes to agent) -> agent runs -> back to SUPERVISOR
                      -> (routes to run_tests) -> runs tests -> back to SUPERVISOR
-                     -> (routes to critic) -> evaluates -> back to SUPERVISOR
                      -> (routes to humanApproval) -> interrupt -> back to SUPERVISOR
                      -> COMPLETE or FAIL -> END
 ```
@@ -91,7 +90,7 @@ Each agent's `run()` method:
    - LLM returns tool calls
    - Executes tools via ToolRegistry
    - Loops until LLM stops calling tools
-3. Self-reflects via `reflect()` (LLM critic scores output)
+3. Self-reflects via `reflect()` (LLM evaluates output)
 4. Records reflection to memory
 5. Returns updated AgentState
 
@@ -131,7 +130,7 @@ PlaywrightRunner.run(filename, signal)
 | base_agent.ts | Base class for all agents. Provides tool loop, reflection, memory, messaging. |
 | state.ts | Defines AgentState and all shared types. |
 | planner.ts | LLM-powered execution plan generator. |
-| agent_critic.ts | Evaluates agent output quality, produces revisions. |
+
 | memory.ts | In-memory + PostgreSQL memory store for cross-run learning. |
 | postgres_memory.ts | PostgreSQL memory implementation with full-text search. |
 | message_bus.ts | In-process pub/sub for inter-agent communication. |

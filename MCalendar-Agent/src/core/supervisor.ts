@@ -366,7 +366,7 @@ export class Supervisor {
   }
 
   private routeAgent(agentName: AgentName): AgentState {
-    const graphNodes = [GRAPH_NODE.RUN_TESTS, GRAPH_NODE.HUMAN_APPROVAL, GRAPH_NODE.CRITIC] as string[];
+    const graphNodes = [GRAPH_NODE.RUN_TESTS, GRAPH_NODE.HUMAN_APPROVAL] as string[];
     const isGraphNode = graphNodes.includes(agentName);
 
     if (!isGraphNode) {

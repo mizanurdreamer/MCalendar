@@ -20,7 +20,6 @@ import { AgentTestsReviewer } from "../agents/agent_tests_reviewer.js";
 import { AgentTestsReportGenerator } from "../agents/agent_tests_report_generator.js";
 import { AgentSummarize } from "../agents/agent_summarize.js";
 import { AgentCodeFixer } from "../agents/agent_code_fixer.js";
-import { AgentCritic } from "../core/agent_critic.js";
 import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers/registry.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
 import { PIPELINE_STATUS, MODE, MEMORY_TYPE } from "../utils/constants.js";
@@ -134,7 +133,6 @@ export async function processIssue(
   const graph = createAgenticGraph({
     memoryType: config.memoryType || MEMORY_TYPE.LOCAL,
     agentMemoryDatabaseUrl: config.agentMemoryDatabaseUrl,
-    enableCritic: true,
     enableHumanGates: !config.commitAutoApprove,
     maxParallelAgents: 3,
   });
@@ -147,12 +145,6 @@ export async function processIssue(
   graph.registerAgent(AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, new AgentTestsReportGenerator(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR)));
   graph.registerAgent(AGENT_NAMES.AGENT_SUMMARIZE, new AgentSummarize(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_SUMMARIZE)));
   graph.registerAgent(AGENT_NAMES.AGENT_CODE_FIXER, new AgentCodeFixer(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_CODE_FIXER)));
-
-  graph.registerCritic(AGENT_NAMES.AGENT_ISSUE_ANALYZER, new AgentCritic(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_ISSUE_ANALYZER), AGENT_NAMES.AGENT_ISSUE_ANALYZER));
-  graph.registerCritic(AGENT_NAMES.AGENT_TESTS_GENERATOR, new AgentCritic(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_TESTS_GENERATOR), AGENT_NAMES.AGENT_TESTS_GENERATOR));
-  graph.registerCritic(AGENT_NAMES.AGENT_TESTS_REVIEWER, new AgentCritic(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_TESTS_REVIEWER), AGENT_NAMES.AGENT_TESTS_REVIEWER));
-  graph.registerCritic(AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, new AgentCritic(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR), AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR));
-  graph.registerCritic(AGENT_NAMES.AGENT_SUMMARIZE, new AgentCritic(initialState, createTaskContext(initialState, AGENT_NAMES.AGENT_SUMMARIZE), AGENT_NAMES.AGENT_SUMMARIZE));
 
   // Run with thread_id for checkpointing
   const threadId = runId;

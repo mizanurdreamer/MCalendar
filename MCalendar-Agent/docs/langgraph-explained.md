@@ -263,7 +263,7 @@ private async humanApprovalNode(state: AgentState) {
 ├──────────────────────────────────────────────────────────────┤
 │  Nodes: Supervisor, IssueAnalyzer, TestsGenerator,          │
 │         RunTests, TestsReviewer, TestsReportGenerator,      │
-│         Summarize, Critic, HumanApproval                    │
+│         Summarize, HumanApproval                            │
 │                                                              │
 │  Edges: Supervisor → Agent → Supervisor (loop)              │
 │         Conditional routing based on state                  │

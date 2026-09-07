@@ -454,7 +454,6 @@ program
       // We need to resume an existing graph - create a minimal graph to resume
       const graph = createAgenticGraph({
         memoryType: MEMORY_TYPE.LOCAL,
-        enableCritic: true,
         enableHumanGates: true,
         maxParallelAgents: 3,
       });

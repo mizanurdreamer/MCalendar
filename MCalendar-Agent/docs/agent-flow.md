@@ -8,7 +8,7 @@
 4. [Commit Mode Pipeline](#commit-mode-pipeline)
 5. [Agent Details](#agent-details)
 6. [Supervisor Routing](#supervisor-routing)
-7. [Critic and Reflection System](#critic-and-reflection-system)
+7. [Reflection System](#reflection-system)
 8. [Planner System](#planner-system)
 9. [Memory System](#memory-system)
 10. [Message Bus](#message-bus)
@@ -45,7 +45,6 @@ Agent Nodes:
     +-- CodeFixer
     +-- TestsReportGenerator
     +-- Summarize
-    +-- Critic (Per-Agent)
     +-- HumanApproval (Built-in Node)
 ```
 
@@ -65,7 +64,6 @@ AGENT_NAMES = {
 
 CORE_AGENT_NAMES = {
   SUPERVISOR: "supervisor",
-  CRITIC:     "critic",
   PLANNER:    "planner",
 }
 ```
@@ -106,7 +104,7 @@ Two orchestrator functions serve as entry points:
 - Initializes tools via `registerAllTools()`
 - Optionally starts the app server and Playwright MCP browser
 - Creates initial state via `createInitialAgentState()` with `mode: MODE.ISSUE`
-- Builds the `AgenticGraph` with 5 registered agents + 5 critics
+- Builds the `AgenticGraph` with 6 agents
 - Creates a git branch from `main-agentic-ai-v2`
 - Invokes the graph with a pipeline-level timeout (default: 30 minutes)
 - Handles human approval interrupts via a `while` loop
@@ -127,10 +125,9 @@ The `AgenticGraph` class wraps LangGraph's `StateGraph`:
 
 ```
 START -> supervisor
-supervisor -> (conditional) -> any agent node / critic / run_tests / human_approval / END
+supervisor -> (conditional) -> any agent node / run_tests / human_approval / END
 every agent node -> supervisor
 run_tests -> supervisor
-critic -> supervisor
 human_approval -> supervisor
 ```
 
@@ -687,13 +684,9 @@ When the supervisor decides, it mutates the state in-place:
 
 ---
 
-## Critic and Reflection System
+## Reflection System
 
-### Two-Level Critique
-
-The system has two levels of quality evaluation:
-
-#### 1. Self-Reflection (in BaseAgent)
+### Self-Reflection (in BaseAgent)
 
 Every agent calls `this.reflect()` after completing its work:
 
@@ -709,35 +702,6 @@ protected async reflect(output: string): Promise<ReflectionResult> {
 - Reflection result stored in `state.reflectionHistory[agentName]`
 - Also stored in memory as a `lesson_learned` entry for cross-run learning
 
-#### 2. External Critic (AgentCritic)
-
-Each agent has a dedicated `AgentCritic` instance registered in the graph:
-
-```typescript
-graph.registerCritic(AGENT_NAMES.AGENT_TESTS_GENERATOR, 
-  new AgentCritic(state, taskContext, AGENT_NAMES.AGENT_TESTS_GENERATOR));
-```
-
-**Critic Flow** (invoked in `agentNode()` after agent completes):
-1. Get the agent's output (`testContent`, `report`, or `summary`)
-2. Call `critic.critiqueWithRevision(output, { goal, agent })`
-3. Critic evaluates using LLM with verification:
-   - Reads the test file from disk to verify structure
-   - Checks for imports, test() calls, expect() assertions, describe blocks
-   - For test files: actually runs the test to verify it works
-   - For reports: checks for sections
-4. If score < 70 and `shouldRevise` is true:
-   - Critic generates `revisedOutput`
-   - Verification step runs the revised test
-   - If verified, the revised output replaces the agent's output in state
-5. Up to `maxRevisions` (2) iterations
-
-**Verification Logic** (`verifyRevisedOutput()`):
-- For test files: checks imports, test() calls, expect(), describe blocks, brace matching, then runs the test
-- For reports: checks for minimum sections
-- For summaries: checks minimum length (50 chars)
-- Partial improvement accepted if >70% tests pass
-
 ### Replanning Triggers
 
 The supervisor checks for replanning in `checkReplanTriggers()`:
@@ -748,7 +712,7 @@ The supervisor checks for replanning in `checkReplanTriggers()`:
 4. **Declining reflection scores**: Score dropped by >15 points between consecutive reflections
 
 When replanning is triggered:
-1. Collect all critic feedback from `reflectionHistory`
+1. Collect all reflection feedback from `reflectionHistory`
 2. Call `planner.generateRevisedPlan()` with feedback
 3. Reset `planStepIndex` to 0
 4. The supervisor follows the revised plan on the next cycle
@@ -1200,7 +1164,7 @@ Orchestrator: processIssue(issue, config)
   1. Infrastructure setup (reader, runner, git, tools, MCP)
   2. createInitialAgentState(mode=ISSUE)
   3. createAgenticGraph()
-  4. Register 6 agents + 6 critics
+   4. Register 6 agents
   5. Generate master plan (AdvancedPlanner)
   6. Create git branch
   7. graph.invoke(initialState)
@@ -1208,29 +1172,29 @@ Orchestrator: processIssue(issue, config)
      +-> Supervisor routes to IssueAnalyzer
      +-> IssueAnalyzer explores app, reads code, analyzes issue
      +-> IssueAnalyzer reflects, sends messages, returns
-     +-> [Critic evaluates IssueAnalyzer output]
+
      +-> Supervisor routes to TestsGenerator
      +-> TestsGenerator explores DOM, reads source, generates tests
      +-> TestsGenerator writes test file to disk
      +-> TestsGenerator reflects, returns
-     +-> [Critic evaluates test content]
+
      +-> Supervisor routes to run_tests
      +-> run_tests executes Playwright, returns testResult
      +-> Supervisor routes to TestsReviewer
      +-> TestsReviewer analyzes errors, classifies fixes by scope
      +-> TestsReviewer applies test-scope fixes, populates targetCodeIssues
      +-> TestsReviewer reflects, returns
-     +-> [Critic evaluates fix quality]
+
      +-> Supervisor routes to CodeFixer (if targetCodeIssues exist)
      +-> CodeFixer reads source, fixes app bugs via write_source_file
      +-> Supervisor routes to run_tests (re-verify after fix)
      +-> ... (code fix loop until pass or CODE_FIX_MAX_RETRIES exhausted)
      +-> Supervisor routes to TestsReportGenerator
      +-> TestsReportGenerator generates markdown report
-     +-> [Critic evaluates report]
+
      +-> Supervisor routes to Summarize
      +-> Summarize creates GitHub comment
-     +-> [Critic evaluates summary]
+
      +-> Supervisor returns COMPLETE
   8. Handle human approvals (if any)
   9. Commit, push, create PR
@@ -1246,7 +1210,7 @@ Orchestrator: processCommit(diff, config)
   1. Infrastructure setup
   2. createInitialAgentState(mode=COMMIT)
   3. createAgenticGraph()
-  4. Register agents (CommitAnalyzer instead of IssueAnalyzer) + critics
+   4. Register agents (CommitAnalyzer instead of IssueAnalyzer)
   5. Generate master plan
   6. Create git branch (test/commit-{shortSha})
   7. graph.invoke(initialState)

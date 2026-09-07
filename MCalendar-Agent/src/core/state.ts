@@ -19,7 +19,6 @@ import {
 
 export type AgentName =
   | typeof CORE_AGENT_NAMES.SUPERVISOR
-  | typeof CORE_AGENT_NAMES.CRITIC
   | typeof CORE_AGENT_NAMES.PLANNER
   | (typeof AGENT_NAMES)[keyof typeof AGENT_NAMES];
 
@@ -252,7 +251,6 @@ export function createInitialAgentState(input: {
 }): AgentState {
   const agentNames: AgentName[] = [
     CORE_AGENT_NAMES.SUPERVISOR,
-    CORE_AGENT_NAMES.CRITIC,
     CORE_AGENT_NAMES.PLANNER,
     AGENT_NAMES.AGENT_ISSUE_ANALYZER,
     AGENT_NAMES.AGENT_COMMIT_ANALYZER,

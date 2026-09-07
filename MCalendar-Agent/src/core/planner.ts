@@ -111,26 +111,26 @@ export class AdvancedPlanner {
   }
 
   /**
-   * Generate a revised plan based on critic feedback from previous execution
+   * Generate a revised plan based on feedback from previous execution
    */
   async generateRevisedPlan(
     goal: string, 
     availableAgents: AgentName[], 
-    criticFeedback: CriticFeedback[],
+    executionFeedback: CriticFeedback[],
     failedAgent?: AgentName
   ): Promise<AgentPlan> {
     if (!this.config.enabled) {
       return this.getDefaultPlan(goal);
     }
 
-    const feedbackSummary = this.formatCriticFeedback(criticFeedback, failedAgent);
+    const feedbackSummary = this.formatExecutionFeedback(executionFeedback, failedAgent);
     const prompt = this.buildRevisedPlanningPrompt(goal, availableAgents, feedbackSummary);
     
     try {
       if (!this.provider) return this.getDefaultPlan(goal);
 
       const response = await this.provider.chat({
-        system: "You are a master planner. Create a revised execution plan based on critic feedback from previous failed/low-quality execution.",
+        system: "You are a master planner. Create a revised execution plan based on feedback from previous failed/low-quality execution.",
         messages: [{ role: "user", content: prompt }],
         maxTokens: 4096,
         temperature: 0.2,
@@ -153,10 +153,10 @@ export class AdvancedPlanner {
     return this.getDefaultPlan(goal);
   }
 
-  private formatCriticFeedback(feedback: CriticFeedback[], failedAgent?: AgentName): string {
-    if (feedback.length === 0) return "No critic feedback available.";
+  private formatExecutionFeedback(feedback: CriticFeedback[], failedAgent?: AgentName): string {
+    if (feedback.length === 0) return "No execution feedback available.";
     
-    let summary = "CRITIC FEEDBACK FROM PREVIOUS EXECUTION:\n\n";
+    let summary = "EXECUTION FEEDBACK FROM PREVIOUS RUN:\n\n";
     
     for (const fb of feedback) {
       summary += `Agent: ${fb.agent}\n`;
@@ -180,7 +180,7 @@ export class AdvancedPlanner {
     return summary;
   }
 
-  private buildRevisedPlanningPrompt(goal: string, availableAgents: AgentName[], criticFeedback: string): string {
+  private buildRevisedPlanningPrompt(goal: string, availableAgents: AgentName[], executionFeedback: string): string {
     const agentDescriptions: Record<string, string> = {
       [AGENT_NAMES.AGENT_ISSUE_ANALYZER]: "Analyzes GitHub issues and determines test requirements",
       [AGENT_NAMES.AGENT_COMMIT_ANALYZER]: "Analyzes commits and determines if tests are needed",
@@ -188,12 +188,11 @@ export class AdvancedPlanner {
       [AGENT_NAMES.AGENT_TESTS_REVIEWER]: "Fixes failing tests based on error analysis",
       [AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR]: "Generates comprehensive test reports",
       [AGENT_NAMES.AGENT_SUMMARIZE]: "Creates concise summaries for GitHub comments",
-      [CORE_AGENT_NAMES.CRITIC]: "Critiques agent outputs and suggests improvements",
     };
 
     return `Create a REVISED execution plan for: ${goal}
 
-${criticFeedback}
+${executionFeedback}
 
 Available agents:
 ${availableAgents.map(a => `- ${a}: ${agentDescriptions[a] || "Unknown"}`).join("\n")}
@@ -231,14 +230,13 @@ Rules:
 2. ${AGENT_NAMES.AGENT_TESTS_REVIEWER} depends on ${AGENT_NAMES.AGENT_TESTS_GENERATOR}
 3. ${AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR} depends on test results
 4. ${AGENT_NAMES.AGENT_SUMMARIZE} depends on ${AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR}
-5. ${CORE_AGENT_NAMES.CRITIC} can run after any agent produces output
-6. Max ${this.config.maxPlanSteps} steps
+5. Max ${this.config.maxPlanSteps} steps
 
-IMPORTANT: Address the critic feedback above. Focus on:
-- Fixing weaknesses identified by the critic
+IMPORTANT: Address the feedback above. Focus on:
+- Fixing weaknesses identified in previous execution
 - Implementing suggested improvements
 - Adding validation steps for previously problematic areas
-- Reducing risk level where critic scored low`;
+- Reducing risk level where scores were low`;
   }
 
   private async buildPlanningPrompt(goal: string, availableAgents: AgentName[]): Promise<string> {
@@ -249,7 +247,6 @@ IMPORTANT: Address the critic feedback above. Focus on:
       [AGENT_NAMES.AGENT_TESTS_REVIEWER]: "Fixes failing tests based on error analysis",
       [AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR]: "Generates comprehensive test reports",
       [AGENT_NAMES.AGENT_SUMMARIZE]: "Creates concise summaries for GitHub comments",
-      [CORE_AGENT_NAMES.CRITIC]: "Critiques agent outputs and suggests improvements",
     };
 
     // Recall past decisions and project context
@@ -295,8 +292,7 @@ Rules:
 2. ${AGENT_NAMES.AGENT_TESTS_REVIEWER} depends on ${AGENT_NAMES.AGENT_TESTS_GENERATOR}
 3. ${AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR} depends on test results
 4. ${AGENT_NAMES.AGENT_SUMMARIZE} depends on ${AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR}
-5. ${CORE_AGENT_NAMES.CRITIC} can run after any agent produces output
-6. Max ${this.config.maxPlanSteps} steps`;
+5. Max ${this.config.maxPlanSteps} steps`;
   }
 
   private validateAndEnhancePlan(plan: AgentPlan, availableAgents: AgentName[]): AgentPlan {

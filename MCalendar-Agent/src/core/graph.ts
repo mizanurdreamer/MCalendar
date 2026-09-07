@@ -2,7 +2,6 @@ import { StateGraph, Annotation, START, END, MemorySaver, BaseCheckpointSaver } 
 import type { AgentState, AgentName, AgentPlan, ReflectionResult } from "./state.js";
 import { Supervisor } from "./supervisor.js";
 import { BaseAgent } from "./base_agent.js";
-import { AgentCritic } from "./agent_critic.js";
 import { metrics } from "./metrics.js";
 import { AdvancedPlanner, type CriticFeedback } from "./planner.js";
 import { createMemoryStore, type MemoryStore } from "./memory.js";
@@ -16,7 +15,6 @@ export interface AgenticGraphConfig {
   memoryType: typeof MEMORY_TYPE[keyof typeof MEMORY_TYPE];
   databaseUrl?: string;
   agentMemoryDatabaseUrl?: string;
-  enableCritic: boolean;
   enableHumanGates: boolean;
   maxParallelAgents: number;
   checkpointer?: BaseCheckpointSaver;
@@ -73,7 +71,6 @@ export class AgenticGraph {
   private messageBus: MessageBus;
   private planner!: AdvancedPlanner;
   private agents: Map<AgentName, BaseAgent> = new Map();
-  private critics: Map<AgentName, AgentCritic> = new Map();
   private config: AgenticGraphConfig;
   private stepCounter = 0;
   private replanCounter = 0;
@@ -82,7 +79,6 @@ export class AgenticGraph {
   constructor(config: Partial<AgenticGraphConfig> = {}) {
     this.config = {
       memoryType: MEMORY_TYPE.LOCAL,
-      enableCritic: true,
       enableHumanGates: true,
       maxParallelAgents: 3,
       checkpointer: new MemorySaver(),
@@ -107,7 +103,6 @@ export class AgenticGraph {
     workflow.addNode(AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, this.agentNode(AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR));
     workflow.addNode(AGENT_NAMES.AGENT_SUMMARIZE, this.agentNode(AGENT_NAMES.AGENT_SUMMARIZE));
     workflow.addNode(AGENT_NAMES.AGENT_CODE_FIXER, this.agentNode(AGENT_NAMES.AGENT_CODE_FIXER));
-    workflow.addNode(GRAPH_NODE.CRITIC, this.criticNode.bind(this));
     workflow.addNode(GRAPH_NODE.HUMAN_APPROVAL, this.humanApprovalNode.bind(this));
 
     // Entry point
@@ -132,7 +127,6 @@ export class AgenticGraph {
       [AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR]: AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR,
       [AGENT_NAMES.AGENT_SUMMARIZE]: AGENT_NAMES.AGENT_SUMMARIZE,
       [AGENT_NAMES.AGENT_CODE_FIXER]: AGENT_NAMES.AGENT_CODE_FIXER,
-      [GRAPH_NODE.CRITIC]: GRAPH_NODE.CRITIC,
       [GRAPH_NODE.HUMAN_APPROVAL]: GRAPH_NODE.HUMAN_APPROVAL,
       [GRAPH_NODE.RUN_TESTS]: GRAPH_NODE.RUN_TESTS,
       [END]: END,
@@ -153,9 +147,6 @@ export class AgenticGraph {
 
     // runTests returns to supervisor
     workflow.addEdge(GRAPH_NODE.RUN_TESTS as any, GRAPH_NODE.SUPERVISOR as any);
-
-    // Critic returns to supervisor
-    workflow.addEdge(GRAPH_NODE.CRITIC as any, GRAPH_NODE.SUPERVISOR as any);
 
     // Human approval returns to supervisor
     workflow.addEdge(GRAPH_NODE.HUMAN_APPROVAL as any, GRAPH_NODE.SUPERVISOR as any);
@@ -257,7 +248,7 @@ export class AgenticGraph {
     logger.info(`[AgenticGraph] Handling replan: ${decision.reason}`);
     this.replanCounter++;
     
-    // Collect critic feedback from reflection history
+    // Collect feedback from reflection history for replanning
     const criticFeedback: CriticFeedback[] = [];
     
     for (const [agentName, reflections] of Object.entries(state.reflectionHistory)) {
@@ -333,40 +324,6 @@ export class AgenticGraph {
         agent.setState(stateCopy);
         
         const newState = await agent.run(stateCopy);
-        
-        if (this.config.enableCritic && this.critics.has(agentName)) {
-          const critic = this.critics.get(agentName)!;
-          const output = newState.testContent || newState.report || newState.summary || "";
-          if (output) {
-            const { result, revised } = await critic.critiqueWithRevision(output, {
-              goal: agent.getGoal(),
-              agent: agentName,
-            });
-            
-            if (revised && result.shouldRevise) {
-              if (agentName === AGENT_NAMES.AGENT_TESTS_GENERATOR) {
-                newState.testContent = revised;
-                // Write verified revision to disk
-                if (newState.testFilename && newState.testOutputPath) {
-                  const fs = await import("node:fs");
-                  const path = await import("node:path");
-                  const fullPath = path.join(newState.testOutputPath, newState.testFilename);
-                  const dir = path.dirname(fullPath);
-                  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-                  fs.writeFileSync(fullPath, revised, "utf-8");
-                  logger.info(`[Graph] Critic revision written to tests/${newState.testFilename}`);
-                }
-              }
-              else if (agentName === AGENT_NAMES.AGENT_TESTS_REVIEWER) {
-                // TestsReviewer output is analysis, not test content
-                // Log the revision for debugging but don't write to disk
-                logger.info(`[Graph] Critic revised TestsReviewer analysis (${revised.length} chars)`);
-              }
-              else if (agentName === AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR) newState.report = revised;
-              else if (agentName === AGENT_NAMES.AGENT_SUMMARIZE) newState.summary = revised;
-            }
-          }
-        }
 
         metrics.endAgent(true);
         const changes = this.extractStateChanges(state, newState);
@@ -443,39 +400,6 @@ export class AgenticGraph {
       currentAgent: state.currentAgent,
       abortSignal: state.abortSignal,
     };
-  }
-
-  private async criticNode(state: AgentState): Promise<Partial<AgentState>> {
-    const lastAgent = state.currentAgent;
-    const critic = this.critics.get(lastAgent);
-    
-    if (!critic) {
-      return { currentAgent: CORE_AGENT_NAMES.SUPERVISOR };
-    }
-
-    const output = state.testContent || state.report || state.summary || "";
-    if (!output) {
-      return { currentAgent: CORE_AGENT_NAMES.SUPERVISOR };
-    }
-
-    try {
-      const { result, revised } = await critic.critiqueWithRevision(output, {
-        goal: this.agents.get(lastAgent)?.getGoal() || "",
-        agent: lastAgent,
-      });
-
-      if (revised && result.shouldRevise) {
-        const updates: Partial<AgentState> = { currentAgent: CORE_AGENT_NAMES.SUPERVISOR };
-        if (lastAgent === AGENT_NAMES.AGENT_TESTS_GENERATOR) updates.testContent = revised;
-        else if (lastAgent === AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR) updates.report = revised;
-        else if (lastAgent === AGENT_NAMES.AGENT_SUMMARIZE) updates.summary = revised;
-        return updates;
-      }
-    } catch (err) {
-      logger.warn(`[AgenticGraph] Critic node failed: ${err}`);
-    }
-
-    return { currentAgent: CORE_AGENT_NAMES.SUPERVISOR };
   }
 
   private async humanApprovalNode(state: AgentState): Promise<Partial<AgentState>> {
@@ -631,10 +555,6 @@ export class AgenticGraph {
 
   registerAgent(name: AgentName, agent: BaseAgent): void {
     this.agents.set(name, agent);
-  }
-
-  registerCritic(agentName: AgentName, critic: AgentCritic): void {
-    this.critics.set(agentName, critic);
   }
 
   async initialize(): Promise<void> {

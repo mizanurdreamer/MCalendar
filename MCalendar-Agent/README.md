@@ -17,7 +17,6 @@ src/
 │   ├── supervisor.ts               # Routes agents (route/parallel/wait/complete/fail/approval)
 │   ├── state.ts                    # AgentState, AgentPlan, memory, messages, approvals
 │   ├── planner.ts                  # AdvancedPlanner generates master plans with dependencies
-│   ├── agent_critic.ts             # AgentCritic for self-revision (score-based)
 │   ├── memory.ts                   # InMemoryStore for cross-run learning
 │   ├── message_bus.ts              # Pub/sub for inter-agent communication
 │   ├── approval_store.ts           # File-based approval persistence
@@ -86,7 +85,6 @@ src/
 |-------|------|---------|
 | `supervisor` | `src/core/supervisor.ts` | Routes agents through LangGraph state graph (route/parallel/wait/complete/fail/approval). |
 | `planner` | `src/core/planner.ts` | AdvancedPlanner generates master plans with dependencies & parallel groups. |
-| `critic` | `src/core/agent_critic.ts` | AgentCritic for self-revision with scoring (0-100) and automated fixes. |
 | `agent_issue_analyzer` | `src/agents/agent_issue_analyzer.ts` | Reads a GitHub issue, explores the codebase, and determines what E2E test scenarios to write. |
 | `agent_commit_analyzer` | `src/agents/agent_commit_analyzer.ts` | Reads a commit diff and decides whether it needs new or updated E2E tests. |
 | `agent_tests_generator` | `src/agents/agent_tests_generator.ts` | Generates Playwright test code based on analysis. Uses agentic tool-use loop to write test files. On retry (after reviewer fixes), writes fixed content directly and re-runs tests. |
