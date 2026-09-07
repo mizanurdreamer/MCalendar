@@ -9,6 +9,26 @@ import type { AgentState, AgentName, AgentPlan, PlanStep, AgentMessage, Reflecti
 import { AGENT_NAMES } from "../utils/agent_names.js";
 import { CORE_AGENT_NAMES, AGENT_STATUS, PIPELINE_STATUS, RISK_LEVEL, MESSAGE_TYPE, MODE } from "../utils/constants.js";
 
+function repairJson(raw: string): string | null {
+  let s = raw;
+  // Strip markdown code fences
+  s = s.replace(/^```(?:json)?\s*\n?/gm, "").replace(/\n?```\s*$/gm, "");
+  // Remove trailing commas before } or ]
+  s = s.replace(/,\s*([}\]])/g, "$1");
+  // Collapse unescaped newlines inside strings
+  s = s.replace(/"([^"]*?)(\n)([^"]*?)"/g, (_, a, _nl, b) => `"${a} ${b}"`);
+  // Remove comments
+  s = s.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
+  // Remove control characters except standard whitespace
+  s = s.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
+  try {
+    JSON.parse(s);
+    return s;
+  } catch {
+    return null;
+  }
+}
+
 export interface TaskContext {
   provider: ProviderInterface;
   reader: CodebaseReader;
@@ -27,8 +47,16 @@ export interface TaskContext {
 export abstract class BaseAgent {
   protected state: AgentState;
   protected agentName: AgentName;
-  protected systemPrompt: string;
   protected taskContext: TaskContext;
+
+  /** Create a fresh AbortSignal per LLM call to avoid MaxListenersExceeded */
+  protected freshSignal(): AbortSignal | undefined {
+    const s = this.state.abortSignal;
+    if (!s) return undefined;
+    if (s.aborted) return s;
+    return AbortSignal.any([s]);
+  }
+  protected systemPrompt: string;
 
   constructor(
     agentName: AgentName,
@@ -93,7 +121,7 @@ Return ONLY valid JSON:
         maxTokens: 2048,
         temperature: 0.1,
         promptCaching,
-        signal: this.state.abortSignal,
+        signal: this.freshSignal(),
       });
 
       const textBlocks = response.content.filter((b): b is { type: "text"; text: string } => b.type === "text");
@@ -101,7 +129,10 @@ Return ONLY valid JSON:
       const jsonMatch = raw.match(/\{[\s\S]*\}/);
       
       if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]) as ReflectionResult;
+        const repaired = repairJson(jsonMatch[0]);
+        if (repaired) {
+          return JSON.parse(repaired) as ReflectionResult;
+        }
       }
     } catch (err) {
       logger.warn(`[${this.agentName}] Reflection failed: ${err}`);
@@ -175,7 +206,7 @@ Return ONLY valid JSON:
         maxTokens: this.taskContext.maxTokens ?? 8192,
         temperature: this.taskContext.temperature ?? 0.3,
         promptCaching,
-        signal: this.state.abortSignal,
+        signal: this.freshSignal(),
       });
 
       const textBlocks = response.content.filter((b): b is { type: "text"; text: string } => b.type === "text");
@@ -322,8 +353,12 @@ Return ONLY valid JSON:
     if (lessons.length === 0) return "";
 
     const formatted = lessons.map((l, i) => {
-      const parsed = JSON.parse(l.content);
-      return `Lesson ${i + 1} (score: ${parsed.score}/100):\n- Strengths: ${parsed.strengths?.join(", ") || "none"}\n- Weaknesses: ${parsed.weaknesses?.join(", ") || "none"}\n- Suggestions: ${parsed.suggestions?.join(", ") || "none"}`;
+      try {
+        const parsed = JSON.parse(l.content);
+        return `Lesson ${i + 1} (score: ${parsed.score}/100):\n- Strengths: ${parsed.strengths?.join(", ") || "none"}\n- Weaknesses: ${parsed.weaknesses?.join(", ") || "none"}\n- Suggestions: ${parsed.suggestions?.join(", ") || "none"}`;
+      } catch {
+        return `Lesson ${i + 1}: ${l.content.slice(0, 300)}`;
+      }
     }).join("\n\n");
 
     return `\nPAST LESSONS FROM PREVIOUS RUNS:\n${formatted}\n\nApply these lessons to improve your current work.`;
@@ -420,7 +455,7 @@ Return ONLY valid JSON:
         maxTokens: this.state.agentConfig[tag]?.maxTokens,
         temperature: this.state.agentConfig[tag]?.temperature,
         promptCaching,
-        signal: this.state.abortSignal,
+        signal: this.freshSignal(),
       });
 
       // Record token usage
@@ -481,6 +516,7 @@ Return ONLY valid JSON:
             codebasePath: this.taskContext.codebasePath,
             testOutputPath: this.taskContext.testOutputPath,
             testProjectPath: this.taskContext.testOutputPath,
+            testFilename: this.state.testFilename,
           }
         );
         

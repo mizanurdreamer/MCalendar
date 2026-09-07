@@ -26,9 +26,16 @@ const AgentStateAnnotation = Annotation.Root({
   issue: Annotation<any>(),
   commitDiff: Annotation<any>(),
   agentConfig: Annotation<any>(),
-  // Heavy objects excluded from annotation to prevent V8 crash during checkpointing
-  // reader, testReader, runner, git, githubClient, provider, memoryStore, messageBus
-  // are passed via state but not serialized
+  // Heavy objects — included so they survive LangGraph state processing
+  // MemorySaver skips non-serializable fields automatically
+  reader: Annotation<any>(),
+  testReader: Annotation<any>(),
+  runner: Annotation<any>(),
+  git: Annotation<any>(),
+  githubClient: Annotation<any>(),
+  provider: Annotation<any>(),
+  memoryStore: Annotation<any>(),
+  messageBus: Annotation<any>(),
   codebasePath: Annotation<string>(),
   testProjectPath: Annotation<string>(),
   testOutputPath: Annotation<string>(),

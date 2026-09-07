@@ -116,8 +116,9 @@ export function registerAllTools(
         handler = async (input: Record<string, unknown>) => JSON.stringify(reader.listDirectory(input.path as string), null, 2);
         break;
       case "write_test_file":
-        handler = async (input: Record<string, unknown>) => {
-          const filename = sanitizeTestFilename(input.filename as string);
+        handler = async (input: Record<string, unknown>, ctx: ToolHandlerContext) => {
+          // Force the expected filename from state — ignore LLM-generated filenames
+          const filename = ctx.testFilename || sanitizeTestFilename(input.filename as string);
           const content = input.content as string;
           const fullPath = path.join(context.testOutputPath, filename);
           const dir = path.dirname(fullPath);
@@ -127,8 +128,8 @@ export function registerAllTools(
         };
         break;
       case "append_test_file":
-        handler = async (input: Record<string, unknown>) => {
-          const filename = sanitizeTestFilename(input.filename as string);
+        handler = async (input: Record<string, unknown>, ctx: ToolHandlerContext) => {
+          const filename = ctx.testFilename || sanitizeTestFilename(input.filename as string);
           const content = input.content as string;
           const fullPath = path.join(context.testOutputPath, filename);
           if (!fs.existsSync(fullPath)) {

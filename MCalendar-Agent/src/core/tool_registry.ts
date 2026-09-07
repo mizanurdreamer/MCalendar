@@ -11,6 +11,7 @@ export interface ToolHandlerContext {
   codebasePath: string;
   testOutputPath: string;
   testProjectPath: string;
+  testFilename?: string;
 }
 
 // Derive AgentRole from AGENT_NAMES to keep them in sync
