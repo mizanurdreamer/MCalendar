@@ -56,9 +56,9 @@ export class InMemoryStore implements MemoryStore {
   }
 }
 
-export function createMemoryStore(type: typeof MEMORY_TYPE[keyof typeof MEMORY_TYPE] = MEMORY_TYPE.LOCAL, databaseUrl?: string): MemoryStore {
+export async function createMemoryStore(type: typeof MEMORY_TYPE[keyof typeof MEMORY_TYPE] = MEMORY_TYPE.LOCAL, databaseUrl?: string): Promise<MemoryStore> {
   if (type === MEMORY_TYPE.POSTGRES) {
-    const { PostgresMemoryStore } = require("./postgres_memory.js");
+    const { PostgresMemoryStore } = await import("./postgres_memory.js");
     return new PostgresMemoryStore(databaseUrl);
   }
   return new InMemoryStore();

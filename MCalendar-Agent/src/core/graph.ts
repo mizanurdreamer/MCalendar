@@ -4,7 +4,7 @@ import { Supervisor } from "./supervisor.js";
 import { BaseAgent } from "./base_agent.js";
 import { metrics } from "./metrics.js";
 import { PlanGenerator } from "./planner.js";
-import { createMemoryStore, type MemoryStore } from "./memory.js";
+import { createMemoryStore, InMemoryStore, type MemoryStore } from "./memory.js";
 import { MessageBus } from "./message_bus.js";
 import { logger } from "../utils/logger.js";
 import { Command, interrupt } from "@langchain/langgraph";
@@ -67,7 +67,7 @@ const AgentStateAnnotation = Annotation.Root({
 export class AgenticGraph {
   private graph: ReturnType<typeof StateGraph.prototype.compile>;
   private supervisor!: Supervisor;
-  private memoryStore: MemoryStore;
+  private memoryStore!: MemoryStore;
   private messageBus: MessageBus;
   private planGenerator!: PlanGenerator;
   private agents: Map<AgentName, BaseAgent> = new Map();
@@ -85,7 +85,6 @@ export class AgenticGraph {
       ...config,
     };
     
-    this.memoryStore = createMemoryStore(this.config.memoryType, this.config.agentMemoryDatabaseUrl || this.config.databaseUrl);
     this.messageBus = new MessageBus();
     this.graph = this.buildGraph();
   }
@@ -537,11 +536,13 @@ export class AgenticGraph {
 
   async initialize(): Promise<void> {
     try {
+      this.memoryStore = await createMemoryStore(this.config.memoryType, this.config.agentMemoryDatabaseUrl || this.config.databaseUrl);
       await this.memoryStore.initialize();
       logger.success(`[AgenticGraph] Memory store initialized (${this.config.memoryType})`);
     } catch (err) {
       logger.error(`[AgenticGraph] Memory store initialization failed: ${err}`);
       logger.warn(`[AgenticGraph] Continuing without persistent memory — memories will not be stored`);
+      this.memoryStore = new InMemoryStore();
     }
     logger.success("[AgenticGraph] Initialized with native LangGraph features");
   }
