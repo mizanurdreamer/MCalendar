@@ -1,4 +1,4 @@
-import type { AgentState, AgentName, AgentMessage, AgentPlan, PlanStep, HumanApprovalRequest } from "./state.js";
+import type { AgentState, AgentName, AgentMessage, AgentPlan, PlanStep, HumanApprovalRequest, RoutingHistoryEntry } from "./state.js";
 import { BaseAgent } from "./base_agent.js";
 import { logger } from "../utils/logger.js";
 import { metrics } from "./metrics.js";
@@ -7,8 +7,8 @@ import { agentEvents } from "./agent_events.js";
 import { CORE_AGENT_NAMES, GRAPH_NODE, ROUTING_ACTION, PIPELINE_STATUS, MODE, AGENT_STATUS } from "../utils/constants.js";
 
 export type RoutingDecision = 
-  | { action: typeof ROUTING_ACTION.ROUTE; nextAgent: AgentName; reason: string; planStep?: PlanStep }
-  | { action: typeof ROUTING_ACTION.PARALLEL; agents: AgentName[]; reason: string; planSteps?: PlanStep[] }
+  | { action: typeof ROUTING_ACTION.ROUTE; nextAgent: AgentName; reason: string }
+  | { action: typeof ROUTING_ACTION.PARALLEL; agents: AgentName[]; reason: string }
   | { action: typeof ROUTING_ACTION.WAIT; reason: string }
   | { action: typeof ROUTING_ACTION.COMPLETE; reason: string }
   | { action: typeof ROUTING_ACTION.FAIL; reason: string }
@@ -18,15 +18,11 @@ export type RoutingDecision =
 export class Supervisor {
   private state: AgentState;
   private agents: Map<AgentName, BaseAgent> = new Map();
-  private routingHistory: Array<{ from: AgentName; to: AgentName; decision: RoutingDecision; timestamp: number }> = [];
-  currentPlanStepIndex = 0;
+  private routingHistory: RoutingHistoryEntry[] = [];
 
   constructor(state: AgentState) {
-    // Clone state to prevent reference aliasing — executeDecision() mutates state in-place,
-    // and if we hold the same reference, extractStateChanges() becomes a no-op
     this.state = { ...state };
-    // Initialize plan step index from state
-    this.currentPlanStepIndex = state.planStepIndex ?? 0;
+    this.routingHistory = state.routingHistory ?? [];
   }
 
   registerAgent(name: AgentName, agent: BaseAgent): void {
@@ -113,267 +109,130 @@ export class Supervisor {
     return null;
   }
 
+  private followPlan(): RoutingDecision | null {
+    const plan = this.state.plan;
+    if (!plan || !plan.steps || plan.steps.length === 0) return null;
+
+    const idx = this.state.planStepIndex ?? 0;
+    if (idx >= plan.steps.length) return null;
+
+    const step = plan.steps[idx];
+
+    // Evaluate skip condition
+    if (step.skip) {
+      // Guardrails: never skip critical agents
+      if (this.isCriticalAgent(step.agent, this.state)) {
+        logger.warn(`[Supervisor] Plan wants to skip ${step.agent} but it's critical — running anyway`);
+        this.state.planStepIndex = idx + 1;
+        return { action: ROUTING_ACTION.ROUTE, nextAgent: step.agent, reason: `Critical agent, ignoring skip: ${step.skip}` };
+      }
+
+      // Skip the agent
+      logger.info(`[Supervisor] Skipping ${step.agent}: ${step.skip}`);
+      this.state.planStepIndex = idx + 1;
+      return this.followPlan();
+    }
+
+    // Don't skip — route to agent
+    this.state.planStepIndex = idx + 1;
+    return { action: ROUTING_ACTION.ROUTE, nextAgent: step.agent, reason: step.guidance || `Following plan` };
+  }
+
+  private isCriticalAgent(agent: AgentName, state: AgentState): boolean {
+    // Never skip run_tests if we have a test file
+    if (agent === (GRAPH_NODE.RUN_TESTS as AgentName) && state.testFilename) return true;
+    // Never skip tests_reviewer if tests failed
+    if (agent === AGENT_NAMES.AGENT_TESTS_REVIEWER && state.testResult && !state.testResult.success) return true;
+    // Never skip summarize (terminal agent)
+    if (agent === AGENT_NAMES.AGENT_SUMMARIZE) return true;
+    return false;
+  }
+
   private async determineNextAgent(): Promise<RoutingDecision> {
-    // First, check if we have a master plan to follow
-    const masterPlan = this.state.plans?.planner;
-    if (masterPlan && masterPlan.steps.length > 0) {
-      const planDecision = this.followMasterPlan(masterPlan);
-      // Validate the plan decision against guardrails
-      const validatedDecision = this.validatePlanDecision(planDecision);
-      if (validatedDecision) {
-        return validatedDecision;
-      }
-      // If validation fails, fall through to hardcoded routing
-      logger.warn(`[Supervisor] Plan decision failed validation, falling back to hardcoded routing`);
-    }
+    // Try plan following first
+    const planDecision = this.followPlan();
+    if (planDecision) return planDecision;
 
-    // Fallback to hardcoded routing if no plan or plan validation failed
-    const { mode, currentAgent, agentStatus, issueAnalysis, commitAnalysis, testResult, retries, testReviewMaxRetries: maxRetries, targetCodeIssues, codeFixRetries, maxCodeFixRetries } = this.state;
-
-    if (mode === MODE.ISSUE) {
-      return this.routeIssueMode(currentAgent, agentStatus, issueAnalysis, testResult, retries, maxRetries, targetCodeIssues, codeFixRetries, maxCodeFixRetries);
-    } else {
-      return this.routeCommitMode(currentAgent, agentStatus, commitAnalysis, testResult, retries, maxRetries, targetCodeIssues, codeFixRetries, maxCodeFixRetries);
-    }
+    // Fall back to data-driven routing table
+    return this.evaluateRoutingTable();
   }
 
-  /**
-   * Validate a plan decision against critical guardrails.
-   * Returns the decision if valid, or null if hardcoded routing should take over.
-   */
-  private validatePlanDecision(decision: RoutingDecision): RoutingDecision | null {
-    // Only validate ROUTE decisions — COMPLETE, FAIL, REPLAN are always valid
-    if (decision.action !== ROUTING_ACTION.ROUTE) {
-      return decision;
-    }
+  private evaluateRoutingTable(): RoutingDecision {
+    const s = this.state;
+    const currentAgent = s.currentAgent;
+    const mode = s.mode;
 
-    const nextAgent = decision.nextAgent;
-    const { testResult, retries, testReviewMaxRetries: maxRetries, targetCodeIssues, codeFixRetries, maxCodeFixRetries } = this.state;
-
-    // Guardrail 1: If tests just passed, skip review and go to report/summarize
-    if (testResult?.success && (nextAgent === AGENT_NAMES.AGENT_TESTS_REVIEWER || nextAgent === AGENT_NAMES.AGENT_CODE_FIXER)) {
-      logger.warn(`[Supervisor] Plan wants ${nextAgent} but tests passed — skipping to report`);
-      return null; // Let hardcoded routing handle this
-    }
-
-    // Guardrail 2: If max retries reached, don't route back to tests_generator
-    if (nextAgent === AGENT_NAMES.AGENT_TESTS_GENERATOR && retries >= maxRetries) {
-      logger.warn(`[Supervisor] Plan wants tests_generator but max retries (${maxRetries}) reached`);
-      return null;
-    }
-
-    // Guardrail 3: If target code issues exist, route to code_fixer first
-    if (targetCodeIssues && targetCodeIssues.length > 0 && codeFixRetries < maxCodeFixRetries) {
-      if (nextAgent !== AGENT_NAMES.AGENT_CODE_FIXER && (nextAgent as string) !== GRAPH_NODE.RUN_TESTS) {
-        logger.warn(`[Supervisor] Plan wants ${nextAgent} but target code issues exist — routing to code_fixer`);
-        return null;
-      }
-    }
-
-    // Guardrail 4: If no test result yet, don't route to report/summarize
-    if (!testResult && (nextAgent === AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR || nextAgent === AGENT_NAMES.AGENT_SUMMARIZE)) {
-      logger.warn(`[Supervisor] Plan wants ${nextAgent} but no test result yet`);
-      return null;
-    }
-
-    // Decision passed all guardrails
-    return decision;
-  }
-
-  private followMasterPlan(masterPlan: AgentPlan): RoutingDecision {
-    // Find the next incomplete step in the master plan
-    const currentAgent = this.state.currentAgent;
-    
-    // If we're at supervisor, find the first pending step
+    // Mode-specific entry point
     if (currentAgent === CORE_AGENT_NAMES.SUPERVISOR) {
-      const nextStep = masterPlan.steps.find((step, idx) => idx >= this.currentPlanStepIndex);
-      if (nextStep) {
-        const stepIndex = masterPlan.steps.indexOf(nextStep);
-        // Increment so next time we look for the step AFTER this one
-        this.currentPlanStepIndex = stepIndex + 1;
-        this.state.planStepIndex = this.currentPlanStepIndex;
-        
-        if (nextStep.canRunParallel) {
-          // Find all parallel steps at this index
-          const parallelSteps = masterPlan.steps.filter((s, idx) => 
-            idx >= stepIndex && s.canRunParallel && s.dependsOn?.every(d => 
-              masterPlan.steps.some(ms => ms.id === d && masterPlan.steps.indexOf(ms) < stepIndex)
-            )
-          );
-          if (parallelSteps.length > 1) {
-            return { 
-              action: ROUTING_ACTION.PARALLEL, 
-              agents: parallelSteps.map(s => s.agent!).filter((a): a is AgentName => !!a),
-              reason: `Parallel execution: ${parallelSteps.map(s => s.id).join(", ")}`,
-              planSteps: parallelSteps
-            };
-          }
-        }
-        return { 
-          action: ROUTING_ACTION.ROUTE, 
-          nextAgent: nextStep.agent!, 
-          reason: nextStep.reasoning || nextStep.expectedOutcome,
-          planStep: nextStep
-        };
+      const entryAgent = mode === MODE.ISSUE
+        ? AGENT_NAMES.AGENT_ISSUE_ANALYZER
+        : AGENT_NAMES.AGENT_COMMIT_ANALYZER;
+      const reason = mode === MODE.ISSUE ? "Start issue analysis" : "Start commit analysis";
+      return { action: ROUTING_ACTION.ROUTE, nextAgent: entryAgent, reason };
+    }
+
+    // Analyzers -> generator or summarize
+    if (currentAgent === AGENT_NAMES.AGENT_ISSUE_ANALYZER) {
+      if (!s.issueAnalysis?.needs_tests) {
+        return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_SUMMARIZE, reason: "No tests needed, summarize" };
       }
-      // All steps complete
-      return { action: ROUTING_ACTION.COMPLETE, reason: "Master plan completed" };
+      return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_GENERATOR, reason: "Generate tests from analysis" };
     }
-
-    // Check if current agent matches expected plan step
-    const expectedStep = masterPlan.steps[this.currentPlanStepIndex];
-    if (expectedStep && expectedStep.agent === currentAgent) {
-      // Current agent completed its step, move to next
-      this.currentPlanStepIndex++;
-      this.state.planStepIndex = this.currentPlanStepIndex;
-      
-      // Find the next step after incrementing
-      const nextStep = masterPlan.steps[this.currentPlanStepIndex];
-      if (nextStep) {
-        return { 
-          action: ROUTING_ACTION.ROUTE, 
-          nextAgent: nextStep.agent!, 
-          reason: nextStep.reasoning || nextStep.expectedOutcome,
-          planStep: nextStep
-        };
-      }
-      // All steps complete
-      return { action: ROUTING_ACTION.COMPLETE, reason: "Master plan completed" };
-    }
-
-    // If current agent doesn't match, check if it completed a step
-    if (expectedStep && expectedStep.agent !== currentAgent) {
-      // Maybe we need to route to the expected agent
-      if (expectedStep.agent) {
-        return { 
-          action: ROUTING_ACTION.ROUTE, 
-          nextAgent: expectedStep.agent, 
-          reason: `Following master plan: ${expectedStep.reasoning || expectedStep.expectedOutcome}`,
-          planStep: expectedStep
-        };
-      }
-    }
-
-    // Fallback
-    return { action: ROUTING_ACTION.COMPLETE, reason: "Master plan completed" };
-  }
-
-  private routeIssueMode(
-    currentAgent: AgentName,
-    agentStatus: Record<AgentName, import("./state.js").AgentStatus>,
-    issueAnalysis: AgentState["issueAnalysis"],
-    testResult: AgentState["testResult"],
-    retries: number,
-    maxRetries: number,
-    targetCodeIssues: AgentState["targetCodeIssues"],
-    codeFixRetries: number,
-    maxCodeFixRetries: number
-  ): RoutingDecision {
-    switch (currentAgent) {
-      case CORE_AGENT_NAMES.SUPERVISOR:
-        return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_ISSUE_ANALYZER, reason: "Start issue analysis" };
-
-      case AGENT_NAMES.AGENT_ISSUE_ANALYZER:
-        if (!issueAnalysis?.needs_tests) {
-          return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_SUMMARIZE, reason: "No tests needed, summarize" };
-        }
-        return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_GENERATOR, reason: "Generate tests from analysis" };
-
-      case AGENT_NAMES.AGENT_TESTS_GENERATOR:
-        return { action: ROUTING_ACTION.ROUTE, nextAgent: GRAPH_NODE.RUN_TESTS as AgentName, reason: "Run generated tests" };
-
-      case GRAPH_NODE.RUN_TESTS as AgentName:
-        return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_REVIEWER, reason: "Review test results" };
-
-      case AGENT_NAMES.AGENT_TESTS_REVIEWER:
-        if (testResult?.success) {
-          return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, reason: "Tests passed, generate report" };
-        }
-        // Route to code fixer if target code issues found and retries remain
-        if (targetCodeIssues && targetCodeIssues.length > 0 && codeFixRetries < maxCodeFixRetries) {
-          this.state.codeFixRetries = (codeFixRetries || 0) + 1;
-          logger.info(`[Supervisor] Code fix ${this.state.codeFixRetries}/${maxCodeFixRetries}: routing to code fixer for target source`);
-          return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_CODE_FIXER, reason: `Fixing target source code (${this.state.codeFixRetries}/${maxCodeFixRetries})` };
-        }
-        if (retries < maxRetries) {
-          this.state.retries = retries + 1;
-          metrics.recordRetry();
-          logger.info(`[Supervisor] Retry ${this.state.retries}/${maxRetries}: routing back to generator with fixes`);
-          return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_GENERATOR, reason: `Tests failed, retry ${this.state.retries}/${maxRetries}` };
-        }
-        return { action: ROUTING_ACTION.FAIL, reason: `Tests failed after ${maxRetries} retries` };
-
-      case AGENT_NAMES.AGENT_CODE_FIXER:
-        return { action: ROUTING_ACTION.ROUTE, nextAgent: GRAPH_NODE.RUN_TESTS as AgentName, reason: "Re-run tests after source code fix" };
-
-      case AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR:
-        return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_SUMMARIZE, reason: "Report generated, summarize" };
-
-      case AGENT_NAMES.AGENT_SUMMARIZE:
-        return { action: ROUTING_ACTION.COMPLETE, reason: "Issue pipeline complete" };
-
-      default:
-        return { action: ROUTING_ACTION.FAIL, reason: `Unknown agent in issue mode: ${currentAgent}` };
-    }
-  }
-
-  private routeCommitMode(
-    currentAgent: AgentName,
-    agentStatus: Record<AgentName, import("./state.js").AgentStatus>,
-    commitAnalysis: AgentState["commitAnalysis"],
-    testResult: AgentState["testResult"],
-    retries: number,
-    maxRetries: number,
-    targetCodeIssues: AgentState["targetCodeIssues"],
-    codeFixRetries: number,
-    maxCodeFixRetries: number
-  ): RoutingDecision {
-    switch (currentAgent) {
-      case CORE_AGENT_NAMES.SUPERVISOR:
-        return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_COMMIT_ANALYZER, reason: "Start commit analysis" };
-
-      case AGENT_NAMES.AGENT_COMMIT_ANALYZER:
-        if (!commitAnalysis?.needsTests) {
-          return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_SUMMARIZE, reason: "No tests needed for this commit" };
-        }
-        return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_GENERATOR, reason: "Generate tests for commit changes" };
-
-      case AGENT_NAMES.AGENT_TESTS_GENERATOR:
-        return { action: ROUTING_ACTION.ROUTE, nextAgent: GRAPH_NODE.RUN_TESTS as AgentName, reason: "Run generated tests" };
-
-      case GRAPH_NODE.RUN_TESTS as AgentName:
-        return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_REVIEWER, reason: "Review test results" };
-
-      case AGENT_NAMES.AGENT_TESTS_REVIEWER:
-        if (testResult?.success) {
-          return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, reason: "Tests passed, generate report" };
-        }
-        // Route to code fixer if target code issues found and retries remain
-        if (targetCodeIssues && targetCodeIssues.length > 0 && codeFixRetries < maxCodeFixRetries) {
-          this.state.codeFixRetries = (codeFixRetries || 0) + 1;
-          logger.info(`[Supervisor] Code fix ${this.state.codeFixRetries}/${maxCodeFixRetries}: routing to code fixer for target source`);
-          return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_CODE_FIXER, reason: `Fixing target source code (${this.state.codeFixRetries}/${maxCodeFixRetries})` };
-        }
-        if (retries < maxRetries) {
-          this.state.retries = retries + 1;
-          metrics.recordRetry();
-          logger.info(`[Supervisor] Retry ${this.state.retries}/${maxRetries}: routing back to generator with fixes`);
-          return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_GENERATOR, reason: `Tests failed, retry ${this.state.retries}/${maxRetries}` };
-        }
-        return { action: ROUTING_ACTION.FAIL, reason: `Tests failed after ${maxRetries} retries` };
-
-      case AGENT_NAMES.AGENT_CODE_FIXER:
-        return { action: ROUTING_ACTION.ROUTE, nextAgent: GRAPH_NODE.RUN_TESTS as AgentName, reason: "Re-run tests after source code fix" };
-
-      case AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR:
-        return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_SUMMARIZE, reason: "Report generated, summarize" };
-
-      case AGENT_NAMES.AGENT_SUMMARIZE:
+    if (currentAgent === AGENT_NAMES.AGENT_COMMIT_ANALYZER) {
+      if (!s.commitAnalysis?.needsTests) {
         return { action: ROUTING_ACTION.COMPLETE, reason: "Commit pipeline complete" };
-
-      default:
-        return { action: ROUTING_ACTION.FAIL, reason: `Unknown agent in commit mode: ${currentAgent}` };
+      }
+      return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_GENERATOR, reason: "Generate tests for commit changes" };
     }
+
+    // Generator -> run_tests
+    if (currentAgent === AGENT_NAMES.AGENT_TESTS_GENERATOR) {
+      return { action: ROUTING_ACTION.ROUTE, nextAgent: GRAPH_NODE.RUN_TESTS as AgentName, reason: "Run generated tests" };
+    }
+
+    // run_tests -> reviewer
+    if (currentAgent === (GRAPH_NODE.RUN_TESTS as AgentName)) {
+      return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_REVIEWER, reason: "Review test results" };
+    }
+
+    // Reviewer branching
+    if (currentAgent === AGENT_NAMES.AGENT_TESTS_REVIEWER) {
+      if (s.testResult?.success) {
+        return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, reason: "Tests passed, generate report" };
+      }
+      // Target source code issues -> code fixer
+      if (s.targetCodeIssues && s.targetCodeIssues.length > 0 && (s.codeFixRetries ?? 0) < (s.maxCodeFixRetries ?? 2)) {
+        s.codeFixRetries = (s.codeFixRetries ?? 0) + 1;
+        logger.info(`[Supervisor] Code fix ${s.codeFixRetries}/${s.maxCodeFixRetries}: routing to code fixer for target source`);
+        return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_CODE_FIXER, reason: `Fixing target source code (${s.codeFixRetries}/${s.maxCodeFixRetries})` };
+      }
+      // Test-scope retry
+      if ((s.retries ?? 0) < (s.testReviewMaxRetries ?? 3)) {
+        s.retries = (s.retries ?? 0) + 1;
+        metrics.recordRetry();
+        logger.info(`[Supervisor] Retry ${s.retries}/${s.testReviewMaxRetries}: routing back to generator with fixes`);
+        return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_GENERATOR, reason: `Tests failed, retry ${s.retries}/${s.testReviewMaxRetries}` };
+      }
+      return { action: ROUTING_ACTION.FAIL, reason: `Tests failed after ${s.testReviewMaxRetries} retries` };
+    }
+
+    // Code fixer -> re-run tests
+    if (currentAgent === AGENT_NAMES.AGENT_CODE_FIXER) {
+      return { action: ROUTING_ACTION.ROUTE, nextAgent: GRAPH_NODE.RUN_TESTS as AgentName, reason: "Re-run tests after source code fix" };
+    }
+
+    // Report -> summarize
+    if (currentAgent === AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR) {
+      return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_SUMMARIZE, reason: "Report generated, summarize" };
+    }
+
+    // Summarize -> complete
+    if (currentAgent === AGENT_NAMES.AGENT_SUMMARIZE) {
+      const reason = mode === MODE.ISSUE ? "Issue pipeline complete" : "Commit pipeline complete";
+      return { action: ROUTING_ACTION.COMPLETE, reason };
+    }
+
+    return { action: ROUTING_ACTION.FAIL, reason: `Unknown agent: ${currentAgent}` };
   }
 
   private checkHumanApprovals(): RoutingDecision {
@@ -436,12 +295,13 @@ export class Supervisor {
         return this.state;
       }
 
-      // Pass plan context to agent — the agent node will execute it
-      const masterPlan = this.state.plans?.planner;
-      const currentStep = masterPlan?.steps[this.currentPlanStepIndex];
+      // Pass plan context to agent
+      const plan = this.state.plan;
+      const stepIdx = (this.state.planStepIndex ?? 1) - 1;
+      const currentStep = plan?.steps[stepIdx];
       agent.updateTaskContext({
         currentPlanStep: currentStep,
-        overallPlan: masterPlan,
+        overallPlan: plan,
       });
     }
 
@@ -461,13 +321,14 @@ export class Supervisor {
     this.state.currentAgent = firstAgent;
     
     // Pass plan context to agent
-    const masterPlan = this.state.plans?.planner;
-    const currentStep = masterPlan?.steps[this.currentPlanStepIndex];
+    const plan = this.state.plan;
+    const stepIdx = (this.state.planStepIndex ?? 1) - 1;
+    const currentStep = plan?.steps[stepIdx];
     const agent = this.agents.get(firstAgent);
     if (agent) {
       agent.updateTaskContext({
         currentPlanStep: currentStep,
-        overallPlan: masterPlan,
+        overallPlan: plan,
       });
     }
     
@@ -478,11 +339,14 @@ export class Supervisor {
     const to = "nextAgent" in decision ? decision.nextAgent : 
                "agents" in decision ? decision.agents.join(",") : "terminal";
     
-    this.routingHistory.push({
+    const entry: RoutingHistoryEntry = {
       from,
       to: to as AgentName,
-      decision,
+      reason: "reason" in decision ? decision.reason : "",
       timestamp: Date.now(),
-    });
+    };
+    
+    this.routingHistory.push(entry);
+    this.state.routingHistory = this.routingHistory;
   }
 }

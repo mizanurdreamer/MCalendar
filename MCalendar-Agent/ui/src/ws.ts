@@ -39,14 +39,15 @@ export interface AgentStatus {
   updatedAt: number;
 }
 
-export interface AgentPlan {
+export interface PlanStep {
   agent: string;
-  goal: string;
-  steps: any[];
-  estimatedIterations: number;
+  skip?: string;
+  guidance?: string;
+}
+
+export interface AgentPlan {
+  steps: PlanStep[];
   riskLevel: "low" | "medium" | "high";
-  createdAt: number;
-  parallelGroups?: string[][];
 }
 
 export interface AgentStep {
@@ -194,7 +195,7 @@ export function useAgentSocket() {
         case "agent:plan": {
           setAgentPlans((prev) => {
             const next = new Map(prev);
-            next.set(msg.agent, { ...msg.plan, agent: msg.agent, createdAt: Date.parse(msg.timestamp) || Date.now() });
+            next.set(msg.agent, { ...msg.plan, agent: msg.agent });
             return next;
           });
           break;

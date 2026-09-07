@@ -55,6 +55,8 @@ export interface TaskConfig {
   maxTokens?: number;
   temperature?: number;
   promptCaching?: boolean;
+  reflection?: boolean;
+  selfCorrection?: boolean;
 }
 
 export interface AgentConfig {

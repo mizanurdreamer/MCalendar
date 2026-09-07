@@ -9,7 +9,7 @@
 5. [Agent Details](#agent-details)
 6. [Supervisor Routing](#supervisor-routing)
 7. [Reflection System](#reflection-system)
-8. [Planner System](#planner-system)
+8. [Plan System](#plan-system)
 9. [Memory System](#memory-system)
 10. [Message Bus](#message-bus)
 11. [Tool System](#tool-system)
@@ -32,7 +32,7 @@ Orchestrator (Entry Point)
 AgenticGraph (LangGraph Workflow)
     |
     +-- Supervisor (Routing Brain)
-    +-- AdvancedPlanner (Master Plan Generator)
+    +-- PlanGenerator (Execution Plan Advisor)
     +-- Memory Store (Cross-Run Learning)
     +-- Message Bus (Inter-Agent Communication)
     |
@@ -191,13 +191,14 @@ interface AgentState {
   // Coordination
   retries: number
   retryHistory: Array<{ attempt, errors, analysis }>
-  plans: Record<AgentName, AgentPlan>
+  plan?: AgentPlan
+  planStepIndex: number
+  routingHistory: RoutingHistoryEntry[]
   messages: AgentMessage[]
   memory: MemoryEntry[]
   reflectionHistory: Record<AgentName, ReflectionResult[]>
   humanApprovals: HumanApprovalRequest[]
   stepHistory: Array<{ name, timestamp, agent, output, decision }>
-  planStepIndex: number
 }
 ```
 
@@ -416,7 +417,7 @@ The only difference from Issue mode:
 **Self-Reflection**: After analysis, calls `this.reflect()` to evaluate quality. Reflection result stored in `reflectionHistory`.
 
 **Messages Sent**:
-- `FEEDBACK` to `AGENT_TESTS_GENERATOR` with analysis results
+- `FEEDBACK` to `AGENT_TESTS_GENERATOR` with analysis results (scenarios, summary, edge_cases, role_checks, relevant_files)
 - `NOTIFICATION` to `SUPERVISOR` with `ISSUE_ANALYZED` event
 
 ---
@@ -453,13 +454,15 @@ The only difference from Issue mode:
 
 **Processing**:
 1. Recall past lessons and test patterns from memory
-2. Check for reviewer feedback messages (on retry)
-3. **Retry shortcut**: If `retries > 0` and `testContent` exists (reviewer already fixed it), write the fixed content directly and return
-4. Build user message with test scenarios, edge cases, role checks
-5. Enter `runToolLoop()` with tests_generator tools
-6. LLM explores source files, reads DOM via browser tools, generates test code
-7. Calls `write_test_file` tool to save the test file to disk
-8. If file not found after tool loop, attempts `fallbackExtractAndWrite()`:
+2. Read `FEEDBACK` from IssueAnalyzer (edge_cases, role_checks, relevant_files) and include in prompt
+3. Check for reviewer feedback messages (on retry)
+4. **Retry shortcut**: If `retries > 0` and `testContent` exists (reviewer already fixed it), write the fixed content directly and return
+5. Build user message with test scenarios, edge cases, role checks, IssueAnalyzer context
+6. Enter `runToolLoop()` with tests_generator tools
+7. LLM explores source files, reads DOM via browser tools, generates test code
+8. Calls `write_test_file` tool to save the test file to disk
+9. Sends `FEEDBACK` to TestsReviewer with scenario context
+10. If file not found after tool loop, attempts `fallbackExtractAndWrite()`:
    - Makes one more LLM call asking specifically for test content
    - Tries to extract from tool call or markdown fences in text response
 
@@ -515,7 +518,8 @@ This is a built-in graph node, not an agent. It does not use the LLM.
 **Processing**:
 1. If `testResult.success` is true, skip review (return immediately)
 2. Recall past error fixes and lessons from memory
-3. **Error Analysis Phase** (`runErrorAnalysis()`):
+3. Read `FEEDBACK` from TestsGenerator (scenario context) and CodeFixer (files fixed)
+4. **Error Analysis Phase** (`runErrorAnalysis()`):
    - Debug the live app via Playwright MCP (`debugAppWithMcp()`):
      - Navigate to the page the test targets
      - Take screenshots, get console messages, network requests, DOM snapshot
@@ -523,7 +527,7 @@ This is a built-in graph node, not an agent. It does not use the LLM.
      - Extract URLs from `page.goto()` calls
      - Map URLs to Next.js app directory structure
      - Read the corresponding source files
-   - Build analysis prompt with test content, errors, retry history, MCP debug info, source files, past fixes, lessons
+   - Build analysis prompt with test content, errors, retry history, MCP debug info, source files, past fixes, lessons, Generator context, CodeFixer context
    - Use `submit_analysis` tool to get structured fix plan with **scope classification** per fix:
      ```json
      {
@@ -543,9 +547,13 @@ This is a built-in graph node, not an agent. It does not use the LLM.
    - Target-scope fixes are stored in `state.targetCodeIssues` for the `CodeFixer` agent
 5. **Re-run Phase**: Execute the test again after fixing (test-scope fixes only)
 6. If tests now pass: store the fix pattern in memory for future recall
-7. If tests still failing: send `FEEDBACK` message to `TestsGenerator`
+7. If tests still failing: send `FEEDBACK` to `TestsGenerator` with errors and analysis
 
 **Output**: Updated `state.testContent`, `state.testResult` (re-run results), `state.retryHistory`, `state.targetCodeIssues` (target-scope fixes for CodeFixer)
+
+**Messages Sent**:
+- `FEEDBACK` to `AGENT_TESTS_GENERATOR` with errors and analysis (on retry when tests still fail)
+- `FEEDBACK` to `SUPERVISOR` with notification events
 
 ---
 
@@ -556,13 +564,21 @@ This is a built-in graph node, not an agent. It does not use the LLM.
 **Input**: `state.targetCodeIssues` (populated by TestsReviewer when `scope="target"`)
 
 **Processing**:
-1. Read target issues from state — each entry has `file`, `issue`, and `fix` descriptions
-2. Format issues into a numbered list with test error context from `state.testResult`
-3. Enter `runToolLoop()` with `code_fixer` role tools
-4. LLM reads source files via `read_file`, investigates the bug, applies fixes via `write_source_file`
-5. Clear `state.targetCodeIssues` to `[]` after fixing (prevents the supervisor from routing back)
+1. Recall past lessons and error fixes from memory
+2. Read target issues from state — each entry has `file`, `issue`, and `fix` descriptions
+3. Format issues into a numbered list with test error context from `state.testResult`
+4. Enter `runToolLoop()` with `code_fixer` role tools
+5. LLM reads source files via `read_file`, investigates the bug, applies fixes via `write_source_file`
+6. Self-reflect on fix quality
+7. Store successful fix pattern in memory
+8. Send `FEEDBACK` to TestsReviewer with files fixed
+9. Clear `state.targetCodeIssues` to `[]` after fixing (prevents the supervisor from routing back)
 
 **Output**: Updated source files on disk, cleared `state.targetCodeIssues`
+
+**Messages Sent**:
+- `FEEDBACK` to `AGENT_TESTS_REVIEWER` with files fixed details
+- `NOTIFICATION` to `SUPERVISOR` with `CODE_FIXED` event
 
 **Tools**: Uses `getByRole("code_fixer")` — includes all core, diagnostic, database, and dev tools, PLUS `write_source_file` (exclusively scoped to this role).
 
@@ -574,7 +590,8 @@ This is a built-in graph node, not an agent. It does not use the LLM.
 | `state.targetCodeIssues` | Set to `[]` (cleared after fixing) |
 | `state.agentStatus[code_fixer]` | `COMPLETED` or `FAILED` |
 | `state.stepHistory` | New entry: `{ name: "fix_source", output: "Fixed N source file(s)" }` |
-| `state.messages` | `NOTIFICATION` to Supervisor with `CODE_FIXED` event |
+| `state.reflectionHistory` | New reflection result |
+| `state.messages` | `FEEDBACK` to TestsReviewer + `NOTIFICATION` to Supervisor |
 
 ---
 
@@ -585,9 +602,11 @@ This is a built-in graph node, not an agent. It does not use the LLM.
 **Input**: `state.testResult`, `state.testFilename`
 
 **Processing**:
-1. Build user message with test results, errors, output, HTML report path
-2. Single LLM call (no tool loop) to generate markdown report
-3. Save report to `reports/` directory with filename format:
+1. Recall past lessons from memory
+2. Build user message with test results, errors, output, HTML report path
+3. Single LLM call (no tool loop) to generate markdown report
+4. Self-reflect on report quality
+5. Save report to `reports/` directory with filename format:
    - Issue: `issue-{number}-{date}.md`
    - Commit: `commit-{shortSha}-{date}.md`
 
@@ -602,10 +621,12 @@ This is a built-in graph node, not an agent. It does not use the LLM.
 **Input**: `state.testResult`, `state.report`, `state.issue`/`state.commitDiff`, `state.branchName`, `state.prUrl`
 
 **Processing**:
-1. Build user message with all pipeline results
-2. Single LLM call to generate summary
-3. Post summary as GitHub comment (to issue or PR)
-4. If LLM fails, generates a fallback summary locally
+1. Recall past lessons from memory
+2. Build user message with all pipeline results
+3. Single LLM call to generate summary
+4. Self-reflect on summary quality
+5. Post summary as GitHub comment (to issue or PR)
+6. If LLM fails, generates a fallback summary locally
 
 **Output**: `state.summary` (posted to GitHub as comment)
 
@@ -635,40 +656,39 @@ route() called
   +-- Check if status is COMPLETE -> return COMPLETE
   +-- Check if status is FAILED -> return REPLAN (trigger replanning)
   +-- checkReplanTriggers() -> may return REPLAN
-  +-- determineNextAgent()
-       |
-       +-- If master plan exists -> followMasterPlan()
-       +-- Else -> routeIssueMode() or routeCommitMode() (hardcoded fallback)
+  +-- determineNextAgent() -> try followPlan() first, then hardcoded routing
 ```
 
-### Master Plan Following
+### Plan Following
 
-The `AdvancedPlanner` generates a master plan at graph initialization. The supervisor follows it step-by-step:
+The supervisor first tries to follow the plan via `followPlan()`:
 
-1. When `currentAgent` is `supervisor`, find the next incomplete step by `planStepIndex`
-2. If the step has `canRunParallel` and other parallel steps are ready, return `PARALLEL` action
-3. Otherwise return `ROUTE` to the step's assigned agent
-4. After an agent completes, `planStepIndex` advances
-5. When all steps are done, return `COMPLETE`
+1. Read the next step from `state.plan.steps[state.planStepIndex]`
+2. If step has `skip` condition:
+   - Check if agent is critical (guardrails)
+   - If critical → run anyway, log warning
+   - If not critical → skip, increment `planStepIndex`, recurse
+3. If step has no `skip` → route to agent, increment `planStepIndex`
+4. If plan is exhausted or empty → fall back to hardcoded routing
 
-### Hardcoded Fallback Routing
+### Hardcoded Routing (Fallback)
 
-If no master plan is available, the supervisor uses hardcoded routing:
+The supervisor uses a data-driven routing table as a fallback when the plan is exhausted or empty. The `PlanGenerator` provides guidance to agents about what to focus on, but the core sequence (analyzer → generator → run_tests → reviewer → report → summarize) stays hardcoded as the backbone.
 
-**Issue Mode** (`routeIssueMode()`):
+The routing is implemented as a single `evaluateRoutingTable()` method that handles both Issue and Commit modes. Mode-specific entry points and gate conditions are handled within the method.
+
+**Routing Table**:
 ```
-supervisor -> issue_analyzer -> [needs_tests?] -> tests_generator -> run_tests
-    -> tests_reviewer -> [tests pass?] -> tests_report_generator -> summarize -> COMPLETE
-                        [fail + targetCodeIssues + codeFixRetries < max] -> code_fixer -> run_tests (loop)
-                        [fail + retries < testReviewMaxRetries] -> tests_generator (retry)
-```
-
-**Commit Mode** (`routeCommitMode()`):
-```
-supervisor -> commit_analyzer -> [needsTests?] -> tests_generator -> run_tests
-    -> tests_reviewer -> [tests pass?] -> tests_report_generator -> summarize -> COMPLETE
-                        [fail + targetCodeIssues + codeFixRetries < max] -> code_fixer -> run_tests (loop)
-                        [fail + retries < testReviewMaxRetries] -> tests_generator (retry)
+supervisor -> [issue_mode] issue_analyzer / [commit_mode] commit_analyzer
+issue_analyzer -> [needs_tests?] tests_generator / [!needs_tests] summarize
+commit_analyzer -> [needsTests?] tests_generator / [!needsTests] complete
+tests_generator -> run_tests -> tests_reviewer
+tests_reviewer -> [success] tests_report_generator
+                -> [targetCodeIssues + codeFixRetries < max] code_fixer -> run_tests
+                -> [retries < max] tests_generator (retry)
+                -> [else] fail
+code_fixer -> run_tests
+tests_report_generator -> summarize -> complete
 ```
 
 ### executeDecision()
@@ -698,9 +718,28 @@ protected async reflect(output: string): Promise<ReflectionResult> {
 ```
 
 - Score: 0-100
-- If `shouldRevise` is true, the agent logs a warning
+- If `shouldRevise` is true, the agent attempts self-correction via `this.selfCorrect()`
+- Self-correction re-calls the LLM with the weaknesses and revised output (max 1 attempt per agent)
 - Reflection result stored in `state.reflectionHistory[agentName]`
 - Also stored in memory as a `lesson_learned` entry for cross-run learning
+
+### Self-Correction
+
+When `shouldRevise` is true, agents can self-correct via `this.selfCorrect()`:
+
+```typescript
+protected async selfCorrect(
+  reflection: ReflectionResult,
+  originalOutput: string,
+  correctionPrompt: string,
+): Promise<string> {
+  // Re-calls LLM with weaknesses and suggestions
+  // Max 1 self-correction attempt per agent (tracked via taskContext.selfCorrectionRetries)
+  // Returns corrected output or original if correction fails
+}
+```
+
+This is wired into IssueAnalyzer, TestsGenerator, and TestsReviewer. Other agents (CodeFixer, ReportGenerator, Summarize) reflect but do not self-correct (their outputs are simpler).
 
 ### Replanning Triggers
 
@@ -713,65 +752,58 @@ The supervisor checks for replanning in `checkReplanTriggers()`:
 
 When replanning is triggered:
 1. Collect all reflection feedback from `reflectionHistory`
-2. Call `planner.generateRevisedPlan()` with feedback
-3. Reset `planStepIndex` to 0
-4. The supervisor follows the revised plan on the next cycle
+2. Call `planGenerator.generateRevisedPlan()` with feedback
+3. Store revised plan in state
+4. Agents receive updated plan guidance on next cycle
 
 ---
 
-## Planner System (`src/core/planner.ts`)
+## Plan System (`src/core/planner.ts`)
 
-### Master Plan Generation
+### Plan Generation
 
-At graph initialization (`invoke()`), the `AdvancedPlanner` generates a master plan:
+At graph initialization (`invoke()`), the `PlanGenerator` generates an execution plan:
 
-1. Recalls past decisions and project context from memory
-2. Sends a planning prompt to the LLM with:
-   - Goal description
-   - Available agents and their descriptions
-   - Current state (mode, issue/commit, retries)
-3. LLM returns a JSON plan with steps, dependencies, and parallelization hints
-4. Plan is validated and enhanced:
-   - Filter out unavailable agents
-   - Set default values for missing fields
-   - Enforce dependency constraints (steps with dependsOn cannot run parallel)
-   - Auto-detect parallel groups
+1. Analyzes the task (issue or commit)
+2. Reviews project context, issue/commit analysis, retries
+3. Returns a JSON plan with steps, skip conditions, and guidance per agent
 
 ### Plan Structure
 
 ```typescript
 interface AgentPlan {
-  agent: "planner"
-  goal: string
-  steps: PlanStep[]
-  estimatedIterations: number
+  steps: PlanStep[]           // Ordered steps defining the pipeline
   riskLevel: "low" | "medium" | "high"
-  createdAt: number
-  approved?: boolean
-  parallelGroups?: string[][]
 }
 
 interface PlanStep {
-  id: string
-  agent?: AgentName
-  tool: string
-  args: Record<string, unknown>
-  expectedOutcome: string
-  reasoning: string
-  dependsOn?: string[]
-  canRunParallel?: boolean
+  agent: AgentName            // Which agent to run
+  skip?: string               // If set, skip this agent (reason explains why)
+  guidance?: string           // What to focus on when running this agent
 }
 ```
 
-### Default Plan
+### How Plan Is Used
 
-If LLM planning fails, the default plan is:
+The plan is passed to agents via `TaskContext.currentPlanStep` and `TaskContext.overallPlan`. Agents read the plan step's `guidance` field to understand what to focus on.
 
-```
-analyze -> generate -> review -> report -> summarize
-```
+The supervisor uses `followPlan()` to evaluate the plan:
+1. Reads the next step from `state.plan.steps[state.planStepIndex]`
+2. If `skip` is set and the agent is not critical → skip it
+3. If `skip` is set but the agent IS critical → run anyway (guardrails)
+4. If `skip` is not set → route to the agent
+5. After each step, increments `planStepIndex`
 
-With `parallelGroups: [["report", "summarize"]]` (though in practice they are sequential due to dependencies).
+**Key point**: The plan controls which agents to SKIP. The core sequence (analyzer → generator → run_tests → reviewer → report → summarize) stays hardcoded as backbone. The plan decides which agents can be skipped and what each agent should focus on.
+
+**Regeneration**: Plans are only regenerated on failure (when `status === FAILED`). The supervisor triggers `planGenerator.generateRevisedPlan()` with execution feedback.
+
+### Guardrails
+
+Critical agents cannot be skipped even if the plan says to:
+- `run_tests` — if a test file exists
+- `tests_reviewer` — if tests failed
+- `summarize` — always runs (terminal agent)
 
 ---
 
@@ -820,13 +852,14 @@ type MemoryEntry = {
 **Storing** (`remember()`):
 - Every agent stores reflection results as `lesson_learned` entries
 - `TestsReviewer` stores successful fix patterns as `error_fix` entries
+- `CodeFixer` stores successful source fix patterns as `error_fix` entries
 - Tags include agent name, project, and success status
 
 **Recalling** (`recall()`, `recallFromStore()`, `recallLessons()`, `recallErrorFixes()`, `recallTestPatterns()`):
 - Each agent recalls relevant memories at the start of its run
 - `recallLessons()`: Retrieves past reflections for this agent type (up to 5)
-- `recallErrorFixes()`: Retrieves past fix patterns (up to 3)
-- `recallTestPatterns()`: Retrieves successful test patterns tagged with "playwright" or "e2e"
+- `recallErrorFixes()`: Retrieves past fix patterns (up to 3) — used by TestsReviewer and CodeFixer
+- `recallTestPatterns()`: Retrieves successful test patterns tagged with "playwright" or "e2e" — used by TestsGenerator
 - Recalled memories are injected into the agent's context as formatted strings
 
 ### In-State Memory Array
@@ -859,15 +892,20 @@ MESSAGE_TYPE = {
 
 ### Message Flow Between Agents
 
-1. **IssueAnalyzer -> TestsGenerator**: `FEEDBACK` with analysis results (scenarios, summary)
-2. **IssueAnalyzer -> Supervisor**: `NOTIFICATION` with `ISSUE_ANALYZED` event
-3. **CommitAnalyzer -> Supervisor**: `NOTIFICATION` with `COMMIT_ANALYZED` event
-4. **TestsGenerator -> Supervisor**: `NOTIFICATION` with `TESTS_GENERATED` event
-5. **TestsReviewer -> TestsGenerator**: `FEEDBACK` with errors and analysis (on retry)
-6. **TestsReviewer -> Supervisor**: `NOTIFICATION` with `TESTS_REVIEWED` event
-7. **CodeFixer -> Supervisor**: `NOTIFICATION` with `CODE_FIXED` event
-8. **TestsReportGenerator -> Supervisor**: `NOTIFICATION` with `REPORT_GENERATED` event
-9. **Summarize -> Supervisor**: `NOTIFICATION` with `SUMMARY_CREATED` event
+**Functional FEEDBACK messages (used for coordination):**
+1. **IssueAnalyzer -> TestsGenerator**: `FEEDBACK` with analysis results (scenarios, summary, edge_cases, role_checks, relevant_files) — consumed by TestsGenerator in prompt
+2. **TestsGenerator -> TestsReviewer**: `FEEDBACK` with scenario context (scenarios, edge_cases, filename) — consumed by TestsReviewer in analysis
+3. **TestsReviewer -> TestsGenerator**: `FEEDBACK` with errors and analysis (on retry when tests still fail) — logged by TestsGenerator
+4. **CodeFixer -> TestsReviewer**: `FEEDBACK` with files fixed details — consumed by TestsReviewer in analysis
+
+**NOTIFICATION messages (observability):**
+5. **IssueAnalyzer -> Supervisor**: `NOTIFICATION` with `ISSUE_ANALYZED` event
+6. **CommitAnalyzer -> Supervisor**: `NOTIFICATION` with `COMMIT_ANALYZED` event
+7. **TestsGenerator -> Supervisor**: `NOTIFICATION` with `TESTS_GENERATED` event
+8. **TestsReviewer -> Supervisor**: `NOTIFICATION` with `TESTS_REVIEWED` event
+9. **CodeFixer -> Supervisor**: `NOTIFICATION` with `CODE_FIXED` event
+10. **TestsReportGenerator -> Supervisor**: `NOTIFICATION` with `REPORT_GENERATED` event
+11. **Summarize -> Supervisor**: `NOTIFICATION` with `SUMMARY_CREATED` event
 
 ### Message History
 
@@ -878,12 +916,7 @@ MESSAGE_TYPE = {
 
 ### Subscription
 
-Agents can subscribe to messages via `initCommunication()`:
-```typescript
-this.initCommunication([AGENT_NAMES.AGENT_ISSUE_ANALYZER, AGENT_NAMES.AGENT_TESTS_REVIEWER]);
-```
-
-The graph also subscribes a broadcast logger to log all messages.
+Agents consume messages via `getLatestMessage(from, type)` which reads from `state.messages`. The graph also subscribes a broadcast logger to log all messages.
 
 ---
 
@@ -1059,7 +1092,7 @@ When the reviewer identifies test failures caused by app bugs, it classifies fix
 
 **Outer Loop — Test Review Retries** (`TEST_REVIEW_MAX_RETRIES`, default 3):
 
-When the code fixer budget is exhausted (or no target issues were found), the system falls back to the general retry path. The reviewer sends a `FEEDBACK` message to `TestsGenerator` with errors and analysis. The generator re-generates tests with the reviewer's feedback context.
+When the code fixer budget is exhausted (or no target issues were found), the system falls back to the general retry path. The reviewer sends a `FEEDBACK` message to `TestsGenerator` with errors and analysis. On retry, if the reviewer already fixed the test content, `TestsGenerator` writes the fixed content directly (skipping re-generation).
 
 **Both exhausted**: The supervisor returns `FAIL` with message "Tests failed after N retries".
 
@@ -1140,7 +1173,7 @@ private extractStateChanges(oldState, newState): Partial<AgentState> {
 }
 ```
 
-Tracked keys: `issueAnalysis`, `commitAnalysis`, `testFilename`, `testContent`, `testResult`, `report`, `reportPath`, `summary`, `prUrl`, `branchName`, `retries`, `retryHistory`, `currentAgent`, `agentStatus`, `plans`, `messages`, `memory`, `reflectionHistory`, `humanApprovals`, `stepHistory`, `status`, `error`, `projectContext`.
+Tracked keys: `issueAnalysis`, `commitAnalysis`, `testFilename`, `testContent`, `testResult`, `report`, `reportPath`, `summary`, `prUrl`, `branchName`, `retries`, `retryHistory`, `currentAgent`, `agentStatus`, `plan`, `planStepIndex`, `routingHistory`, `messages`, `memory`, `reflectionHistory`, `humanApprovals`, `stepHistory`, `status`, `error`, `projectContext`.
 
 ### Checkpointing
 
@@ -1165,8 +1198,8 @@ Orchestrator: processIssue(issue, config)
   2. createInitialAgentState(mode=ISSUE)
   3. createAgenticGraph()
    4. Register 6 agents
-  5. Generate master plan (AdvancedPlanner)
-  6. Create git branch
+   5. Generate plan (PlanGenerator)
+   6. Create git branch
   7. graph.invoke(initialState)
      |
      +-> Supervisor routes to IssueAnalyzer
@@ -1211,7 +1244,7 @@ Orchestrator: processCommit(diff, config)
   2. createInitialAgentState(mode=COMMIT)
   3. createAgenticGraph()
    4. Register agents (CommitAnalyzer instead of IssueAnalyzer)
-  5. Generate master plan
+   5. Generate plan
   6. Create git branch (test/commit-{shortSha})
   7. graph.invoke(initialState)
      |

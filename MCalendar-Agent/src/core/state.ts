@@ -10,7 +10,6 @@ import {
   CORE_AGENT_NAMES,
   AGENT_STATUS,
   RISK_LEVEL,
-  APPROVED_BY,
   MESSAGE_TYPE,
   APPROVAL_TYPE,
   MODE,
@@ -32,26 +31,14 @@ export type AgentStatus =
   | typeof AGENT_STATUS.FAILED;
 
 export interface PlanStep {
-  id: string;
-  agent?: AgentName;
-  tool: string;
-  args: Record<string, unknown>;
-  expectedOutcome: string;
-  reasoning: string;
-  dependsOn?: string[];
-  canRunParallel?: boolean;
+  agent: AgentName;
+  skip?: string;
+  guidance?: string;
 }
 
 export interface AgentPlan {
-  agent: AgentName;
-  goal: string;
   steps: PlanStep[];
-  estimatedIterations: number;
   riskLevel: typeof RISK_LEVEL.LOW | typeof RISK_LEVEL.MEDIUM | typeof RISK_LEVEL.HIGH;
-  createdAt: number;
-  approved?: boolean;
-  approvedBy?: typeof APPROVED_BY.HUMAN | typeof APPROVED_BY.SUPERVISOR;
-  parallelGroups?: string[][];
 }
 
 export interface AgentMessage {
@@ -88,6 +75,22 @@ export interface ReflectionResult {
   suggestions: string[];
   shouldRevise: boolean;
   revisedOutput?: string;
+}
+
+export interface ExecutionFeedback {
+  agent: AgentName;
+  score: number;
+  weaknesses: string[];
+  suggestions: string[];
+  shouldRevise: boolean;
+  revisedOutput?: string;
+}
+
+export interface RoutingHistoryEntry {
+  from: AgentName;
+  to: AgentName;
+  reason: string;
+  timestamp: number;
 }
 
 export interface HumanApprovalRequest {
@@ -136,6 +139,7 @@ export interface AgentState {
   retries: number;
   playwrightWorkers: number;
   
+  plan?: AgentPlan;
   planStepIndex: number;
   
   baseBranch?: string;
@@ -200,7 +204,6 @@ export interface AgentState {
   currentAgent: AgentName;
   agentStatus: Record<AgentName, AgentStatus> & { parallelQueue?: AgentName[] };
   
-  plans: Record<AgentName, AgentPlan>;
   messages: AgentMessage[];
   memory: MemoryEntry[];
   
@@ -215,6 +218,8 @@ export interface AgentState {
     output: string;
     decision: string;
   }>;
+
+  routingHistory: RoutingHistoryEntry[];
   
   status: typeof PIPELINE_STATUS.RUNNING | typeof PIPELINE_STATUS.COMPLETED | typeof PIPELINE_STATUS.FAILED | typeof PIPELINE_STATUS.SKIPPED | typeof PIPELINE_STATUS.AWAITING_HUMAN;
   error?: string;
@@ -293,12 +298,12 @@ export function createInitialAgentState(input: {
     maxCodeFixRetries: input.codeFixMaxRetries ?? 2,
     currentAgent: CORE_AGENT_NAMES.SUPERVISOR,
     agentStatus: agentNames.reduce((acc, name) => ({ ...acc, [name]: AGENT_STATUS.IDLE }), {} as Record<AgentName, AgentStatus> & { parallelQueue: [] }),
-    plans: {} as Record<AgentName, AgentPlan>,
     messages: [],
     memory: [],
     reflectionHistory: {} as Record<AgentName, ReflectionResult[]>,
     humanApprovals: [],
     stepHistory: [],
+    routingHistory: [],
     status: PIPELINE_STATUS.RUNNING,
     abortSignal: input.abortSignal,
   };

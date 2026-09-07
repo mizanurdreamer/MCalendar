@@ -4,7 +4,7 @@ import { BaseAgent } from "../core/base_agent.js";
 import { logger } from "../utils/logger.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
 import { getTaskProviderName, getTaskModel } from "../providers/registry.js";
-import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL, MESSAGE_TYPE, AGENT_EVENT, CORE_AGENT_NAMES } from "../utils/constants.js";
+import { AGENT_STATUS, PIPELINE_STATUS, MODE, MESSAGE_TYPE, AGENT_EVENT, CORE_AGENT_NAMES } from "../utils/constants.js";
 import { getToolRegistry } from "../core/tool_registry.js";
 import { exploreAppWithMcp } from "../mcp/explore.js";
 
@@ -118,32 +118,6 @@ When you have enough information, call submit_analysis with your complete analys
     return `Analyze issue #${issue?.number}: ${issue?.title} and determine test requirements`;
   }
 
-  getDefaultPlan(): import("../core/state.js").AgentPlan {
-    return {
-      agent: AGENT_NAMES.AGENT_ISSUE_ANALYZER,
-      goal: this.getGoal(),
-      steps: [
-        {
-          id: "explore_app",
-          tool: "browser_navigate",
-          args: {},
-          expectedOutcome: "Explore live app to understand current UI state",
-          reasoning: "Browser exploration helps ground test scenarios in the real app",
-        },
-        {
-          id: "analyze_issue",
-          tool: "submit_analysis",
-          args: {},
-          expectedOutcome: "Complete issue analysis with test scenarios",
-          reasoning: "Use LLM to analyze the issue and identify test requirements",
-        },
-      ],
-      estimatedIterations: 2,
-      riskLevel: RISK_LEVEL.LOW,
-      createdAt: Date.now(),
-    };
-  }
-
   protected getAvailableTools(): ToolDefinition[] {
     return getToolRegistry().getByRole("issue_analyzer");
   }
@@ -167,8 +141,8 @@ When you have enough information, call submit_analysis with your complete analys
     const labels = issue.labels.map((l: { name: string }) => l.name).join(", ") || "none";
     
     // Build plan context if available
-    const planContext = this.taskContext.currentPlanStep 
-      ? `\n\nPlan Context:\n- Step: ${this.taskContext.currentPlanStep.reasoning}\n- Expected Outcome: ${this.taskContext.currentPlanStep.expectedOutcome}`
+    const planContext = this.taskContext.currentPlanStep?.guidance
+      ? `\n\nPlan Guidance: ${this.taskContext.currentPlanStep.guidance}`
       : '';
     
     const userMessage = `Issue #${issue.number}: ${issue.title}
@@ -304,6 +278,24 @@ When you have enough information, call submit_analysis with your complete analys
 
       if (reflection.shouldRevise) {
         logger.warn(`[AgentIssueAnalyzer] Reflection suggests revision (score: ${reflection.score}): ${reflection.weaknesses.join(", ")}`);
+        
+        // Self-correct the analysis
+        const corrected = await this.selfCorrect(
+          reflection,
+          JSON.stringify(state.issueAnalysis, null, 2),
+          `Improve the following issue analysis. Address these weaknesses: ${reflection.weaknesses.join("; ")}\n\nCurrent analysis:\n${JSON.stringify(state.issueAnalysis, null, 2)}`
+        );
+        
+        // Try to parse corrected output as analysis
+        try {
+          const parsed = JSON.parse(corrected);
+          if (parsed.summary && parsed.test_scenarios) {
+            state.issueAnalysis = parsed;
+            logger.info(`[AgentIssueAnalyzer] Self-correction applied to analysis`);
+          }
+        } catch {
+          logger.warn(`[AgentIssueAnalyzer] Self-correction output was not valid JSON, keeping original`);
+        }
       }
 
       this.updateStatus(AGENT_STATUS.COMPLETED);
@@ -321,6 +313,9 @@ When you have enough information, call submit_analysis with your complete analys
         needsTests: state.issueAnalysis.needs_tests,
         scenarios: state.issueAnalysis.test_scenarios,
         summary: state.issueAnalysis.summary,
+        edgeCases: state.issueAnalysis.edge_cases,
+        roleChecks: state.issueAnalysis.role_checks,
+        relevantFiles: state.issueAnalysis.relevant_files,
       });
     }
 

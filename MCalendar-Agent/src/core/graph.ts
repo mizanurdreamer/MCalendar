@@ -1,9 +1,9 @@
 import { StateGraph, Annotation, START, END, MemorySaver, BaseCheckpointSaver } from "@langchain/langgraph";
-import type { AgentState, AgentName, AgentPlan, ReflectionResult } from "./state.js";
+import type { AgentState, AgentName, AgentPlan, ReflectionResult, ExecutionFeedback } from "./state.js";
 import { Supervisor } from "./supervisor.js";
 import { BaseAgent } from "./base_agent.js";
 import { metrics } from "./metrics.js";
-import { AdvancedPlanner, type ExecutionFeedback } from "./planner.js";
+import { PlanGenerator } from "./planner.js";
 import { createMemoryStore, type MemoryStore } from "./memory.js";
 import { MessageBus } from "./message_bus.js";
 import { logger } from "../utils/logger.js";
@@ -38,7 +38,6 @@ const AgentStateAnnotation = Annotation.Root({
   maxPipelineSteps: Annotation<number>(),
   commitAutoApprove: Annotation<boolean>(),
   retries: Annotation<number>(),
-  planStepIndex: Annotation<number>(),
   baseBranch: Annotation<string>(),
   branchName: Annotation<string>(),
   projectContext: Annotation<any>(),
@@ -54,7 +53,8 @@ const AgentStateAnnotation = Annotation.Root({
   retryHistory: Annotation<any[]>(),
   currentAgent: Annotation<AgentName>(),
   agentStatus: Annotation<any>(),
-  plans: Annotation<any>(),
+  plan: Annotation<any>(),
+  planStepIndex: Annotation<number>(),
   messages: Annotation<any[]>(),
   memory: Annotation<any[]>(),
   reflectionHistory: Annotation<any>(),
@@ -69,7 +69,7 @@ export class AgenticGraph {
   private supervisor!: Supervisor;
   private memoryStore: MemoryStore;
   private messageBus: MessageBus;
-  private planner!: AdvancedPlanner;
+  private planGenerator!: PlanGenerator;
   private agents: Map<AgentName, BaseAgent> = new Map();
   private config: AgenticGraphConfig;
   private stepCounter = 0;
@@ -230,13 +230,8 @@ export class AgenticGraph {
       
       const newState = await this.supervisor.executeDecision(decision);
       
-      // Extract changes and include planStepIndex if it was updated
+      // Extract changes
       const changes = this.extractStateChanges(state, newState);
-      
-      // Persist planStepIndex so next supervisor invocation starts from correct step
-      if (this.supervisor.currentPlanStepIndex !== undefined) {
-        changes.planStepIndex = this.supervisor.currentPlanStepIndex;
-      }
       
       return changes;
     } catch (err) {
@@ -266,30 +261,14 @@ export class AgenticGraph {
       }
     }
     
-    // Get the failed agent from the decision or state
-    const failedAgent = state.currentAgent !== CORE_AGENT_NAMES.SUPERVISOR ? state.currentAgent : undefined;
-    
     // Generate revised plan
-    const availableAgents = Array.from(this.agents.keys());
-    const goal = state.mode === MODE.ISSUE 
-      ? `Process issue #${state.issue?.number}: ${state.issue?.title}`
-      : `Process commit ${state.commitDiff?.sha.slice(0,7)}`;
+    const revisedPlan = await this.planGenerator.generateRevisedPlan(executionFeedback);
     
-    const revisedPlan = await this.planner.generateRevisedPlan(
-      goal,
-      availableAgents,
-      executionFeedback,
-      failedAgent
-    );
-    
-    logger.success("[AgenticGraph] Replan complete - revised master plan generated");
+    logger.success("[AgenticGraph] Replan complete - revised plan generated");
     
     // Return mutations (don't mutate the state parameter)
     return {
-      plans: {
-        ...state.plans,
-        planner: revisedPlan
-      },
+      plan: revisedPlan,
       planStepIndex: 0,
       currentAgent: CORE_AGENT_NAMES.SUPERVISOR as AgentName,
       status: PIPELINE_STATUS.RUNNING,
@@ -363,9 +342,8 @@ export class AgenticGraph {
       codeFixRetries: state.codeFixRetries,
       maxCodeFixRetries: state.maxCodeFixRetries,
       // Preserve shared coordination data (deep copy to avoid cross-agent mutation)
-      plans: Object.fromEntries(
-        Object.entries(state.plans).map(([k, v]) => [k, { ...v, steps: v.steps.map(s => ({ ...s })) }])
-      ) as Record<AgentName, AgentPlan>,
+      plan: state.plan ? { ...state.plan } : undefined,
+      planStepIndex: state.planStepIndex,
       messages: state.messages.map(m => ({ ...m })),
       memory: state.memory.map(m => ({ ...m })),
       reflectionHistory: Object.fromEntries(
@@ -394,7 +372,6 @@ export class AgenticGraph {
       maxPipelineSteps: state.maxPipelineSteps,
       commitAutoApprove: state.commitAutoApprove,
       baseBranch: state.baseBranch,
-      planStepIndex: state.planStepIndex,
       projectContext: state.projectContext ? { ...state.projectContext } : undefined,
       issueAnalysis: state.issueAnalysis ? { ...state.issueAnalysis } : undefined,
       commitAnalysis: state.commitAnalysis ? { ...state.commitAnalysis } : undefined,
@@ -490,8 +467,8 @@ export class AgenticGraph {
     const keys: (keyof AgentState)[] = [
       "issueAnalysis", "commitAnalysis", "testFilename", "testContent", "testResult",
       "report", "reportPath", "summary", "prUrl", "branchName", "retries",
-      "retryHistory", "currentAgent", "agentStatus", "plans", "messages",
-      "memory", "reflectionHistory", "humanApprovals", "stepHistory", "status", "error",
+      "retryHistory", "currentAgent", "agentStatus", "plan", "planStepIndex", "messages",
+      "memory", "reflectionHistory", "humanApprovals", "stepHistory", "routingHistory", "status", "error",
       "projectContext", "targetCodeIssues", "codeFixRetries", "maxCodeFixRetries",
     ];
 
@@ -583,21 +560,13 @@ export class AgenticGraph {
       logger.info(`[MessageBus] ${msg.from} → ${msg.to}: ${msg.type} | event=${payload?.event ?? "unknown"} ${JSON.stringify(payload)}`);
     });
     
-    // Generate initial master plan
-    this.planner = new AdvancedPlanner(initialState);
-    const availableAgents = Array.from(this.agents.keys());
-    const masterPlan = await this.planner.generateMasterPlan(
-      initialState.mode === MODE.ISSUE 
-        ? `Process issue #${initialState.issue?.number}: ${initialState.issue?.title}`
-        : `Process commit ${initialState.commitDiff?.sha.slice(0,7)}`,
-      availableAgents
-    );
+    // Generate initial plan
+    this.planGenerator = new PlanGenerator(initialState);
+    const plan = await this.planGenerator.generatePlan();
     
     // Store plan in state
-    initialState.plans = { 
-      ...initialState.plans,
-      planner: masterPlan 
-    } as Record<AgentName, AgentPlan>;
+    initialState.plan = plan;
+    initialState.planStepIndex = 0;
     
     // Use thread_id from runId for checkpointing
     const threadId = config?.configurable?.thread_id || initialState.runId;

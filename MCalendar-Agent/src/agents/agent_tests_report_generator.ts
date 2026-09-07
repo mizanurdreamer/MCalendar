@@ -5,7 +5,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers/registry.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
-import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL, MESSAGE_TYPE, AGENT_EVENT, CORE_AGENT_NAMES } from "../utils/constants.js";
+import { AGENT_STATUS, PIPELINE_STATUS, MODE, MESSAGE_TYPE, AGENT_EVENT, CORE_AGENT_NAMES } from "../utils/constants.js";
 
 export class AgentTestsReportGenerator extends BaseAgent {
   constructor(state: AgentState, taskContext: import("../core/base_agent.js").TaskContext) {
@@ -29,25 +29,6 @@ Output a well-structured markdown report.`;
     return `Generate test report for ${this.state.testFilename}`;
   }
 
-  getDefaultPlan(): import("../core/state.js").AgentPlan {
-    return {
-      agent: AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR,
-      goal: this.getGoal(),
-      steps: [
-        {
-          id: "generate_report",
-          tool: "generate_report",
-          args: {},
-          expectedOutcome: "Complete markdown test report",
-          reasoning: "Generate comprehensive report from test results",
-        },
-      ],
-      estimatedIterations: 1,
-      riskLevel: RISK_LEVEL.LOW,
-      createdAt: Date.now(),
-    };
-  }
-
   async run(inputState?: AgentState): Promise<AgentState> {
     const state = inputState || this.state;
     if (!state.testResult) {
@@ -56,12 +37,18 @@ Output a well-structured markdown report.`;
       return state;
     }
 
+    // Recall past lessons
+    const lessons = await this.recallLessons();
+    if (lessons) {
+      logger.info(`[AgentTestsReportGenerator] Recalled ${lessons.split("\n").length} lines of past lessons`);
+    }
+
     const testResult = state.testResult;
     logger.info(`[AgentTestsReportGenerator] Generating report for ${state.testFilename}`);
     logger.info(`[AgentTestsReportGenerator] Input: ${testResult.passed} passed, ${testResult.failed} failed, ${testResult.total} total`);
 
     try {
-      const output = await this.runReportGeneration();
+      const output = await this.runReportGeneration(lessons);
 
       state.report = output;
       state.reportPath = this.saveReportFile(output);
@@ -76,6 +63,14 @@ Output a well-structured markdown report.`;
         for (const line of lines) {
           logger.info(`  ${line}`);
         }
+      }
+
+      // Self-reflect on report quality
+      const reflection = await this.reflect(output);
+      this.recordReflection(reflection, state);
+
+      if (reflection.shouldRevise) {
+        logger.warn(`[AgentTestsReportGenerator] Reflection suggests revision (score: ${reflection.score}): ${reflection.weaknesses.join(", ")}`);
       }
 
       this.recordStep("generate_report", "Report generated", "next");
@@ -95,15 +90,15 @@ Output a well-structured markdown report.`;
     return state;
   }
 
-  private async runReportGeneration(): Promise<string> {
+  private async runReportGeneration(lessons?: string): Promise<string> {
     const provider = getTaskProvider(AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, this.state.agentConfig);
     logger.task(AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, `${getTaskProviderName(AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, this.state.agentConfig)}/${getTaskModel(AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, this.state.agentConfig)}`);
 
     const systemPrompt = AgentTestsReportGenerator.buildSystemPrompt();
 
     const testResult = this.state.testResult!;
-    const planContext = this.taskContext.currentPlanStep 
-      ? `\n\nPlan Context:\n- Step: ${this.taskContext.currentPlanStep.reasoning}\n- Expected Outcome: ${this.taskContext.currentPlanStep.expectedOutcome}`
+    const planContext = this.taskContext.currentPlanStep?.guidance
+      ? `\n\nPlan Guidance: ${this.taskContext.currentPlanStep.guidance}`
       : '';
     
     const userMessage = `Generate a comprehensive test report for: ${this.state.testFilename}
@@ -121,6 +116,7 @@ Test Output:
 ${testResult.output}
 
 HTML Report: ${testResult.htmlReportPath || "N/A"}
+${lessons ? `\nPast lessons:\n${lessons}` : ''}
 
 Generate a comprehensive markdown report with:
 1. Executive Summary

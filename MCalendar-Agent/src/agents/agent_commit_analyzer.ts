@@ -4,7 +4,7 @@ import { BaseAgent } from "../core/base_agent.js";
 import { logger } from "../utils/logger.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
 import { getTaskProviderName, getTaskModel } from "../providers/registry.js";
-import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL, MESSAGE_TYPE, AGENT_EVENT, CORE_AGENT_NAMES } from "../utils/constants.js";
+import { AGENT_STATUS, PIPELINE_STATUS, MODE, MESSAGE_TYPE, AGENT_EVENT, CORE_AGENT_NAMES } from "../utils/constants.js";
 import { getToolRegistry } from "../core/tool_registry.js";
 import { exploreAppWithMcp } from "../mcp/explore.js";
 
@@ -90,39 +90,6 @@ When you have enough information, call submit_commit_analysis with your complete
     return `Analyze commit ${diff?.sha.slice(0,7)}: ${diff?.message.split("\n")[0]} and determine test requirements`;
   }
 
-  getDefaultPlan(): import("../core/state.js").AgentPlan {
-    return {
-      agent: AGENT_NAMES.AGENT_COMMIT_ANALYZER,
-      goal: this.getGoal(),
-      steps: [
-        {
-          id: "explore_app",
-          tool: "browser_navigate",
-          args: {},
-          expectedOutcome: "Explore live app to understand current UI state",
-          reasoning: "Browser exploration helps verify the commit's impact on the UI",
-        },
-        {
-          id: "read_changed_files",
-          tool: "read_file",
-          args: {},
-          expectedOutcome: "Understand the code changes in context",
-          reasoning: "Reading changed files helps assess risk and test scope",
-        },
-        {
-          id: "analyze_commit",
-          tool: "submit_commit_analysis",
-          args: {},
-          expectedOutcome: "Complete commit analysis with test decision",
-          reasoning: "Use LLM to analyze the commit diff and determine if tests are needed",
-        },
-      ],
-      estimatedIterations: 2,
-      riskLevel: RISK_LEVEL.LOW,
-      createdAt: Date.now(),
-    };
-  }
-
   protected getAvailableTools(): ToolDefinition[] {
     return getToolRegistry().getByRole("commit_analyzer");
   }
@@ -163,6 +130,11 @@ When you have enough information, call submit_commit_analysis with your complete
     if (lessons) {
       logger.info(`[AgentCommitAnalyzer] Recalled ${lessons.split("\n").length} lines of past lessons`);
     }
+
+    // Build plan context if available
+    const planContext = this.taskContext.currentPlanStep?.guidance
+      ? `\n\nPlan Guidance: ${this.taskContext.currentPlanStep.guidance}`
+      : '';
 
     const diff = state.commitDiff;
     const shortSha = diff.sha.slice(0, 7);
@@ -243,7 +215,7 @@ ${fileList}`;
     }
 
     try {
-      const analysis = await this.runAnalysis(userMessage, mcpExploration, fileExploration, projectExploration, lessons);
+      const analysis = await this.runAnalysis(userMessage, mcpExploration, fileExploration, projectExploration, lessons, planContext);
       state.commitAnalysis = analysis;
 
       if (!analysis.needsTests) {
@@ -281,7 +253,7 @@ ${fileList}`;
     return state;
   }
 
-  private async runAnalysis(userMessage: string, mcpExploration?: string, fileExploration?: string, projectExploration?: string, lessons?: string): Promise<NonNullable<AgentState["commitAnalysis"]>> {
+  private async runAnalysis(userMessage: string, mcpExploration?: string, fileExploration?: string, projectExploration?: string, lessons?: string, planContext?: string): Promise<NonNullable<AgentState["commitAnalysis"]>> {
     logger.task(AGENT_NAMES.AGENT_COMMIT_ANALYZER, `${getTaskProviderName(AGENT_NAMES.AGENT_COMMIT_ANALYZER, this.state.agentConfig)}/${getTaskModel(AGENT_NAMES.AGENT_COMMIT_ANALYZER, this.state.agentConfig)}`);
 
     const systemPrompt = AgentCommitAnalyzer.buildSystemPrompt();
@@ -301,6 +273,9 @@ ${fileList}`;
       sections.push(lessons);
     }
     sections.push(`\nYou have baseline context above. Use tools to investigate further if needed. Call submit_commit_analysis when ready.`);
+    if (planContext) {
+      sections.push(planContext);
+    }
     const fullMessage = sections.join("\n");
 
     const { messages } = await this.runToolLoop({

@@ -77,11 +77,14 @@ export function loadConfig(): AppConfig {
   if (!fs.existsSync(configPath)) {
     throw new Error("agent.config.json not found. Run from the MCalendar-Agent directory.");
   }
-  const fileConfig: Record<string, { maxTokens?: number; temperature?: number; promptCaching?: boolean }> = JSON.parse(
+  const fileConfig: Record<string, { maxTokens?: number; temperature?: number; promptCaching?: boolean; reflection?: boolean; selfCorrection?: boolean }> = JSON.parse(
     fs.readFileSync(configPath, "utf-8")
   );
 
   const promptCachingEnabled = (process.env.PROMPT_CACHING_ENABLED ?? "true").toLowerCase() === "true";
+
+  const reflectionEnabled = (process.env.AGENT_REFLECTION_ENABLED ?? "true").toLowerCase() === "true";
+  const selfCorrectionEnabled = (process.env.AGENT_SELF_CORRECTION_ENABLED ?? "true").toLowerCase() === "true";
 
   const agentConfig: AgentConfig = {};
   for (const [taskName, settings] of Object.entries(fileConfig)) {
@@ -91,6 +94,8 @@ export function loadConfig(): AppConfig {
       maxTokens: settings.maxTokens,
       temperature: settings.temperature,
       promptCaching: settings.promptCaching ?? promptCachingEnabled,
+      reflection: settings.reflection ?? reflectionEnabled,
+      selfCorrection: settings.selfCorrection ?? selfCorrectionEnabled,
     };
   }
 

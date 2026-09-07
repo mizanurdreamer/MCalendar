@@ -1,11 +1,11 @@
-import type { AgentState, AgentPlan } from "../core/state.js";
+import type { AgentState } from "../core/state.js";
 import { BaseAgent } from "../core/base_agent.js";
 import { logger } from "../utils/logger.js";
 import * as path from "node:path";
 import * as fs from "node:fs";
 import { getTaskProviderName, getTaskModel } from "../providers/registry.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
-import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL, MESSAGE_TYPE, AGENT_EVENT, CORE_AGENT_NAMES } from "../utils/constants.js";
+import { AGENT_STATUS, PIPELINE_STATUS, MODE, MESSAGE_TYPE, AGENT_EVENT, CORE_AGENT_NAMES } from "../utils/constants.js";
 import { getToolRegistry } from "../core/tool_registry.js";
 import type { ToolDefinition } from "../providers/types.js";
 
@@ -42,33 +42,6 @@ Use all available tools to investigate and fix the source code. Return the fixed
     return `Fix target project source code for ${this.state.testFilename} (attempt ${this.state.retries + 1})`;
   }
 
-  getDefaultPlan(): AgentPlan {
-    return {
-      agent: AGENT_NAMES.AGENT_CODE_FIXER,
-      goal: this.getGoal(),
-      steps: [
-        {
-          id: "analyze_source",
-          tool: "read_file",
-          args: {},
-          expectedOutcome: "Understand the buggy source code",
-          reasoning: "Read the source files referenced in the test failure analysis",
-        },
-        {
-          id: "fix_source",
-          tool: "write_source_file",
-          args: { path: "", content: "" },
-          expectedOutcome: "Fixed source file that resolves the test failure",
-          reasoning: "Apply the fix to the application source code",
-          dependsOn: ["analyze_source"],
-        },
-      ],
-      estimatedIterations: 3,
-      riskLevel: RISK_LEVEL.MEDIUM,
-      createdAt: Date.now(),
-    };
-  }
-
   async run(inputState?: AgentState): Promise<AgentState> {
     const state = inputState || this.state;
     const targetIssues = state.targetCodeIssues;
@@ -79,7 +52,19 @@ Use all available tools to investigate and fix the source code. Return the fixed
       return state;
     }
 
+    // Recall past lessons and error fixes
+    const lessons = await this.recallLessons();
+    const errorFixes = await this.recallErrorFixes(targetIssues[0]?.issue);
+    if (lessons) {
+      logger.info(`[AgentCodeFixer] Recalled ${lessons.split("\n").length} lines of past lessons`);
+    }
+
     logger.info(`[AgentCodeFixer] Fixing ${targetIssues.length} target code issue(s)`);
+
+    // Build plan context if available
+    const planContext = this.taskContext.currentPlanStep?.guidance
+      ? `\n\nPlan Guidance: ${this.taskContext.currentPlanStep.guidance}`
+      : '';
 
     try {
       const issuesText = targetIssues.map((issue, i) =>
@@ -92,6 +77,9 @@ ${issuesText}
 
 Test file: ${state.testFilename}
 Test errors: ${state.testResult?.errors?.join("\n\n") ?? "N/A"}
+${lessons ? `\nPast lessons:\n${lessons}` : ''}
+${errorFixes ? `\nPast error fixes:\n${errorFixes}` : ''}
+${planContext}
 
 Read the source files using read_file, fix the bugs, and use write_source_file to save the fixed files.`;
 
@@ -104,7 +92,41 @@ Read the source files using read_file, fix the bugs, and use write_source_file t
         }
       }
 
+      // Self-reflect on the fix quality
+      const fixedFiles = targetIssues.map(i => i.file).join(", ");
+      const reflectionOutput = `Fixed ${targetIssues.length} source file(s): ${fixedFiles}\nAttempt: ${state.codeFixRetries}`;
+      const reflection = await this.reflect(reflectionOutput);
+      this.recordReflection(reflection, state);
+
+      if (reflection.shouldRevise) {
+        logger.warn(`[AgentCodeFixer] Reflection suggests revision (score: ${reflection.score}): ${reflection.weaknesses.join(", ")}`);
+      }
+
+      // Store successful fix pattern in memory
+      this.remember({
+        type: "error_fix",
+        content: JSON.stringify({
+          files: targetIssues.map(i => ({ file: i.file, issue: i.issue })),
+          fixCount: targetIssues.length,
+        }),
+        metadata: {
+          project: state.projectName || "unknown",
+          agent: this.agentName,
+          success: true,
+          tags: ["code_fix", "source_fix", state.testFilename || "unknown"],
+          source: "code-fixer",
+        },
+      });
+
       this.recordStep("fix_source", `Fixed ${targetIssues.length} source file(s)`, "next");
+
+      // Send feedback to Reviewer about what was fixed
+      this.sendMessage(AGENT_NAMES.AGENT_TESTS_REVIEWER, MESSAGE_TYPE.FEEDBACK, {
+        event: "source_fixed",
+        filesFixed: targetIssues.map(i => ({ file: i.file, issue: i.issue })),
+        fixCount: targetIssues.length,
+      });
+
       this.updateStatus(AGENT_STATUS.COMPLETED);
 
       state.targetCodeIssues = [];

@@ -7,7 +7,7 @@ import { metrics } from "./metrics.js";
 import { agentEvents } from "./agent_events.js";
 import type { AgentState, AgentName, AgentPlan, PlanStep, AgentMessage, ReflectionResult, MemoryEntry, HumanApprovalRequest } from "./state.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
-import { CORE_AGENT_NAMES, AGENT_STATUS, PIPELINE_STATUS, RISK_LEVEL, APPROVED_BY, APPROVAL_RESOLUTION, APPROVAL_TYPE, MESSAGE_TYPE, MODE } from "../utils/constants.js";
+import { CORE_AGENT_NAMES, AGENT_STATUS, PIPELINE_STATUS, RISK_LEVEL, MESSAGE_TYPE, MODE } from "../utils/constants.js";
 
 export interface TaskContext {
   provider: ProviderInterface;
@@ -21,6 +21,7 @@ export interface TaskContext {
   testReviewMaxRetries?: number;
   currentPlanStep?: PlanStep;
   overallPlan?: AgentPlan;
+  selfCorrectionRetries?: number;
 }
 
 export abstract class BaseAgent {
@@ -42,7 +43,6 @@ export abstract class BaseAgent {
   }
 
   abstract getGoal(): string;
-  abstract getDefaultPlan(): AgentPlan;
   abstract run(inputState?: AgentState): Promise<AgentState>;
   
   public setState(state: AgentState): void {
@@ -50,6 +50,18 @@ export abstract class BaseAgent {
   }
 
   protected async reflect(output: string): Promise<ReflectionResult> {
+    const agentConfig = this.state.agentConfig[this.agentName];
+    if (agentConfig?.reflection === false) {
+      logger.debug(`[${this.agentName}] Reflection disabled by config`);
+      return {
+        score: 70,
+        strengths: [],
+        weaknesses: [],
+        suggestions: [],
+        shouldRevise: false,
+      };
+    }
+
     const evaluationPrompt = `You are an evaluator assessing the output of the ${this.agentName} agent.
 
 Agent Goal: ${this.getGoal()}
@@ -71,7 +83,7 @@ Return ONLY valid JSON:
   "revisedOutput": "improved version if shouldRevise else null"
 }`;
 
-    const promptCaching = this.state.agentConfig[this.agentName]?.promptCaching ?? true;
+    const promptCaching = agentConfig?.promptCaching ?? true;
     logger.debug(`[${this.agentName}] Reflect - prompt caching: ${promptCaching ? "enabled" : "disabled"}`);
     
     try {
@@ -132,68 +144,52 @@ Return ONLY valid JSON:
     });
   }
 
-  protected async requestHumanApproval(plan: AgentPlan, state?: AgentState): Promise<boolean> {
-    const s = state || this.state;
-    
-    // Check risk level - only require approval for high-risk actions
-    const requireApproval = s.enableHumanGates && plan.riskLevel === RISK_LEVEL.HIGH;
-    
-    if (s.commitAutoApprove && !requireApproval) {
-      plan.approved = true;
-      plan.approvedBy = APPROVED_BY.SUPERVISOR;
-      return true;
+  protected async selfCorrect(
+    reflection: ReflectionResult,
+    originalOutput: string,
+    correctionPrompt: string,
+  ): Promise<string> {
+    if (!reflection.shouldRevise || !reflection.revisedOutput) return originalOutput;
+
+    const agentConfig = this.state.agentConfig[this.agentName];
+    if (agentConfig?.selfCorrection === false) {
+      logger.debug(`[${this.agentName}] Self-correction disabled by config`);
+      return originalOutput;
     }
-
-    // Check if there's already a resolved approval for this plan
-    const existingApproval = s.humanApprovals.find(
-      a => a.agent === this.agentName && a.type === APPROVAL_TYPE.PLAN && a.resolved
-    );
     
-    if (existingApproval) {
-      plan.approved = existingApproval.resolution === APPROVAL_RESOLUTION.APPROVE;
-      plan.approvedBy = existingApproval.resolution === APPROVAL_RESOLUTION.APPROVE ? APPROVED_BY.HUMAN : APPROVED_BY.SUPERVISOR;
-      return plan.approved;
+    const retries = this.taskContext.selfCorrectionRetries ?? 0;
+    if (retries >= 1) {
+      logger.warn(`[${this.agentName}] Self-correction max retries (1) reached, keeping original`);
+      return originalOutput;
     }
-
-    // Check if there's a pending (unresolved) approval — don't create duplicates
-    const pendingApproval = s.humanApprovals.find(
-      a => a.agent === this.agentName && a.type === APPROVAL_TYPE.PLAN && !a.resolved
-    );
     
-    if (pendingApproval) {
-      // Approval already pending — return false, graph will interrupt and handle resolution
-      logger.warn(`[${this.agentName}] Approval already pending (${pendingApproval.id})`);
-      return false;
+    this.taskContext.selfCorrectionRetries = retries + 1;
+    logger.info(`[${this.agentName}] Self-correcting (attempt ${retries + 1}/1, score: ${reflection.score})`);
+    
+    const promptCaching = agentConfig?.promptCaching ?? true;
+    
+    try {
+      const response = await this.taskContext.provider.chat({
+        system: `You are the ${this.agentName} agent. Your previous output was evaluated and needs improvement.\n\nWeaknesses: ${reflection.weaknesses.join(", ")}\nSuggestions: ${reflection.suggestions.join(", ")}`,
+        messages: [{ role: "user", content: correctionPrompt }],
+        maxTokens: this.taskContext.maxTokens ?? 8192,
+        temperature: this.taskContext.temperature ?? 0.3,
+        promptCaching,
+        signal: this.state.abortSignal,
+      });
+
+      const textBlocks = response.content.filter((b): b is { type: "text"; text: string } => b.type === "text");
+      const corrected = textBlocks.map((b) => b.text).join("\n");
+      
+      if (corrected.length > 0) {
+        logger.info(`[${this.agentName}] Self-correction applied (${corrected.length} chars)`);
+        return corrected;
+      }
+    } catch (err) {
+      logger.warn(`[${this.agentName}] Self-correction failed: ${err}`);
     }
-
-    // Create new approval request
-    const request: HumanApprovalRequest = {
-      id: `approval-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-      agent: this.agentName,
-      type: APPROVAL_TYPE.PLAN,
-      title: `Approve plan for ${this.agentName}`,
-      description: `Goal: ${plan.goal}\nSteps: ${plan.steps.length}\nRisk: ${plan.riskLevel}`,
-      data: plan,
-      options: [
-        { label: "Approve", value: APPROVAL_RESOLUTION.APPROVE },
-        { label: "Reject", value: APPROVAL_RESOLUTION.REJECT },
-        { label: "Modify", value: "modify" },
-      ],
-      defaultOption: APPROVAL_RESOLUTION.APPROVE,
-      createdAt: Date.now(),
-      resolved: false,
-    };
-
-    s.humanApprovals.push(request);
-    s.status = PIPELINE_STATUS.AWAITING_HUMAN;
-    this.updateStatus(AGENT_STATUS.AWAITING_APPROVAL, s);
     
-    logger.warn(`[${this.agentName}] Awaiting human approval for plan (${request.id})`);
-    
-    // Don't block here — return false so the agent returns,
-    // graph routes to humanApprovalNode which uses LangGraph's interrupt(),
-    // and on resume the agent re-runs finding the resolved approval.
-    return false;
+    return originalOutput;
   }
 
   protected getAvailableTools(): ToolDefinition[] {
@@ -319,6 +315,9 @@ Return ONLY valid JSON:
    * Returns a formatted string to inject into agent context.
    */
   protected async recallLessons(context?: string): Promise<string> {
+    const agentConfig = this.state.agentConfig[this.agentName];
+    if (agentConfig?.reflection === false) return "";
+
     const lessons = await this.recallFromStore("lesson_learned", [this.agentName], 5);
     if (lessons.length === 0) return "";
 

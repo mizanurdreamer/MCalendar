@@ -4,7 +4,7 @@ import { formatTestReport } from "../test_runner/reporter.js";
 import { logger } from "../utils/logger.js";
 import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers/registry.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
-import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL, MESSAGE_TYPE, AGENT_EVENT, CORE_AGENT_NAMES } from "../utils/constants.js";
+import { AGENT_STATUS, PIPELINE_STATUS, MODE, MESSAGE_TYPE, AGENT_EVENT, CORE_AGENT_NAMES } from "../utils/constants.js";
 
 export class AgentSummarize extends BaseAgent {
   constructor(state: AgentState, taskContext: import("../core/base_agent.js").TaskContext) {
@@ -33,33 +33,20 @@ Keep it concise and actionable for developers.`;
     return "Summarize test results";
   }
 
-  getDefaultPlan(): import("../core/state.js").AgentPlan {
-    return {
-      agent: AGENT_NAMES.AGENT_SUMMARIZE,
-      goal: this.getGoal(),
-      steps: [
-        {
-          id: "generate_summary",
-          tool: "generate_summary",
-          args: {},
-          expectedOutcome: "Concise summary for GitHub comment",
-          reasoning: "Create final summary from all pipeline results",
-        },
-      ],
-      estimatedIterations: 1,
-      riskLevel: RISK_LEVEL.LOW,
-      createdAt: Date.now(),
-    };
-  }
-
   async run(inputState?: AgentState): Promise<AgentState> {
     const state = inputState || this.state;
     let userMessage: string;
     
     // Build plan context if available
-    const planContext = this.taskContext.currentPlanStep 
-      ? `\n\nPlan Context:\n- Step: ${this.taskContext.currentPlanStep.reasoning}\n- Expected Outcome: ${this.taskContext.currentPlanStep.expectedOutcome}`
+    const planContext = this.taskContext.currentPlanStep?.guidance
+      ? `\n\nPlan Guidance: ${this.taskContext.currentPlanStep.guidance}`
       : '';
+
+    // Recall past lessons
+    const lessons = await this.recallLessons();
+    if (lessons) {
+      logger.info(`[AgentSummarize] Recalled ${lessons.split("\n").length} lines of past lessons`);
+    }
 
     if (state.mode === MODE.ISSUE && state.issue) {
       logger.info(`[AgentSummarize] Summarizing issue #${state.issue.number} pipeline results`);
@@ -81,7 +68,7 @@ Test Results:
 ${state.testResult ? formatTestReport(state.testResult) : "(no results)"}
 
 Report:
-${state.report ?? "(no report)"}${planContext}`;
+${state.report ?? "(no report)"}${planContext}${lessons ? `\n\nPast lessons:\n${lessons}` : ''}`;
     } else if (state.mode === MODE.COMMIT && state.commitDiff) {
       const shortSha = state.commitDiff.sha.slice(0, 7);
       logger.info(`[AgentSummarize] Summarizing commit ${shortSha} pipeline results`);
@@ -103,7 +90,7 @@ Test Results:
 ${state.testResult ? formatTestReport(state.testResult) : "(no results)"}
 
 Report:
-${state.report ?? "(no report)"}${planContext}`;
+${state.report ?? "(no report)"}${planContext}${lessons ? `\n\nPast lessons:\n${lessons}` : ''}`;
     } else {
       logger.warn(`[AgentSummarize] No mode/issue/commit to summarize, skipping`);
       this.updateStatus(AGENT_STATUS.COMPLETED);
@@ -120,6 +107,14 @@ ${state.report ?? "(no report)"}${planContext}`;
     }
 
     state.summary = output;
+    
+    // Self-reflect on summary quality
+    const reflection = await this.reflect(output);
+    this.recordReflection(reflection, state);
+
+    if (reflection.shouldRevise) {
+      logger.warn(`[AgentSummarize] Reflection suggests revision (score: ${reflection.score}): ${reflection.weaknesses.join(", ")}`);
+    }
     
     // Log the generated summary
     logger.info(`[AgentSummarize] Summary generated (${output.length} chars):`);

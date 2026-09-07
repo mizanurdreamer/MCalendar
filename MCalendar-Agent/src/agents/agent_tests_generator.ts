@@ -1,4 +1,4 @@
-import type { AgentState, PlanStep } from "../core/state.js";
+import type { AgentState } from "../core/state.js";
 import { BaseAgent } from "../core/base_agent.js";
 import { GitBranch } from "../github/git_operations.js";
 import { logger } from "../utils/logger.js";
@@ -6,7 +6,7 @@ import * as path from "node:path";
 import * as fs from "node:fs";
 import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers/registry.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
-import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL, MESSAGE_TYPE, AGENT_EVENT, CORE_AGENT_NAMES } from "../utils/constants.js";
+import { AGENT_STATUS, PIPELINE_STATUS, MODE, MESSAGE_TYPE, AGENT_EVENT, CORE_AGENT_NAMES } from "../utils/constants.js";
 import { getToolRegistry } from "../core/tool_registry.js";
 import type { ToolDefinition } from "../providers/types.js";
 
@@ -106,58 +106,9 @@ You MUST use the write_test_file and append_test_file tools to save your test.`;
     return "Generate Playwright tests";
   }
 
-  getDefaultPlan(): import("../core/state.js").AgentPlan {
-    const steps: PlanStep[] = [
-      {
-        id: "discover_context",
-        tool: "read_file",
-        args: { path: "package.json" },
-        expectedOutcome: "Understand project dependencies and structure",
-        reasoning: "Need project context before generating tests",
-      },
-    ];
-
-    let testFilename = "test.spec.ts";
-    if (this.state.mode === MODE.ISSUE && this.state.issue) {
-      testFilename = `issue-${this.state.issue.number}-${GitBranch.slugify(this.state.issue.title)}.spec.ts`;
-    } else if (this.state.mode === MODE.COMMIT && this.state.commitDiff) {
-      testFilename = `commit-${this.state.commitDiff.sha.slice(0, 7)}.spec.ts`;
-    }
-
-    if (this.state.mode === MODE.ISSUE && this.state.issueAnalysis) {
-      steps.push({
-        id: "generate_tests",
-        tool: "write_test_file",
-        args: { filename: testFilename, content: "" } as Record<string, unknown>,
-        expectedOutcome: "Complete test file with all scenarios",
-        reasoning: "Generate tests based on issue analysis scenarios",
-      });
-    } else if (this.state.mode === MODE.COMMIT && this.state.commitDiff) {
-      steps.push({
-        id: "generate_tests",
-        tool: "write_test_file",
-        args: { filename: testFilename, content: "" } as Record<string, unknown>,
-        expectedOutcome: "Complete test file for commit changes",
-        reasoning: "Generate tests based on commit analysis scope",
-      });
-    }
-
-    return {
-      agent: AGENT_NAMES.AGENT_TESTS_GENERATOR,
-      goal: this.getGoal(),
-      steps,
-      estimatedIterations: 3,
-      riskLevel: RISK_LEVEL.MEDIUM,
-      createdAt: Date.now(),
-    };
-  }
-
   async run(inputState?: AgentState): Promise<AgentState> {
     const state = inputState || this.state;
     
-    // Initialize communication with other agents
-    this.initCommunication([AGENT_NAMES.AGENT_ISSUE_ANALYZER, AGENT_NAMES.AGENT_TESTS_REVIEWER]);
-
     // Recall past lessons and test patterns
     const lessons = await this.recallLessons();
     const testPatterns = await this.recallTestPatterns();
@@ -169,6 +120,18 @@ You MUST use the write_test_file and append_test_file tools to save your test.`;
     const reviewerFeedback = this.getLatestMessage(AGENT_NAMES.AGENT_TESTS_REVIEWER, MESSAGE_TYPE.FEEDBACK);
     if (reviewerFeedback) {
       logger.info(`[AgentTestsGenerator] Received feedback from reviewer`);
+    }
+
+    // Check for analysis from IssueAnalyzer
+    const issueFeedback = this.getLatestMessage(AGENT_NAMES.AGENT_ISSUE_ANALYZER, MESSAGE_TYPE.FEEDBACK);
+    let issueContextFromMessage = "";
+    if (issueFeedback?.payload) {
+      const p = issueFeedback.payload as any;
+      issueContextFromMessage = `\nIssue Analysis (from analyzer):
+- Summary: ${p.summary ?? "N/A"}
+- Edge Cases: ${JSON.stringify(p.edgeCases ?? [])}
+- Role Checks: ${JSON.stringify(p.roleChecks ?? [])}
+- Relevant Files: ${JSON.stringify(p.relevantFiles ?? [])}`;
     }
 
     let testFilename: string;
@@ -212,8 +175,8 @@ You MUST use the write_test_file and append_test_file tools to save your test.`;
     let userMessage: string;
     
     // Build plan context if available
-    const planContext = this.taskContext.currentPlanStep 
-      ? `\n\nPlan Context:\n- Step: ${this.taskContext.currentPlanStep.reasoning}\n- Expected Outcome: ${this.taskContext.currentPlanStep.expectedOutcome}`
+    const planContext = this.taskContext.currentPlanStep?.guidance
+      ? `\n\nPlan Guidance: ${this.taskContext.currentPlanStep.guidance}`
       : '';
     
     if (state.mode === MODE.ISSUE && state.issue && state.issueAnalysis) {
@@ -229,6 +192,7 @@ ${state.issue.body ?? ""}
 TEST SCENARIOS (write one test case per scenario):
 ${scenarios || "(no scenarios — generate based on the issue)"}
 
+${issueContextFromMessage}
 ${lessons ? `\n${lessons}\n` : ""}
 ${testPatterns ? `\n${testPatterns}\n` : ""}
 Use read_file/list_directory to explore source files as needed.
@@ -305,6 +269,16 @@ Use the write_test_file tool to save the test as "${testFilename}".${planContext
 
       this.recordStep("generate_tests", `Generated ${testFilename}`, "next");
 
+      // Send context to Reviewer
+      this.sendMessage(AGENT_NAMES.AGENT_TESTS_REVIEWER, MESSAGE_TYPE.FEEDBACK, {
+        event: "tests_generated",
+        filename: testFilename,
+        scenarioCount: state.issueAnalysis?.test_scenarios?.length ?? state.commitAnalysis?.scope ? 1 : 0,
+        scenarios: state.issueAnalysis?.test_scenarios?.map(s => s.name) ?? [],
+        edgeCases: state.issueAnalysis?.edge_cases ?? [],
+        testContentLength: state.testContent?.length ?? 0,
+      });
+
       // Self-reflect on the generated tests
       if (state.testContent) {
         const reflection = await this.reflect(state.testContent);
@@ -312,6 +286,24 @@ Use the write_test_file tool to save the test as "${testFilename}".${planContext
 
         if (reflection.shouldRevise) {
           logger.warn(`[AgentTestsGenerator] Reflection suggests revision (score: ${reflection.score}): ${reflection.weaknesses.join(", ")}`);
+          
+          // Self-correct the test content
+          const corrected = await this.selfCorrect(
+            reflection,
+            state.testContent,
+            `Improve the following Playwright test file. Address these weaknesses: ${reflection.weaknesses.join("; ")}\n\nCurrent test:\n${state.testContent}`
+          );
+          
+          if (corrected !== state.testContent && testFilename) {
+            // Write corrected content to file
+            const { writeFileSync, mkdirSync, existsSync } = await import("node:fs");
+            const { dirname } = await import("node:path");
+            const testPath = `${this.state.testOutputPath}/${testFilename}`;
+            if (!existsSync(dirname(testPath))) mkdirSync(dirname(testPath), { recursive: true });
+            writeFileSync(testPath, corrected, "utf-8");
+            state.testContent = corrected;
+            logger.info(`[AgentTestsGenerator] Self-correction applied and written to ${testFilename}`);
+          }
         }
       }
 

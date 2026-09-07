@@ -76,10 +76,9 @@ START -> SUPERVISOR -> (routes to agent) -> agent runs -> back to SUPERVISOR
 
 ### 4. Supervisor Decision (`src/core/supervisor.ts`)
 
-1. Follows master plan from `AdvancedPlanner` if available
-2. Falls back to hardcoded routing rules
-3. Checks replan triggers (low scores, repeated errors, stuck pipeline)
-4. Returns `RoutingDecision`: route, parallel, wait, complete, fail, replan, request_approval
+1. Always uses hardcoded routing rules
+2. Checks replan triggers (low scores, repeated errors, stuck pipeline)
+3. Returns `RoutingDecision`: route, parallel, wait, complete, fail, replan, request_approval
 
 ### 5. Agent Execution (`src/core/base_agent.ts`)
 
@@ -129,7 +128,7 @@ PlaywrightRunner.run(filename, signal)
 | supervisor.ts | Routing engine. Decides which agent runs next. |
 | base_agent.ts | Base class for all agents. Provides tool loop, reflection, memory, messaging. |
 | state.ts | Defines AgentState and all shared types. |
-| planner.ts | LLM-powered execution plan generator. |
+| planner.ts | LLM-powered execution plan advisor. Generates plan with steps, skip conditions, and per-agent guidance. Controls which agents can be skipped. |
 
 | memory.ts | In-memory + PostgreSQL memory store for cross-run learning. |
 | postgres_memory.ts | PostgreSQL memory implementation with full-text search. |

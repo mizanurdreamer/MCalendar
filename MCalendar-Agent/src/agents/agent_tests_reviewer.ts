@@ -3,7 +3,7 @@ import { BaseAgent } from "../core/base_agent.js";
 import { logger } from "../utils/logger.js";
 import { getTaskProvider, getTaskProviderName, getTaskModel } from "../providers/registry.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
-import { AGENT_STATUS, PIPELINE_STATUS, MODE, RISK_LEVEL, MESSAGE_TYPE, AGENT_EVENT, CORE_AGENT_NAMES } from "../utils/constants.js";
+import { AGENT_STATUS, PIPELINE_STATUS, MODE, MESSAGE_TYPE, AGENT_EVENT, CORE_AGENT_NAMES } from "../utils/constants.js";
 import { getToolRegistry } from "../core/tool_registry.js";
 import { callMcpTool, isMcpAlive } from "../mcp/client.js";
 import type { ToolDefinition } from "../providers/types.js";
@@ -71,33 +71,6 @@ Use all available tools to debug and fix tests. Return the fixed test file conte
     return `Fix failing tests for ${this.state.testFilename} (attempt ${this.state.retries + 1}/${this.state.testReviewMaxRetries})`;
   }
 
-  getDefaultPlan(): import("../core/state.js").AgentPlan {
-    return {
-      agent: AGENT_NAMES.AGENT_TESTS_REVIEWER,
-      goal: this.getGoal(),
-      steps: [
-        {
-          id: "analyze_errors",
-          tool: "analyze_test_error",
-          args: {},
-          expectedOutcome: "Root cause analysis of test failures",
-          reasoning: "Understand why tests are failing before fixing",
-        },
-        {
-          id: "fix_tests",
-          tool: "write_test_file",
-          args: { filename: this.state.testFilename || "test.spec.ts", content: "" },
-          expectedOutcome: "Fixed test file that passes",
-          reasoning: "Apply fixes based on error analysis",
-          dependsOn: ["analyze_errors"],
-        },
-      ],
-      estimatedIterations: 2,
-      riskLevel: RISK_LEVEL.MEDIUM,
-      createdAt: Date.now(),
-    };
-  }
-
   async run(inputState?: AgentState): Promise<AgentState> {
     const state = inputState || this.state;
     const testFilename = state.testFilename;
@@ -123,6 +96,24 @@ Use all available tools to debug and fix tests. Return the fixed test file conte
       logger.info(`[AgentTestsReviewer] Recalled past error fixes and lessons`);
     }
 
+    // Read Generator context
+    const generatorContext = this.getLatestMessage(AGENT_NAMES.AGENT_TESTS_GENERATOR, MESSAGE_TYPE.FEEDBACK);
+    let generatorContextText = "";
+    if (generatorContext?.payload) {
+      const p = generatorContext.payload as any;
+      logger.info(`[AgentTestsReviewer] Generator context: ${p.scenarioCount} scenarios, ${p.testContentLength} chars`);
+      generatorContextText = `\nGenerator context: ${p.scenarioCount} scenarios (${(p.scenarios as string[])?.join(", ")}), ${p.edgeCases?.length ?? 0} edge cases`;
+    }
+
+    // Read CodeFixer context (if this is a re-review after source fix)
+    const codeFixContext = this.getLatestMessage(AGENT_NAMES.AGENT_CODE_FIXER, MESSAGE_TYPE.FEEDBACK);
+    let codeFixContextText = "";
+    if (codeFixContext?.payload) {
+      const p = codeFixContext.payload as any;
+      logger.info(`[AgentTestsReviewer] CodeFixer feedback: ${p.fixCount} files fixed`);
+      codeFixContextText = `\nCodeFixer context: ${p.fixCount} source file(s) fixed: ${(p.filesFixed as any[])?.map((f: any) => f.file).join(", ")}`;
+    }
+
     const testContent = state.testContent || "";
     
     logger.info(`[AgentTestsReviewer] Starting review for ${testFilename} (attempt ${state.retries + 1})`);
@@ -135,7 +126,7 @@ Use all available tools to debug and fix tests. Return the fixed test file conte
     }
 
     try {
-      const analysis = await this.runErrorAnalysis(testContent, errorFixes, lessons);
+      const analysis = await this.runErrorAnalysis(testContent, errorFixes, lessons, generatorContextText, codeFixContextText);
 
       state.retryHistory.push({
         attempt: state.retries,
@@ -261,6 +252,17 @@ Use all available tools to debug and fix tests. Return the fixed test file conte
 
       if (reflection.shouldRevise) {
         logger.warn(`[AgentTestsReviewer] Reflection suggests revision (score: ${reflection.score}): ${reflection.weaknesses.join(", ")}`);
+        
+        // Self-correct the fix analysis
+        const corrected = await this.selfCorrect(
+          reflection,
+          reflectionOutput,
+          `Improve the test fix. Address these weaknesses: ${reflection.weaknesses.join("; ")}\n\nCurrent fix status:\n${reflectionOutput}\n\nTest content:\n${state.testContent ?? "(not available)"}`
+        );
+        
+        if (corrected !== reflectionOutput) {
+          logger.info(`[AgentTestsReviewer] Self-correction applied to fix analysis`);
+        }
       }
 
       this.updateStatus(AGENT_STATUS.COMPLETED);
@@ -394,7 +396,7 @@ Use all available tools to debug and fix tests. Return the fixed test file conte
     return sourceInfo.join("\n\n");
   }
 
-  private async runErrorAnalysis(testContent: string, errorFixes?: string, lessons?: string): Promise<string> {
+  private async runErrorAnalysis(testContent: string, errorFixes?: string, lessons?: string, generatorContext?: string, codeFixContext?: string): Promise<string> {
     const testFilename = this.state.testFilename;
     const testResult = this.state.testResult;
     
@@ -455,7 +457,9 @@ ${mcpDebugInfo ? `Live App Debug Info:\n${mcpDebugInfo}\n` : ""}
 ${sourceFileInfo ? `Source Files Context:\n${sourceFileInfo}\n` : ""}
 ${errorFixes ? `\nPrevious fix attempts:\n${errorFixes}\n` : ""}
 ${lessons ? `\nPast lessons:\n${lessons}\n` : ""}
-${this.taskContext.currentPlanStep ? `\nPlan Context:\n- Step: ${this.taskContext.currentPlanStep.reasoning}\n- Expected Outcome: ${this.taskContext.currentPlanStep.expectedOutcome}\n` : ""}
+${generatorContext ? `\nFrom Generator:${generatorContext}\n` : ""}
+${codeFixContext ? `\nFrom CodeFixer:${codeFixContext}\n` : ""}
+${this.taskContext.currentPlanStep?.guidance ? `\nPlan Guidance: ${this.taskContext.currentPlanStep.guidance}\n` : ""}
 Use tools to investigate the root cause, then call submit_analysis with your fix plan.`;
 
     const submitAnalysisTool: ToolDefinition = {
