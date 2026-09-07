@@ -113,29 +113,28 @@ export class Supervisor {
     const plan = this.state.plan;
     if (!plan || !plan.steps || plan.steps.length === 0) return null;
 
-    const idx = this.state.planStepIndex ?? 0;
-    if (idx >= plan.steps.length) return null;
+    let idx = this.state.planStepIndex ?? 0;
 
-    const step = plan.steps[idx];
+    while (idx < plan.steps.length) {
+      const step = plan.steps[idx];
 
-    // Evaluate skip condition
-    if (step.skip) {
-      // Guardrails: never skip critical agents
-      if (this.isCriticalAgent(step.agent, this.state)) {
-        logger.warn(`[Supervisor] Plan wants to skip ${step.agent} but it's critical — running anyway`);
-        this.state.planStepIndex = idx + 1;
-        return { action: ROUTING_ACTION.ROUTE, nextAgent: step.agent, reason: `Critical agent, ignoring skip: ${step.skip}` };
+      if (step.skip) {
+        if (this.isCriticalAgent(step.agent, this.state)) {
+          logger.warn(`[Supervisor] Plan wants to skip ${step.agent} but it's critical — running anyway`);
+          this.state.planStepIndex = idx + 1;
+          return { action: ROUTING_ACTION.ROUTE, nextAgent: step.agent, reason: `Critical agent, ignoring skip: ${step.skip}` };
+        }
+
+        logger.info(`[Supervisor] Skipping ${step.agent}: ${step.skip}`);
+        idx++;
+        continue;
       }
 
-      // Skip the agent
-      logger.info(`[Supervisor] Skipping ${step.agent}: ${step.skip}`);
       this.state.planStepIndex = idx + 1;
-      return this.followPlan();
+      return { action: ROUTING_ACTION.ROUTE, nextAgent: step.agent, reason: step.guidance || `Following plan` };
     }
 
-    // Don't skip — route to agent
-    this.state.planStepIndex = idx + 1;
-    return { action: ROUTING_ACTION.ROUTE, nextAgent: step.agent, reason: step.guidance || `Following plan` };
+    return null;
   }
 
   private isCriticalAgent(agent: AgentName, state: AgentState): boolean {
@@ -202,16 +201,11 @@ export class Supervisor {
       }
       // Target source code issues -> code fixer
       if (s.targetCodeIssues && s.targetCodeIssues.length > 0 && (s.codeFixRetries ?? 0) < (s.maxCodeFixRetries ?? 2)) {
-        s.codeFixRetries = (s.codeFixRetries ?? 0) + 1;
-        logger.info(`[Supervisor] Code fix ${s.codeFixRetries}/${s.maxCodeFixRetries}: routing to code fixer for target source`);
-        return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_CODE_FIXER, reason: `Fixing target source code (${s.codeFixRetries}/${s.maxCodeFixRetries})` };
+        return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_CODE_FIXER, reason: `Fixing target source code (${(s.codeFixRetries ?? 0) + 1}/${s.maxCodeFixRetries})` };
       }
       // Test-scope retry
       if ((s.retries ?? 0) < (s.testReviewMaxRetries ?? 3)) {
-        s.retries = (s.retries ?? 0) + 1;
-        metrics.recordRetry();
-        logger.info(`[Supervisor] Retry ${s.retries}/${s.testReviewMaxRetries}: routing back to generator with fixes`);
-        return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_GENERATOR, reason: `Tests failed, retry ${s.retries}/${s.testReviewMaxRetries}` };
+        return { action: ROUTING_ACTION.ROUTE, nextAgent: AGENT_NAMES.AGENT_TESTS_GENERATOR, reason: `Tests failed, retry ${(s.retries ?? 0) + 1}/${s.testReviewMaxRetries}` };
       }
       return { action: ROUTING_ACTION.FAIL, reason: `Tests failed after ${s.testReviewMaxRetries} retries` };
     }
@@ -247,6 +241,15 @@ export class Supervisor {
   async executeDecision(decision: RoutingDecision): Promise<AgentState> {
     switch (decision.action) {
       case ROUTING_ACTION.ROUTE:
+        if (decision.nextAgent === AGENT_NAMES.AGENT_CODE_FIXER) {
+          this.state.codeFixRetries = (this.state.codeFixRetries ?? 0) + 1;
+          logger.info(`[Supervisor] Code fix ${this.state.codeFixRetries}/${this.state.maxCodeFixRetries}`);
+        }
+        if (decision.nextAgent === AGENT_NAMES.AGENT_TESTS_GENERATOR && this.state.testResult && !this.state.testResult.success) {
+          this.state.retries = (this.state.retries ?? 0) + 1;
+          metrics.recordRetry();
+          logger.info(`[Supervisor] Retry ${this.state.retries}/${this.state.testReviewMaxRetries}`);
+        }
         return this.routeAgent(decision.nextAgent);
 
       case ROUTING_ACTION.PARALLEL:
