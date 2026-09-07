@@ -46,7 +46,7 @@ export class PostgresMemoryStore implements MemoryStore {
       connectionString: url,
       max: 5,
       idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000,
+      connectionTimeoutMillis: 50000,
     });
   }
 
@@ -78,22 +78,29 @@ export class PostgresMemoryStore implements MemoryStore {
         access_count = agent_memories.access_count
     `;
 
-    try {
-      await this.pool.query(sql, [
-        entry.id,
-        entry.type,
-        entry.content,
-        entry.metadata.project,
-        entry.metadata.agent,
-        entry.metadata.success,
-        JSON.stringify(entry.metadata.tags),
-        entry.metadata.timestamp,
-        entry.metadata.relatedIssue ?? null,
-        entry.metadata.relatedCommit ?? null,
-        entry.metadata.source ?? null,
-      ]);
-    } catch (err) {
-      logger.warn(`[PostgresMemory] Store failed: ${err}`);
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await this.pool.query(sql, [
+          entry.id,
+          entry.type,
+          entry.content,
+          entry.metadata.project,
+          entry.metadata.agent,
+          entry.metadata.success,
+          JSON.stringify(entry.metadata.tags),
+          entry.metadata.timestamp,
+          entry.metadata.relatedIssue ?? null,
+          entry.metadata.relatedCommit ?? null,
+          entry.metadata.source ?? null,
+        ]);
+        return;
+      } catch (err) {
+        if (attempt === 3) {
+          logger.warn(`[PostgresMemory] Store failed after 3 attempts: ${err}`);
+        } else {
+          await new Promise(r => setTimeout(r, 500 * attempt));
+        }
+      }
     }
   }
 
