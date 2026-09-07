@@ -10,7 +10,7 @@ export interface PlannerConfig {
   allowParallel: boolean;
 }
 
-export interface CriticFeedback {
+export interface ExecutionFeedback {
   agent: AgentName;
   score: number;
   weaknesses: string[];
@@ -116,7 +116,7 @@ export class AdvancedPlanner {
   async generateRevisedPlan(
     goal: string, 
     availableAgents: AgentName[], 
-    executionFeedback: CriticFeedback[],
+    executionFeedback: ExecutionFeedback[],
     failedAgent?: AgentName
   ): Promise<AgentPlan> {
     if (!this.config.enabled) {
@@ -153,7 +153,7 @@ export class AdvancedPlanner {
     return this.getDefaultPlan(goal);
   }
 
-  private formatExecutionFeedback(feedback: CriticFeedback[], failedAgent?: AgentName): string {
+  private formatExecutionFeedback(feedback: ExecutionFeedback[], failedAgent?: AgentName): string {
     if (feedback.length === 0) return "No execution feedback available.";
     
     let summary = "EXECUTION FEEDBACK FROM PREVIOUS RUN:\n\n";
@@ -360,7 +360,7 @@ Rules:
         { id: "generate", agent: AGENT_NAMES.AGENT_TESTS_GENERATOR, tool: "write_test_file", args: {}, expectedOutcome: "Test file", reasoning: "Generate tests", dependsOn: ["analyze"], canRunParallel: false },
         { id: "run_tests", agent: GRAPH_NODE.RUN_TESTS as any, tool: "run_playwright_test", args: {}, expectedOutcome: "Test results", reasoning: "Execute generated tests", dependsOn: ["generate"], canRunParallel: false },
         { id: "review", agent: AGENT_NAMES.AGENT_TESTS_REVIEWER, tool: "write_test_file", args: {}, expectedOutcome: "Fixed tests", reasoning: "Review and fix", dependsOn: ["run_tests"], canRunParallel: false },
-        { id: "report", agent: AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, tool: "generate_report", args: {}, expectedOutcome: "Report", reasoning: "Generate report", dependsOn: ["review"], canRunParallel: true },
+        { id: "report", agent: AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, tool: "generate_report", args: {}, expectedOutcome: "Report", reasoning: "Generate report", dependsOn: ["review"], canRunParallel: false },
         { id: "summarize", agent: AGENT_NAMES.AGENT_SUMMARIZE, tool: "generate_summary", args: {}, expectedOutcome: "Summary", reasoning: "Create summary", dependsOn: ["report"], canRunParallel: false }
       );
     } else {
@@ -369,7 +369,7 @@ Rules:
         { id: "generate", agent: AGENT_NAMES.AGENT_TESTS_GENERATOR, tool: "write_test_file", args: {}, expectedOutcome: "Test file", reasoning: "Generate tests", dependsOn: ["analyze"], canRunParallel: false },
         { id: "run_tests", agent: GRAPH_NODE.RUN_TESTS as any, tool: "run_playwright_test", args: {}, expectedOutcome: "Test results", reasoning: "Execute generated tests", dependsOn: ["generate"], canRunParallel: false },
         { id: "review", agent: AGENT_NAMES.AGENT_TESTS_REVIEWER, tool: "write_test_file", args: {}, expectedOutcome: "Fixed tests", reasoning: "Review and fix", dependsOn: ["run_tests"], canRunParallel: false },
-        { id: "report", agent: AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, tool: "generate_report", args: {}, expectedOutcome: "Report", reasoning: "Generate report", dependsOn: ["review"], canRunParallel: true },
+        { id: "report", agent: AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR, tool: "generate_report", args: {}, expectedOutcome: "Report", reasoning: "Generate report", dependsOn: ["review"], canRunParallel: false },
         { id: "summarize", agent: AGENT_NAMES.AGENT_SUMMARIZE, tool: "generate_summary", args: {}, expectedOutcome: "Summary", reasoning: "Create summary", dependsOn: ["report"], canRunParallel: false }
       );
     }
@@ -381,7 +381,7 @@ Rules:
       estimatedIterations: steps.length,
       riskLevel: RISK_LEVEL.MEDIUM,
       createdAt: Date.now(),
-      parallelGroups: [["report", "summarize"]],
+      parallelGroups: [],
     };
   }
 }

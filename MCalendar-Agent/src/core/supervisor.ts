@@ -4,7 +4,7 @@ import { logger } from "../utils/logger.js";
 import { metrics } from "./metrics.js";
 import { AGENT_NAMES } from "../utils/agent_names.js";
 import { agentEvents } from "./agent_events.js";
-import { CORE_AGENT_NAMES, GRAPH_NODE, ROUTING_ACTION, PIPELINE_STATUS, MODE } from "../utils/constants.js";
+import { CORE_AGENT_NAMES, GRAPH_NODE, ROUTING_ACTION, PIPELINE_STATUS, MODE, AGENT_STATUS } from "../utils/constants.js";
 
 export type RoutingDecision = 
   | { action: typeof ROUTING_ACTION.ROUTE; nextAgent: AgentName; reason: string; planStep?: PlanStep }
@@ -51,6 +51,15 @@ export class Supervisor {
     if (this.state.status === PIPELINE_STATUS.FAILED) {
       // Trigger replanning on failure
       return { action: ROUTING_ACTION.REPLAN, reason: `Agent failed: ${this.state.error || "Unknown failure"}` };
+    }
+
+    // Check if the current agent soft-failed (set agentStatus to FAILED without throwing)
+    if (currentAgent && currentAgent !== CORE_AGENT_NAMES.SUPERVISOR) {
+      const agentStatus = this.state.agentStatus?.[currentAgent];
+      if (agentStatus === AGENT_STATUS.FAILED) {
+        logger.warn(`[Supervisor] Agent ${currentAgent} soft-failed, triggering replan`);
+        return { action: ROUTING_ACTION.REPLAN, reason: `Agent ${currentAgent} failed: ${this.state.error || "Unknown failure"}` };
+      }
     }
 
     // Check for replanning triggers based on reflection quality
@@ -108,10 +117,17 @@ export class Supervisor {
     // First, check if we have a master plan to follow
     const masterPlan = this.state.plans?.planner;
     if (masterPlan && masterPlan.steps.length > 0) {
-      return this.followMasterPlan(masterPlan);
+      const planDecision = this.followMasterPlan(masterPlan);
+      // Validate the plan decision against guardrails
+      const validatedDecision = this.validatePlanDecision(planDecision);
+      if (validatedDecision) {
+        return validatedDecision;
+      }
+      // If validation fails, fall through to hardcoded routing
+      logger.warn(`[Supervisor] Plan decision failed validation, falling back to hardcoded routing`);
     }
 
-    // Fallback to hardcoded routing if no plan
+    // Fallback to hardcoded routing if no plan or plan validation failed
     const { mode, currentAgent, agentStatus, issueAnalysis, commitAnalysis, testResult, retries, testReviewMaxRetries: maxRetries, targetCodeIssues, codeFixRetries, maxCodeFixRetries } = this.state;
 
     if (mode === MODE.ISSUE) {
@@ -119,6 +135,49 @@ export class Supervisor {
     } else {
       return this.routeCommitMode(currentAgent, agentStatus, commitAnalysis, testResult, retries, maxRetries, targetCodeIssues, codeFixRetries, maxCodeFixRetries);
     }
+  }
+
+  /**
+   * Validate a plan decision against critical guardrails.
+   * Returns the decision if valid, or null if hardcoded routing should take over.
+   */
+  private validatePlanDecision(decision: RoutingDecision): RoutingDecision | null {
+    // Only validate ROUTE decisions — COMPLETE, FAIL, REPLAN are always valid
+    if (decision.action !== ROUTING_ACTION.ROUTE) {
+      return decision;
+    }
+
+    const nextAgent = decision.nextAgent;
+    const { testResult, retries, testReviewMaxRetries: maxRetries, targetCodeIssues, codeFixRetries, maxCodeFixRetries } = this.state;
+
+    // Guardrail 1: If tests just passed, skip review and go to report/summarize
+    if (testResult?.success && (nextAgent === AGENT_NAMES.AGENT_TESTS_REVIEWER || nextAgent === AGENT_NAMES.AGENT_CODE_FIXER)) {
+      logger.warn(`[Supervisor] Plan wants ${nextAgent} but tests passed — skipping to report`);
+      return null; // Let hardcoded routing handle this
+    }
+
+    // Guardrail 2: If max retries reached, don't route back to tests_generator
+    if (nextAgent === AGENT_NAMES.AGENT_TESTS_GENERATOR && retries >= maxRetries) {
+      logger.warn(`[Supervisor] Plan wants tests_generator but max retries (${maxRetries}) reached`);
+      return null;
+    }
+
+    // Guardrail 3: If target code issues exist, route to code_fixer first
+    if (targetCodeIssues && targetCodeIssues.length > 0 && codeFixRetries < maxCodeFixRetries) {
+      if (nextAgent !== AGENT_NAMES.AGENT_CODE_FIXER && (nextAgent as string) !== GRAPH_NODE.RUN_TESTS) {
+        logger.warn(`[Supervisor] Plan wants ${nextAgent} but target code issues exist — routing to code_fixer`);
+        return null;
+      }
+    }
+
+    // Guardrail 4: If no test result yet, don't route to report/summarize
+    if (!testResult && (nextAgent === AGENT_NAMES.AGENT_TESTS_REPORT_GENERATOR || nextAgent === AGENT_NAMES.AGENT_SUMMARIZE)) {
+      logger.warn(`[Supervisor] Plan wants ${nextAgent} but no test result yet`);
+      return null;
+    }
+
+    // Decision passed all guardrails
+    return decision;
   }
 
   private followMasterPlan(masterPlan: AgentPlan): RoutingDecision {

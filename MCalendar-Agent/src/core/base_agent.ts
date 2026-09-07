@@ -50,7 +50,7 @@ export abstract class BaseAgent {
   }
 
   protected async reflect(output: string): Promise<ReflectionResult> {
-    const criticPrompt = `You are a critic evaluating the output of the ${this.agentName} agent.
+    const evaluationPrompt = `You are an evaluator assessing the output of the ${this.agentName} agent.
 
 Agent Goal: ${this.getGoal()}
 Agent Output: ${output.slice(0, 5000)}
@@ -76,8 +76,8 @@ Return ONLY valid JSON:
     
     try {
       const response = await this.taskContext.provider.chat({
-        system: "You are a harsh but fair critic. Output ONLY valid JSON.",
-        messages: [{ role: "user", content: criticPrompt }],
+        system: "You are a harsh but fair evaluator. Output ONLY valid JSON.",
+        messages: [{ role: "user", content: evaluationPrompt }],
         maxTokens: 2048,
         temperature: 0.1,
         promptCaching,

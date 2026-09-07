@@ -107,12 +107,6 @@ Read the source files using read_file, fix the bugs, and use write_source_file t
       this.recordStep("fix_source", `Fixed ${targetIssues.length} source file(s)`, "next");
       this.updateStatus(AGENT_STATUS.COMPLETED);
 
-      this.sendMessage(CORE_AGENT_NAMES.SUPERVISOR, MESSAGE_TYPE.NOTIFICATION, {
-        event: AGENT_EVENT.CODE_FIXED,
-        filename: state.testFilename,
-        filesFixed: targetIssues.length,
-      });
-
       state.targetCodeIssues = [];
     } catch (err) {
       logger.error(`[AgentCodeFixer] Code fix failed: ${err}`);

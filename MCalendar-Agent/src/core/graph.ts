@@ -3,7 +3,7 @@ import type { AgentState, AgentName, AgentPlan, ReflectionResult } from "./state
 import { Supervisor } from "./supervisor.js";
 import { BaseAgent } from "./base_agent.js";
 import { metrics } from "./metrics.js";
-import { AdvancedPlanner, type CriticFeedback } from "./planner.js";
+import { AdvancedPlanner, type ExecutionFeedback } from "./planner.js";
 import { createMemoryStore, type MemoryStore } from "./memory.js";
 import { MessageBus } from "./message_bus.js";
 import { logger } from "../utils/logger.js";
@@ -169,9 +169,10 @@ export class AgenticGraph {
       };
     }
 
-    // If pipeline already completed or failed, stop the graph
-    if (state.status === PIPELINE_STATUS.COMPLETED || state.status === PIPELINE_STATUS.FAILED) {
-      logger.info(`[AgenticGraph] Pipeline ${state.status}, stopping`);
+    // If pipeline already completed, stop the graph
+    // Note: FAILED status is NOT short-circuited here — it reaches route() for potential replanning
+    if (state.status === PIPELINE_STATUS.COMPLETED) {
+      logger.info(`[AgenticGraph] Pipeline completed, stopping`);
       return { currentAgent: END as AgentName };
     }
 
@@ -223,7 +224,7 @@ export class AgenticGraph {
       }
       
       // Handle replan action
-      if (decision.action === "replan") {
+      if (decision.action === ROUTING_ACTION.REPLAN) {
         return this.handleReplan(state, decision);
       }
       
@@ -249,12 +250,12 @@ export class AgenticGraph {
     this.replanCounter++;
     
     // Collect feedback from reflection history for replanning
-    const criticFeedback: CriticFeedback[] = [];
+    const executionFeedback: ExecutionFeedback[] = [];
     
     for (const [agentName, reflections] of Object.entries(state.reflectionHistory)) {
       const latestReflection = reflections[reflections.length - 1];
       if (latestReflection) {
-        criticFeedback.push({
+        executionFeedback.push({
           agent: agentName as AgentName,
           score: latestReflection.score,
           weaknesses: latestReflection.weaknesses,
@@ -277,7 +278,7 @@ export class AgenticGraph {
     const revisedPlan = await this.planner.generateRevisedPlan(
       goal,
       availableAgents,
-      criticFeedback,
+      executionFeedback,
       failedAgent
     );
     
